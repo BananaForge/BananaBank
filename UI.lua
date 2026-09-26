@@ -1,0 +1,1082 @@
+-- BananaBank UI Teil 1: Stil, Hauptfenster, Bestand, Export, Danke-Fenster, Minimap
+
+local BB = BananaBank
+local T = function(k) return BB.T(k) end
+local getn = table.getn
+local floor = math.floor
+
+BB.UI = { loc = {}, tabs = {}, pages = {} }
+local UI = BB.UI
+
+local MEDIA = "Interface\\AddOns\\BananaBank\\Media\\"
+local FONT = "Fonts\\FRIZQT__.TTF"
+local FONT_TITLE = "Fonts\\MORPHEUS.TTF"
+local WHITE = "Interface\\ChatFrame\\ChatFrameBackground"
+
+UI.MEDIA, UI.FONT, UI.FONT_TITLE, UI.WHITE = MEDIA, FONT, FONT_TITLE, WHITE
+
+-- Farben passend zum Logo: Nachtblau, Messing, Bananengold
+UI.C = {
+  gold = { 1.00, 0.82, 0.26 },
+  goldDim = { 0.78, 0.60, 0.22 },
+  brass = { 0.55, 0.40, 0.16 },
+  text = { 0.92, 0.90, 0.84 },
+  muted = { 0.60, 0.62, 0.70 },
+  bg = { 0.03, 0.045, 0.09 },
+  panel = { 0.055, 0.08, 0.16 },
+  blue = { 0.08, 0.16, 0.36 },
+  green = { 0.35, 0.85, 0.35 },
+  red = { 0.95, 0.30, 0.25 },
+  orange = { 1.00, 0.60, 0.15 },
+}
+local C = UI.C
+
+UI.STATUS_COLOR = {
+  open = { 0.95, 0.75, 0.20 },
+  confirmed = { 0.30, 0.65, 1.00 },
+  sent = { 0.35, 0.85, 0.35 },
+  rejected = { 0.90, 0.30, 0.25 },
+  cancelled = { 0.55, 0.55, 0.55 },
+  expired = { 0.45, 0.45, 0.50 },
+}
+
+-- ------------------------------------------------------------
+-- Bausteine
+-- ------------------------------------------------------------
+function UI:Font(parent, size, color, font, flags)
+  local fs = parent:CreateFontString(nil, "OVERLAY")
+  fs:SetFont(font or FONT, size or 12, flags or "")
+  color = color or C.text
+  fs:SetTextColor(color[1], color[2], color[3])
+  fs:SetShadowColor(0, 0, 0, 1)
+  fs:SetShadowOffset(1, -1)
+  fs:SetJustifyH("LEFT")
+  return fs
+end
+
+function UI:Loc(fs, key)
+  fs:SetText(T(key))
+  table.insert(self.loc, { fs = fs, key = key })
+  return fs
+end
+
+function UI:Tex(parent, layer, r, g, b, a)
+  local t = parent:CreateTexture(nil, layer or "ARTWORK")
+  t:SetTexture(r, g, b, a or 1)
+  return t
+end
+
+function UI:HLine(parent, y, x1, x2, color, alpha)
+  local t = parent:CreateTexture(nil, "ARTWORK")
+  t:SetTexture(WHITE)
+  color = color or C.goldDim
+  t:SetVertexColor(color[1], color[2], color[3], alpha or 0.8)
+  t:SetHeight(1)
+  t:SetPoint("TOPLEFT", parent, "TOPLEFT", x1, y)
+  t:SetPoint("TOPRIGHT", parent, "TOPRIGHT", x2, y)
+  return t
+end
+
+-- Gold-Verlauf: in der Mitte hell, nach aussen transparent
+function UI:GlowLine(parent, y, x1, x2)
+  local l = parent:CreateTexture(nil, "ARTWORK")
+  l:SetTexture(WHITE)
+  l:SetHeight(1)
+  l:SetPoint("TOPLEFT", parent, "TOPLEFT", x1, y)
+  l:SetPoint("TOPRIGHT", parent, "TOP", 0, y)
+  l:SetGradientAlpha("HORIZONTAL", 1, 0.82, 0.26, 0, 1, 0.82, 0.26, 0.9)
+  local r = parent:CreateTexture(nil, "ARTWORK")
+  r:SetTexture(WHITE)
+  r:SetHeight(1)
+  r:SetPoint("TOPLEFT", parent, "TOP", 0, y)
+  r:SetPoint("TOPRIGHT", parent, "TOPRIGHT", x2, y)
+  r:SetGradientAlpha("HORIZONTAL", 1, 0.82, 0.26, 0.9, 1, 0.82, 0.26, 0)
+end
+
+UI.BACKDROP_PANEL = {
+  bgFile = "Interface\\Tooltips\\UI-Tooltip-Background",
+  edgeFile = "Interface\\Tooltips\\UI-Tooltip-Border",
+  tile = true, tileSize = 16, edgeSize = 14,
+  insets = { left = 3, right = 3, top = 3, bottom = 3 },
+}
+
+function UI:Panel(parent, w, h)
+  local p = CreateFrame("Frame", nil, parent)
+  if w then p:SetWidth(w) end
+  if h then p:SetHeight(h) end
+  p:SetBackdrop(self.BACKDROP_PANEL)
+  p:SetBackdropColor(C.panel[1], C.panel[2], C.panel[3], 0.92)
+  p:SetBackdropBorderColor(C.brass[1], C.brass[2], C.brass[3], 0.9)
+  return p
+end
+
+-- Knopf im BananaForge-Stil. style: nil | "primary" | "danger" | "ok" | "flat"
+function UI:Button(parent, w, h, key, onClick, style)
+  local b = CreateFrame("Button", nil, parent)
+  b:SetWidth(w)
+  b:SetHeight(h)
+  b:SetBackdrop(self.BACKDROP_PANEL)
+  local bg = { 0.09, 0.13, 0.27 }
+  local tc = C.gold
+  if style == "primary" then
+    bg = { 0.50, 0.34, 0.05 }
+    tc = { 1, 0.95, 0.80 }
+  elseif style == "danger" then
+    bg = { 0.38, 0.08, 0.06 }
+    tc = { 1, 0.85, 0.80 }
+  elseif style == "ok" then
+    bg = { 0.10, 0.32, 0.12 }
+    tc = { 0.85, 1, 0.85 }
+  elseif style == "flat" then
+    bg = { 0.05, 0.07, 0.14 }
+  end
+  b.bgColor, b.textColor = bg, tc
+  b:SetBackdropColor(bg[1], bg[2], bg[3], 0.95)
+  b:SetBackdropBorderColor(C.goldDim[1], C.goldDim[2], C.goldDim[3], 0.9)
+
+  local shine = b:CreateTexture(nil, "BORDER")
+  shine:SetTexture(WHITE)
+  shine:SetPoint("TOPLEFT", b, "TOPLEFT", 3, -3)
+  shine:SetPoint("BOTTOMRIGHT", b, "RIGHT", -3, 0)
+  shine:SetGradientAlpha("VERTICAL", 1, 1, 1, 0, 1, 1, 1, 0.07)
+
+  local hl = b:CreateTexture(nil, "HIGHLIGHT")
+  hl:SetTexture(WHITE)
+  hl:SetPoint("TOPLEFT", b, "TOPLEFT", 3, -3)
+  hl:SetPoint("BOTTOMRIGHT", b, "BOTTOMRIGHT", -3, 3)
+  hl:SetVertexColor(1, 0.82, 0.3, 0.15)
+
+  local fs = self:Font(b, h >= 26 and 13 or 11, tc)
+  fs:SetPoint("CENTER", b, "CENTER", 0, 0)
+  fs:SetJustifyH("CENTER")
+  b.fs = fs
+  if key then
+    if BB.L.enUS[key] then self:Loc(fs, key) else fs:SetText(key) end
+  end
+  b:SetScript("OnClick", function()
+    if b.disabled then return end
+    PlaySound("igMainMenuOptionCheckBoxOn")
+    if onClick then onClick(b, arg1) end
+  end)
+  b.SetOn = function(self2, on)
+    b.disabled = not on
+    if on then
+      fs:SetTextColor(tc[1], tc[2], tc[3])
+      b:SetBackdropColor(bg[1], bg[2], bg[3], 0.95)
+      b:SetBackdropBorderColor(C.goldDim[1], C.goldDim[2], C.goldDim[3], 0.9)
+    else
+      fs:SetTextColor(0.45, 0.45, 0.48)
+      b:SetBackdropColor(0.06, 0.06, 0.08, 0.9)
+      b:SetBackdropBorderColor(0.3, 0.3, 0.32, 0.8)
+    end
+  end
+  return b
+end
+
+-- Umschalter mit Haken
+function UI:Check(parent, key, getter, setter)
+  local b = CreateFrame("Button", nil, parent)
+  b:SetWidth(150)
+  b:SetHeight(18)
+  local box = CreateFrame("Frame", nil, b)
+  box:SetWidth(16)
+  box:SetHeight(16)
+  box:SetPoint("LEFT", b, "LEFT", 0, 0)
+  box:SetBackdrop(self.BACKDROP_PANEL)
+  box:SetBackdropColor(0.02, 0.03, 0.06, 1)
+  box:SetBackdropBorderColor(C.goldDim[1], C.goldDim[2], C.goldDim[3], 1)
+  local chk = box:CreateTexture(nil, "OVERLAY")
+  chk:SetTexture("Interface\\Buttons\\UI-CheckBox-Check")
+  chk:SetWidth(22)
+  chk:SetHeight(22)
+  chk:SetPoint("CENTER", box, "CENTER", 1, 1)
+  local fs = self:Font(b, 11, C.text)
+  fs:SetPoint("LEFT", box, "RIGHT", 6, 0)
+  self:Loc(fs, key)
+  b.fs = fs
+  b.Update = function()
+    if getter() then chk:Show() else chk:Hide() end
+  end
+  b:SetScript("OnClick", function()
+    setter(not getter())
+    PlaySound("igMainMenuOptionCheckBoxOn")
+    b.Update()
+  end)
+  b.Update()
+  return b
+end
+
+-- kleiner Filter-Chip
+function UI:Chip(parent, w, key, onClick)
+  local b = self:Button(parent, w, 18, key, onClick, "flat")
+  b.SetActive = function(self2, on)
+    if on then
+      b.fs:SetTextColor(1, 0.9, 0.5)
+      b:SetBackdropColor(0.35, 0.25, 0.05, 0.95)
+    else
+      b.fs:SetTextColor(C.muted[1], C.muted[2], C.muted[3])
+      b:SetBackdropColor(0.05, 0.07, 0.14, 0.95)
+    end
+  end
+  return b
+end
+
+function UI:EditBox(name, parent, w)
+  local e = CreateFrame("EditBox", name, parent, "InputBoxTemplate")
+  e:SetWidth(w)
+  e:SetHeight(20)
+  e:SetAutoFocus(false)
+  e:SetFontObject("ChatFontNormal")
+  e:SetScript("OnEscapePressed", function() this:ClearFocus() end)
+  return e
+end
+
+-- Item-Feld mit Qualitaetsrahmen
+function UI:Slot(parent, size)
+  local b = CreateFrame("Button", nil, parent)
+  b:SetWidth(size)
+  b:SetHeight(size)
+  local bg = b:CreateTexture(nil, "BACKGROUND")
+  bg:SetTexture(0, 0, 0, 0.55)
+  bg:SetAllPoints(b)
+  local icon = b:CreateTexture(nil, "ARTWORK")
+  icon:SetPoint("TOPLEFT", b, "TOPLEFT", 2, -2)
+  icon:SetPoint("BOTTOMRIGHT", b, "BOTTOMRIGHT", -2, 2)
+  icon:SetTexCoord(0.07, 0.93, 0.07, 0.93)
+  b.icon = icon
+  b.edges = {}
+  local function edge(p1, p2, horiz)
+    local t = b:CreateTexture(nil, "OVERLAY")
+    t:SetTexture(WHITE)
+    t:SetPoint(p1, b, p1, 0, 0)
+    t:SetPoint(p2, b, p2, 0, 0)
+    if horiz then t:SetHeight(1) else t:SetWidth(1) end
+    table.insert(b.edges, t)
+  end
+  edge("TOPLEFT", "TOPRIGHT", true)
+  edge("BOTTOMLEFT", "BOTTOMRIGHT", true)
+  edge("TOPLEFT", "BOTTOMLEFT", false)
+  edge("TOPRIGHT", "BOTTOMRIGHT", false)
+  local glow = b:CreateTexture(nil, "OVERLAY")
+  glow:SetTexture("Interface\\Buttons\\UI-ActionButton-Border")
+  glow:SetBlendMode("ADD")
+  glow:SetWidth(size * 1.75)
+  glow:SetHeight(size * 1.75)
+  glow:SetPoint("CENTER", b, "CENTER", 0, 0)
+  glow:SetAlpha(0.55)
+  b.glow = glow
+  local hl = b:CreateTexture(nil, "HIGHLIGHT")
+  hl:SetTexture("Interface\\Buttons\\ButtonHilight-Square")
+  hl:SetBlendMode("ADD")
+  hl:SetAllPoints(icon)
+  b.count = self:Font(b, 12, { 1, 1, 1 }, FONT, "OUTLINE")
+  b.count:SetPoint("BOTTOMRIGHT", b, "BOTTOMRIGHT", -2, 2)
+  b.count:SetJustifyH("RIGHT")
+  b.badge = self:Font(b, 10, C.gold, FONT, "OUTLINE")
+  b.badge:SetPoint("TOPRIGHT", b, "TOPRIGHT", -1, -2)
+  b.badge:SetJustifyH("RIGHT")
+  b.res = self:Font(b, 9, C.orange, FONT, "OUTLINE")
+  b.res:SetPoint("TOPLEFT", b, "TOPLEFT", 2, -2)
+  b.SetQuality = function(self2, q)
+    local c = BB.QUALITY_COLOR[q or 1] or BB.QUALITY_COLOR[1]
+    local a = 0.9
+    if (q or 1) <= 1 then
+      c = { 0.35, 0.33, 0.28 }
+      a = 1
+    end
+    for i = 1, 4 do b.edges[i]:SetVertexColor(c[1], c[2], c[3], a) end
+    if (q or 1) >= 2 then
+      b.glow:SetVertexColor(c[1], c[2], c[3])
+      b.glow:Show()
+    else
+      b.glow:Hide()
+    end
+  end
+  return b
+end
+
+-- Item-Tooltip nur ueber Cache (SetHyperlink auf unbekannte Items kann in 1.12 trennen)
+function UI:ItemTooltip(owner, id, extra)
+  GameTooltip:SetOwner(owner, "ANCHOR_RIGHT")
+  if GetItemInfo(id) then
+    GameTooltip:SetHyperlink("item:" .. id .. ":0:0:0")
+  else
+    local n, q = BB:ItemInfo(id)
+    local c = BB.QUALITY_COLOR[q or 1] or BB.QUALITY_COLOR[1]
+    GameTooltip:AddLine(n, c[1], c[2], c[3])
+  end
+  if extra then
+    GameTooltip:AddLine(" ")
+    for i = 1, getn(extra) do
+      local l = extra[i]
+      GameTooltip:AddDoubleLine(l[1], l[2] or "", 0.8, 0.8, 0.8, l[3] or 1, l[4] or 1, l[5] or 1)
+    end
+  end
+  GameTooltip:Show()
+end
+
+-- ------------------------------------------------------------
+-- Hauptfenster
+-- ------------------------------------------------------------
+function UI:Init()
+  if self.frame then return end
+  local f = CreateFrame("Frame", "BananaBankFrame", UIParent)
+  self.frame = f
+  f:SetWidth(790)
+  f:SetHeight(530)
+  f:SetPoint("CENTER", UIParent, "CENTER", 0, 30)
+  f:SetFrameStrata("HIGH")
+  f:SetMovable(true)
+  f:EnableMouse(true)
+  f:RegisterForDrag("LeftButton")
+  f:SetScript("OnDragStart", function() this:StartMoving() end)
+  f:SetScript("OnDragStop", function() this:StopMovingOrSizing() end)
+  f:SetBackdrop({
+    bgFile = "Interface\\Tooltips\\UI-Tooltip-Background",
+    edgeFile = "Interface\\DialogFrame\\UI-DialogBox-Border",
+    tile = true, tileSize = 16, edgeSize = 32,
+    insets = { left = 11, right = 12, top = 12, bottom = 11 },
+  })
+  f:SetBackdropColor(C.bg[1], C.bg[2], C.bg[3], 0.97)
+  f:Hide()
+  tinsert(UISpecialFrames, "BananaBankFrame")
+  f:SetScript("OnShow", function() UI:Refresh() end)
+
+  -- Kopfbereich: blauer Verlauf wie das Banner im Logo
+  local head = f:CreateTexture(nil, "BORDER")
+  head:SetTexture(WHITE)
+  head:SetPoint("TOPLEFT", f, "TOPLEFT", 12, -12)
+  head:SetPoint("BOTTOMRIGHT", f, "TOPRIGHT", -12, -78)
+  head:SetGradientAlpha("VERTICAL", C.bg[1], C.bg[2], C.bg[3], 0, C.blue[1], C.blue[2], C.blue[3], 0.75)
+
+  local logoHolder = CreateFrame("Frame", nil, f)
+  logoHolder:SetWidth(64)
+  logoHolder:SetHeight(64)
+  logoHolder:SetPoint("TOPLEFT", f, "TOPLEFT", 14, -10)
+  logoHolder:SetFrameLevel(f:GetFrameLevel() + 10)
+  local logo = logoHolder:CreateTexture(nil, "OVERLAY")
+  logo:SetTexture(MEDIA .. "Logo64")
+  logo:SetAllPoints(logoHolder)
+
+  local title = self:Font(f, 26, C.gold, FONT_TITLE)
+  title:SetPoint("TOPLEFT", f, "TOPLEFT", 84, -16)
+  title:SetText("BananaBank")
+  local forge = self:Font(f, 10, C.goldDim)
+  forge:SetPoint("BOTTOMLEFT", title, "BOTTOMRIGHT", 8, 6)
+  forge:SetText("by BananaForge  v" .. BB.VERSION)
+  self.subtitle = self:Font(f, 11, C.muted)
+  self.subtitle:SetPoint("TOPLEFT", f, "TOPLEFT", 86, -50)
+  self.subtitle:SetWidth(520)
+  self.subtitle:SetHeight(14)
+
+  -- rechts oben: Unterstuetzen, DE/EN, Schliessen
+  local close = CreateFrame("Button", nil, f, "UIPanelCloseButton")
+  close:SetPoint("TOPRIGHT", f, "TOPRIGHT", -6, -6)
+  self.enBtn = self:Button(f, 30, 18, "EN", function() UI:SetLanguage("enUS") end, "flat")
+  self.enBtn:SetPoint("TOPRIGHT", f, "TOPRIGHT", -40, -15)
+  self.deBtn = self:Button(f, 30, 18, "DE", function() UI:SetLanguage("deDE") end, "flat")
+  self.deBtn:SetPoint("RIGHT", self.enBtn, "LEFT", -4, 0)
+  self.supportBtn = self:Button(f, 96, 18, "BTN_SUPPORT", function() UI:ShowThanks() end, "flat")
+  self.supportBtn:SetPoint("RIGHT", self.deBtn, "LEFT", -8, 0)
+
+  self:GlowLine(f, -76, 80, -16)
+
+  -- Reiter
+  local tabDefs = {
+    { key = "TAB_STOCK", page = "stock" },
+    { key = "TAB_REQUESTS", page = "requests" },
+    { key = "TAB_LEDGER", page = "ledger" },
+    { key = "TAB_PRICES", page = "prices" },
+    { key = "TAB_BANK", page = "bank" },
+  }
+  local prev
+  for i = 1, getn(tabDefs) do
+    local d = tabDefs[i]
+    local tb = CreateFrame("Button", nil, f)
+    tb:SetWidth(96)
+    tb:SetHeight(26)
+    if prev then tb:SetPoint("LEFT", prev, "RIGHT", 2, 0) else tb:SetPoint("TOPLEFT", f, "TOPLEFT", 84, -80) end
+    local fs = self:Font(tb, 13, C.muted)
+    fs:SetPoint("CENTER", tb, "CENTER", 0, 1)
+    fs:SetJustifyH("CENTER")
+    self:Loc(fs, d.key)
+    tb.fs = fs
+    local bar = tb:CreateTexture(nil, "OVERLAY")
+    bar:SetTexture(WHITE)
+    bar:SetHeight(2)
+    bar:SetPoint("BOTTOMLEFT", tb, "BOTTOMLEFT", 8, 0)
+    bar:SetPoint("BOTTOMRIGHT", tb, "BOTTOMRIGHT", -8, 0)
+    bar:SetVertexColor(C.gold[1], C.gold[2], C.gold[3], 1)
+    tb.bar = bar
+    local hl = tb:CreateTexture(nil, "HIGHLIGHT")
+    hl:SetTexture(WHITE)
+    hl:SetAllPoints(tb)
+    hl:SetGradientAlpha("VERTICAL", 1, 0.82, 0.3, 0.12, 1, 0.82, 0.3, 0)
+    tb.page = d.page
+    tb:SetScript("OnClick", function()
+      PlaySound("igCharacterInfoTab")
+      UI:ShowPage(this.page)
+    end)
+    self.tabs[d.page] = tb
+    prev = tb
+  end
+
+  -- Inhaltsbereich
+  local content = CreateFrame("Frame", nil, f)
+  content:SetPoint("TOPLEFT", f, "TOPLEFT", 20, -114)
+  content:SetPoint("BOTTOMRIGHT", f, "BOTTOMRIGHT", -20, 18)
+  self.content = content
+
+  self:BuildStock(content)
+  self:BuildRequests(content)
+  self:BuildLedger(content)
+  if self.BuildPrices then self:BuildPrices(content) end
+  self:BuildBank(content)
+  self:BuildExport()
+  self:BuildThanks()
+  self:BuildMailHelper()
+
+  self:OnBankModeChanged()
+  self:UpdateLangButtons()
+  self:ShowPage("stock")
+end
+
+function UI:ShowPage(page)
+  if page == "bank" and not BB:IsBank() then page = "stock" end
+  if page == "prices" and not self.pages.prices then page = "stock" end
+  self.page = page
+  for name, p in pairs(self.pages) do
+    if name == page then p:Show() else p:Hide() end
+  end
+  if self.tabs.prices and not self.pages.prices then self.tabs.prices:Hide() end
+  for name, tb in pairs(self.tabs) do
+    if name == page then
+      tb.fs:SetTextColor(C.gold[1], C.gold[2], C.gold[3])
+      tb.bar:Show()
+    else
+      tb.fs:SetTextColor(C.muted[1], C.muted[2], C.muted[3])
+      tb.bar:Hide()
+    end
+  end
+  self:Refresh()
+end
+
+function UI:OnBankModeChanged()
+  if not self.frame then return end
+  if BB:IsBank() then self.tabs.bank:Show() else self.tabs.bank:Hide() end
+  if self.page == "bank" and not BB:IsBank() then self:ShowPage("stock") end
+  self:Refresh()
+end
+
+function UI:Toggle()
+  self:Init()
+  if self.frame:IsVisible() then self.frame:Hide() else self.frame:Show() end
+end
+
+function UI:SetLanguage(lang)
+  BananaBankDB.lang = lang
+  BB:ApplyLanguage()
+  for i = 1, getn(self.loc) do
+    local e = self.loc[i]
+    e.fs:SetText(T(e.key))
+  end
+  self:UpdateLangButtons()
+  self:Refresh()
+  BB:Print(T("MSG_LANGUAGE"))
+end
+
+function UI:UpdateLangButtons()
+  if not self.deBtn then return end
+  local de = BB.lang == "deDE"
+  local on, off = C.gold, { 0.5, 0.5, 0.5 }
+  local a, b = on, off
+  if not de then a, b = off, on end
+  self.deBtn.fs:SetTextColor(a[1], a[2], a[3])
+  self.enBtn.fs:SetTextColor(b[1], b[2], b[3])
+end
+
+function UI:Refresh()
+  if not self.frame then return end
+  self:RefreshMailHelper()
+  if not self.frame:IsVisible() then return end
+  local snap = BB:NewestSnapshot()
+  if snap then
+    local stock = BB:GetStock()
+    local n = 0
+    for _, e in pairs(stock) do n = n + e.c end
+    local line = string.format(T("SUBTITLE"), BB.Date(snap.ts), n, BB.Money(BB:TotalGold()))
+    local partial = false
+    for _, sn in pairs(BananaBankDB.snaps) do
+      if sn.partial then partial = true end
+    end
+    if partial then line = line .. "   |cffff8000" .. T("SUBTITLE_PARTIAL") .. "|r" end
+    self.subtitle:SetText(line)
+  else
+    self.subtitle:SetText(T("SUBTITLE_EMPTY"))
+  end
+  local p = self.page
+  if p == "stock" then self:RefreshStock()
+  elseif p == "requests" then self:RefreshRequests()
+  elseif p == "ledger" then self:RefreshLedger()
+  elseif p == "prices" then
+    if self.RefreshPrices then self:RefreshPrices() end
+  elseif p == "bank" then self:RefreshBank() end
+end
+
+-- ------------------------------------------------------------
+-- Reiter Bestand
+-- ------------------------------------------------------------
+local COLS, ROWS, SIZE, GAP = 10, 7, 40, 5
+
+function UI:BuildStock(parent)
+  local p = CreateFrame("Frame", nil, parent)
+  p:SetAllPoints(parent)
+  self.pages.stock = p
+  self.stock = { page = 1, filter = 0, onlyAvail = false, search = "" }
+  local S = self.stock
+
+  local search = self:EditBox("BananaBankSearch", p, 170)
+  search:SetPoint("TOPLEFT", p, "TOPLEFT", 8, -2)
+  local ph = self:Font(search, 11, C.muted)
+  ph:SetPoint("LEFT", search, "LEFT", 2, 0)
+  self:Loc(ph, "SEARCH")
+  search:SetScript("OnTextChanged", function()
+    local txt = this:GetText() or ""
+    if txt == "" then ph:Show() else ph:Hide() end
+    S.search = string.lower(txt)
+    S.page = 1
+    UI:RefreshStock()
+  end)
+  search:SetScript("OnEnterPressed", function() this:ClearFocus() end)
+
+  S.chips = {}
+  local chipDefs = { { "FILTER_ALL", 0 }, { "FILTER_GREEN", 2 }, { "FILTER_BLUE", 3 }, { "FILTER_EPIC", 4 } }
+  local prev = search
+  for i = 1, getn(chipDefs) do
+    local q = chipDefs[i][2]
+    local chip = self:Chip(p, 58, chipDefs[i][1], function()
+      S.filter = q
+      S.page = 1
+      UI:RefreshStock()
+    end)
+    chip.q = q
+    chip:SetPoint("LEFT", prev, "RIGHT", i == 1 and 12 or 4, 0)
+    table.insert(S.chips, chip)
+    prev = chip
+  end
+  local avail = self:Check(p, "ONLY_AVAILABLE", function() return S.onlyAvail end, function(v)
+    S.onlyAvail = v
+    S.page = 1
+    UI:RefreshStock()
+  end)
+  avail:SetPoint("TOPLEFT", p, "TOPLEFT", 8, -28)
+
+  -- Raster
+  local grid = CreateFrame("Frame", nil, p)
+  grid:SetWidth(COLS * (SIZE + GAP) - GAP)
+  grid:SetHeight(ROWS * (SIZE + GAP) - GAP)
+  grid:SetPoint("TOPLEFT", p, "TOPLEFT", 8, -52)
+  grid:EnableMouseWheel(true)
+  grid:SetScript("OnMouseWheel", function()
+    S.page = S.page - arg1
+    UI:RefreshStock()
+  end)
+  S.slots = {}
+  for r = 0, ROWS - 1 do
+    for c = 0, COLS - 1 do
+      local s = self:Slot(grid, SIZE)
+      s:SetPoint("TOPLEFT", grid, "TOPLEFT", c * (SIZE + GAP), -r * (SIZE + GAP))
+      s:RegisterForClicks("LeftButtonUp", "RightButtonUp")
+      s:SetScript("OnClick", function() UI:OnSlotClick(this, arg1) end)
+      s:SetScript("OnEnter", function() UI:OnSlotEnter(this) end)
+      s:SetScript("OnLeave", function() GameTooltip:Hide() end)
+      table.insert(S.slots, s)
+    end
+  end
+  S.empty = self:Font(grid, 13, C.muted)
+  S.empty:SetPoint("CENTER", grid, "CENTER", 0, 0)
+  S.empty:SetJustifyH("CENTER")
+  S.empty:SetWidth(380)
+
+  local prevBtn = self:Button(p, 26, 20, "<", function()
+    S.page = S.page - 1
+    UI:RefreshStock()
+  end, "flat")
+  prevBtn:SetPoint("BOTTOMLEFT", p, "BOTTOMLEFT", 8, 2)
+  local nextBtn = self:Button(p, 26, 20, ">", function()
+    S.page = S.page + 1
+    UI:RefreshStock()
+  end, "flat")
+  nextBtn:SetPoint("LEFT", prevBtn, "RIGHT", 60, 0)
+  S.pageFs = self:Font(p, 11, C.text)
+  S.pageFs:SetPoint("LEFT", prevBtn, "RIGHT", 4, 0)
+  S.pageFs:SetWidth(52)
+  S.pageFs:SetJustifyH("CENTER")
+  S.info = self:Font(p, 11, C.muted)
+  S.info:SetPoint("LEFT", nextBtn, "RIGHT", 12, 0)
+  S.info:SetWidth(300)
+
+  -- Warenkorb rechts
+  local cart = self:Panel(p, 268, 0)
+  cart:SetPoint("TOPRIGHT", p, "TOPRIGHT", 0, 0)
+  cart:SetPoint("BOTTOMRIGHT", p, "BOTTOMRIGHT", 0, 0)
+  local ct = self:Font(cart, 15, C.gold, FONT_TITLE)
+  ct:SetPoint("TOPLEFT", cart, "TOPLEFT", 12, -10)
+  self:Loc(ct, "CART_TITLE")
+  self:HLine(cart, -32, 10, -10, C.brass, 0.9)
+  S.cartRows = {}
+  for i = 1, 9 do
+    local row = CreateFrame("Frame", nil, cart)
+    row:SetWidth(248)
+    row:SetHeight(28)
+    row:SetPoint("TOPLEFT", cart, "TOPLEFT", 10, -38 - (i - 1) * 30)
+    local ic = self:Slot(row, 26)
+    ic:SetPoint("LEFT", row, "LEFT", 0, 0)
+    ic:SetScript("OnEnter", function() if this.id then UI:ItemTooltip(this, this.id) end end)
+    ic:SetScript("OnLeave", function() GameTooltip:Hide() end)
+    row.ic = ic
+    row.name = self:Font(row, 11, C.text)
+    row.name:SetPoint("LEFT", ic, "RIGHT", 6, 0)
+    row.name:SetWidth(128)
+    row.name:SetHeight(13)
+    row.cnt = self:Font(row, 12, C.gold)
+    row.cnt:SetPoint("RIGHT", row, "RIGHT", -46, 0)
+    row.cnt:SetJustifyH("RIGHT")
+    local minus = self:Button(row, 20, 20, "-", function() UI:CartAdd(row.id, -1) end, "flat")
+    minus:SetPoint("RIGHT", row, "RIGHT", -22, 0)
+    local plus = self:Button(row, 20, 20, "+", function() UI:CartAdd(row.id, 1) end, "flat")
+    plus:SetPoint("RIGHT", row, "RIGHT", 0, 0)
+    table.insert(S.cartRows, row)
+  end
+  S.cartEmpty = self:Font(cart, 11, C.muted)
+  S.cartEmpty:SetPoint("TOPLEFT", cart, "TOPLEFT", 14, -46)
+  S.cartEmpty:SetWidth(240)
+  self:Loc(S.cartEmpty, "CART_EMPTY")
+  S.cartSum = self:Font(cart, 11, C.muted)
+  S.cartSum:SetPoint("BOTTOMLEFT", cart, "BOTTOMLEFT", 12, 76)
+  S.cartSum:SetWidth(244)
+  S.cartPrice = self:Font(cart, 11, C.gold)
+  S.cartPrice:SetPoint("BOTTOMLEFT", cart, "BOTTOMLEFT", 12, 90)
+  S.cartPrice:SetWidth(244)
+  local hint = self:Font(cart, 9, C.muted)
+  hint:SetPoint("BOTTOMLEFT", cart, "BOTTOMLEFT", 12, 62)
+  hint:SetWidth(244)
+  self:Loc(hint, "CART_HINT")
+  local clear = self:Button(cart, 76, 22, "BTN_CLEAR", function()
+    BananaBankDB.basket = {}
+    UI:RefreshStock()
+  end, "flat")
+  clear:SetPoint("BOTTOMLEFT", cart, "BOTTOMLEFT", 10, 32)
+  S.makeBtn = self:Button(cart, 166, 22, "BTN_MAKE_CODE", function() UI:MakeCode() end, "primary")
+  S.makeBtn:SetPoint("LEFT", clear, "RIGHT", 6, 0)
+  S.lastCodeBtn = self:Button(cart, 248, 20, "BTN_LAST_CODE", function()
+    if UI.lastReq then UI:ShowExport(UI.lastReq) end
+  end, "flat")
+  S.lastCodeBtn:SetPoint("BOTTOMLEFT", cart, "BOTTOMLEFT", 10, 8)
+end
+
+function UI:StockList()
+  local S = self.stock
+  local stock = BB:GetStock()
+  local res = BB:GetReserved()
+  local list = {}
+  for id, e in pairs(stock) do
+    local avail = e.c - (res[id] or 0)
+    local ok = (e.q or 1) >= S.filter
+    if ok and S.search ~= "" and not string.find(string.lower(e.n or ""), S.search, 1, true) then ok = false end
+    if ok and S.onlyAvail and avail <= 0 then ok = false end
+    if ok then table.insert(list, { id = id, e = e, res = res[id] or 0, avail = avail }) end
+  end
+  table.sort(list, function(a, b)
+    if (a.e.q or 1) ~= (b.e.q or 1) then return (a.e.q or 1) > (b.e.q or 1) end
+    return (a.e.n or "") < (b.e.n or "")
+  end)
+  return list, stock, res
+end
+
+function UI:RefreshStock()
+  if not self.stock then return end
+  local S = self.stock
+  for i = 1, getn(S.chips) do S.chips[i]:SetActive(S.chips[i].q == S.filter) end
+  local list, stock, res = self:StockList()
+  local per = COLS * ROWS
+  local pages = floor((getn(list) - 1) / per) + 1
+  if pages < 1 then pages = 1 end
+  if S.page > pages then S.page = pages end
+  if S.page < 1 then S.page = 1 end
+  local basket = BananaBankDB.basket
+  for i = 1, per do
+    local s = S.slots[i]
+    local entry = list[(S.page - 1) * per + i]
+    if entry then
+      s.id = entry.id
+      s.icon:SetTexture(BB.FullTex(entry.e.t))
+      s:SetQuality(entry.e.q)
+      if entry.avail > 0 then s.icon:SetVertexColor(1, 1, 1) else s.icon:SetVertexColor(0.35, 0.35, 0.35) end
+      s.count:SetText(entry.avail > 1 and entry.avail or (entry.avail == 1 and "" or "0"))
+      if entry.res > 0 then s.res:SetText(entry.res) else s.res:SetText("") end
+      if basket[entry.id] then s.badge:SetText("x" .. basket[entry.id]) else s.badge:SetText("") end
+      s:Show()
+    else
+      s.id = nil
+      s:Hide()
+    end
+  end
+  if getn(list) == 0 then
+    if BB:NewestSnapshot() then
+      S.empty:SetText(T("STOCK_NO_MATCH"))
+    elseif BB:IsBank() then
+      S.empty:SetText(T("STOCK_EMPTY_BANK"))
+    else
+      S.empty:SetText(T("STOCK_EMPTY"))
+    end
+    S.empty:Show()
+  else
+    S.empty:Hide()
+  end
+  S.pageFs:SetText(S.page .. " / " .. pages)
+  local total, reserved = 0, 0
+  for id, e in pairs(stock) do total = total + 1 end
+  for id, n in pairs(res) do reserved = reserved + n end
+  S.info:SetText(string.format(T("STOCK_INFO"), total, reserved))
+  self:RefreshCart()
+end
+
+function UI:CartAdd(id, delta, absolute)
+  if not id then return end
+  local basket = BananaBankDB.basket
+  local avail = BB:GetAvailable(id)
+  local n = (basket[id] or 0) + delta
+  if absolute then n = delta end
+  if n > avail then
+    n = avail
+    if delta > 0 and not absolute then BB:Print(T("MSG_NOT_MORE")) end
+  end
+  if n <= 0 then basket[id] = nil else basket[id] = n end
+  self:RefreshStock()
+end
+
+function UI:OnSlotClick(slot, button)
+  local id = slot.id
+  if not id then return end
+  if button == "RightButton" then
+    self:CartAdd(id, -1)
+  elseif IsAltKeyDown() and BB:IsBank() then
+    BananaBankDB.hidden[id] = true
+    BB:Print(string.format(T("MSG_HIDDEN"), BB:ColoredName(id)))
+    self:RefreshStock()
+  elseif IsShiftKeyDown() then
+    self:CartAdd(id, BB:GetAvailable(id), true)
+  else
+    self:CartAdd(id, 1)
+  end
+end
+
+function UI:OnSlotEnter(slot)
+  local id = slot.id
+  if not id then return end
+  local avail, stock, res = BB:GetAvailable(id)
+  local G, O, W = C.green, C.orange, C.text
+  local lines = {
+    { T("TT_STOCK"), stock, W[1], W[2], W[3] },
+    { T("TT_RESERVED"), res, O[1], O[2], O[3] },
+    { T("TT_AVAILABLE"), avail, G[1], G[2], G[3] },
+  }
+  local e = BB.stockCache and BB.stockCache[id]
+  if e and BB.Count(e.per) > 1 then
+    for bank, c in pairs(e.per) do table.insert(lines, { "  " .. bank, c }) end
+  end
+  local u, src, pts, samples = BB:GetPrice(id)
+  if u then
+    local label = T("TT_PRICE")
+    if src == "man" then label = label .. " " .. T("TT_PRICE_MAN") end
+    table.insert(lines, { label, BB.Money(u), C.gold[1], C.gold[2], C.gold[3] })
+  elseif BB:IsBOE(id) then
+    table.insert(lines, { T("TT_PRICE"), T("TT_PRICE_NONE"), 0.8, 0.8, 0.8 })
+  end
+  table.insert(lines, { T("TT_HINT"), "", 0.5, 0.5, 0.5 })
+  self:ItemTooltip(slot, id, lines)
+end
+
+function UI:RefreshCart()
+  local S = self.stock
+  local basket = BananaBankDB.basket
+  local ids = {}
+  for id in pairs(basket) do table.insert(ids, id) end
+  table.sort(ids, function(a, b) return (BB:ItemInfo(a)) < (BB:ItemInfo(b)) end)
+  local items = 0
+  for i = 1, getn(S.cartRows) do
+    local row = S.cartRows[i]
+    local id = ids[i]
+    if id then
+      local n, q, t = BB:ItemInfo(id)
+      row.id = id
+      row.ic.id = id
+      row.ic.icon:SetTexture(BB.FullTex(t))
+      row.ic:SetQuality(q)
+      local c = BB.QUALITY_COLOR[q or 1] or BB.QUALITY_COLOR[1]
+      row.name:SetText(n)
+      row.name:SetTextColor(c[1], c[2], c[3])
+      row.cnt:SetText(basket[id] .. "x")
+      row:Show()
+    else
+      row.id = nil
+      row:Hide()
+    end
+  end
+  for _, n in pairs(basket) do items = items + n end
+  local positions = getn(ids)
+  if positions == 0 then S.cartEmpty:Show() else S.cartEmpty:Hide() end
+  local extra = ""
+  if positions > getn(S.cartRows) then extra = string.format(T("CART_MORE"), positions - getn(S.cartRows)) end
+  S.cartSum:SetText(string.format(T("CART_SUM"), positions, items) .. extra)
+  local sum, missing = BB:PriceTotal(basket)
+  if sum > 0 then
+    S.cartPrice:SetText(string.format(T("CART_PRICE"), BB.Money(sum)))
+  elseif missing > 0 then
+    S.cartPrice:SetText(T("CART_PRICE_OPEN"))
+  else
+    S.cartPrice:SetText("")
+  end
+  S.makeBtn:SetOn(positions > 0)
+  S.lastCodeBtn:SetOn(self.lastReq ~= nil)
+end
+
+function UI:MakeCode()
+  local basket = BananaBankDB.basket
+  -- Verfuegbarkeit erneut pruefen (Reservierungen anderer koennen inzwischen da sein)
+  local items = {}
+  local stock = BB:GetStock()
+  local res = BB:GetReserved()
+  for id, n in pairs(basket) do
+    local a = BB:GetAvailable(id, stock, res)
+    if n > a then n = a end
+    if n > 0 then items[id] = n end
+  end
+  if BB.Count(items) == 0 then
+    BB:Print(T("MSG_CART_UNAVAILABLE"))
+    return
+  end
+  local r = BB:CreateRequest(items)
+  if not r then return end
+  BananaBankDB.basket = {}
+  self.lastReq = r
+  self:ShowExport(r)
+  self:Refresh()
+end
+
+-- ------------------------------------------------------------
+-- Export-Fenster (Discord)
+-- ------------------------------------------------------------
+function UI:DiscordText(r)
+  local parts = {}
+  local ids = {}
+  for id in pairs(r.items) do table.insert(ids, id) end
+  table.sort(ids)
+  for i = 1, getn(ids) do
+    table.insert(parts, r.items[ids[i]] .. "x " .. (BB:ItemInfo(ids[i])))
+  end
+  local msg = string.format(T("DISCORD_MSG"), r.p, table.concat(parts, ", "), r.code)
+  local sum = BB:PriceTotal(r.items)
+  if sum > 0 then msg = msg .. " " .. string.format(T("DISCORD_COD"), BB.Money(sum)) end
+  return msg
+end
+
+local function readonlyBox(box)
+  box:SetScript("OnTextChanged", function()
+    if this.fixed and this:GetText() ~= this.fixed then
+      this:SetText(this.fixed)
+      this:HighlightText()
+    end
+  end)
+  box:SetScript("OnEditFocusGained", function() this:HighlightText() end)
+  box:SetScript("OnEnterPressed", function() this:ClearFocus() end)
+end
+
+function UI:BuildExport()
+  local e = CreateFrame("Frame", "BananaBankExport", UIParent)
+  self.export = e
+  e:SetWidth(580)
+  e:SetHeight(210)
+  e:SetPoint("CENTER", UIParent, "CENTER", 0, 80)
+  e:SetFrameStrata("DIALOG")
+  e:SetBackdrop({
+    bgFile = "Interface\\Tooltips\\UI-Tooltip-Background",
+    edgeFile = "Interface\\DialogFrame\\UI-DialogBox-Border",
+    tile = true, tileSize = 16, edgeSize = 32,
+    insets = { left = 11, right = 12, top = 12, bottom = 11 },
+  })
+  e:SetBackdropColor(C.bg[1], C.bg[2], C.bg[3], 0.98)
+  e:EnableMouse(true)
+  e:SetMovable(true)
+  e:RegisterForDrag("LeftButton")
+  e:SetScript("OnDragStart", function() this:StartMoving() end)
+  e:SetScript("OnDragStop", function() this:StopMovingOrSizing() end)
+  e:Hide()
+  tinsert(UISpecialFrames, "BananaBankExport")
+  local logo = e:CreateTexture(nil, "OVERLAY")
+  logo:SetTexture(MEDIA .. "Logo64")
+  logo:SetWidth(64)
+  logo:SetHeight(64)
+  logo:SetPoint("TOPLEFT", e, "TOPLEFT", 14, -14)
+  local t = self:Font(e, 20, C.gold, FONT_TITLE)
+  t:SetPoint("TOPLEFT", e, "TOPLEFT", 92, -20)
+  self:Loc(t, "EXPORT_TITLE")
+  e.sub = self:Font(e, 11, C.muted)
+  e.sub:SetPoint("TOPLEFT", t, "BOTTOMLEFT", 0, -4)
+  e.sub:SetWidth(460)
+  local l1 = self:Font(e, 11, C.text)
+  l1:SetPoint("TOPLEFT", e, "TOPLEFT", 24, -88)
+  self:Loc(l1, "EXPORT_MSG_LABEL")
+  e.msg = self:EditBox("BananaBankExportMsg", e, 526)
+  e.msg:SetMaxLetters(0)
+  e.msg:SetPoint("TOPLEFT", l1, "BOTTOMLEFT", 4, -4)
+  readonlyBox(e.msg)
+  local l2 = self:Font(e, 11, C.text)
+  l2:SetPoint("TOPLEFT", e.msg, "BOTTOMLEFT", -4, -10)
+  self:Loc(l2, "EXPORT_CODE_LABEL")
+  e.code = self:EditBox("BananaBankExportCode", e, 340)
+  e.code:SetMaxLetters(0)
+  e.code:SetPoint("TOPLEFT", l2, "BOTTOMLEFT", 4, -4)
+  readonlyBox(e.code)
+  local ok = self:Button(e, 120, 24, "BTN_DONE", function() e:Hide() end, "primary")
+  ok:SetPoint("BOTTOMRIGHT", e, "BOTTOMRIGHT", -20, 18)
+end
+
+function UI:ShowExport(r)
+  local e = self.export
+  e.sub:SetText(string.format(T("EXPORT_SUB"), r.id))
+  e.msg.fixed = nil
+  e.code.fixed = nil
+  local msg = self:DiscordText(r)
+  e.msg:SetText(msg)
+  e.code:SetText(r.code)
+  e.msg.fixed = msg
+  e.code.fixed = r.code
+  e:Show()
+  e.msg:SetFocus()
+  e.msg:HighlightText()
+end
+
+-- ------------------------------------------------------------
+-- Danke-/Spendenfenster (wie in den anderen BananaForge-Addons)
+-- ------------------------------------------------------------
+function UI:BuildThanks()
+  local tf = CreateFrame("Frame", "BananaBankThanks", UIParent)
+  self.thanks = tf
+  tf:SetWidth(380)
+  tf:SetHeight(250)
+  tf:SetPoint("CENTER", UIParent, "CENTER", 0, 40)
+  tf:SetFrameStrata("DIALOG")
+  tf:SetBackdrop({
+    bgFile = "Interface\\Tooltips\\UI-Tooltip-Background",
+    edgeFile = "Interface\\DialogFrame\\UI-DialogBox-Border",
+    tile = true, tileSize = 16, edgeSize = 32,
+    insets = { left = 11, right = 12, top = 12, bottom = 11 },
+  })
+  tf:SetBackdropColor(C.bg[1], C.bg[2], C.bg[3], 0.98)
+  tf:EnableMouse(true)
+  tf:Hide()
+  tinsert(UISpecialFrames, "BananaBankThanks")
+  local logo = tf:CreateTexture(nil, "OVERLAY")
+  logo:SetTexture(MEDIA .. "Logo64")
+  logo:SetWidth(64)
+  logo:SetHeight(64)
+  logo:SetPoint("TOP", tf, "TOP", 0, 24)
+  local title = self:Font(tf, 17, C.gold, FONT_TITLE)
+  title:SetPoint("TOP", tf, "TOP", 0, -52)
+  title:SetJustifyH("CENTER")
+  self:Loc(title, "THANKS_TITLE")
+  tf.titleFS = title
+  local txt = self:Font(tf, 11, C.text)
+  txt:SetPoint("TOP", title, "BOTTOM", 0, -10)
+  txt:SetWidth(320)
+  txt:SetJustifyH("CENTER")
+  self:Loc(txt, "THANKS_TEXT")
+  local nb = self:EditBox("BananaBankThanksName", tf, 140)
+  nb:SetPoint("TOP", txt, "BOTTOM", 0, -12)
+  nb:SetText(BB.DONATE_NAME)
+  nb.fixed = BB.DONATE_NAME
+  readonlyBox(nb)
+  tf.nameBox = nb
+  local mail = self:Button(tf, 130, 24, "BTN_MAILBOX", function()
+    if MailFrame and MailFrame:IsVisible() and SendMailNameEditBox then
+      if MailFrameTab_OnClick then MailFrameTab_OnClick(2) end
+      SendMailNameEditBox:SetText(BB.DONATE_NAME)
+      SendMailSubjectEditBox:SetText("BananaForge")
+      tf:Hide()
+    else
+      BB:Print(T("MSG_OPEN_MAILBOX"))
+    end
+  end, "primary")
+  mail:SetPoint("BOTTOMRIGHT", tf, "BOTTOM", -4, 18)
+  tf.mailBtn = mail
+  local ok = self:Button(tf, 130, 24, "BTN_CLOSE", function() tf:Hide() end)
+  ok:SetPoint("BOTTOMLEFT", tf, "BOTTOM", 4, 18)
+  tf.okBtn = ok
+end
+
+function UI:ShowThanks()
+  self:Init()
+  self.thanks:Show()
+end
+
+-- ------------------------------------------------------------
+-- Minimap-Knopf
+-- ------------------------------------------------------------
+function UI:BuildMinimap()
+  if self.minimap then return end
+  local b = CreateFrame("Button", "BananaBankMinimapButton", Minimap)
+  self.minimap = b
+  b:SetWidth(31)
+  b:SetHeight(31)
+  b:SetFrameStrata("MEDIUM")
+  b:SetFrameLevel(8)
+  b:RegisterForClicks("LeftButtonUp", "RightButtonUp")
+  b:RegisterForDrag("LeftButton")
+  local icon = b:CreateTexture(nil, "BACKGROUND")
+  icon:SetTexture(MEDIA .. "Minimap")
+  icon:SetWidth(21)
+  icon:SetHeight(21)
+  icon:SetPoint("TOPLEFT", b, "TOPLEFT", 5, -5)
+  local border = b:CreateTexture(nil, "OVERLAY")
+  border:SetTexture("Interface\\Minimap\\MiniMap-TrackingBorder")
+  border:SetWidth(53)
+  border:SetHeight(53)
+  border:SetPoint("TOPLEFT", b, "TOPLEFT", 0, 0)
+  b:SetHighlightTexture("Interface\\Minimap\\UI-Minimap-ZoomButton-Highlight")
+  b:SetScript("OnClick", function()
+    if arg1 == "RightButton" then UI:ShowThanks() else UI:Toggle() end
+  end)
+  b:SetScript("OnDragStart", function()
+    this:SetScript("OnUpdate", function()
+      local mx, my = Minimap:GetCenter()
+      local cx, cy = GetCursorPosition()
+      local s = Minimap:GetEffectiveScale()
+      cx, cy = cx / s, cy / s
+      local a = math.deg(math.atan2(cy - my, cx - mx))
+      BananaBankDB.minimap.angle = a
+      UI:PlaceMinimap()
+    end)
+  end)
+  b:SetScript("OnDragStop", function() this:SetScript("OnUpdate", nil) end)
+  b:SetScript("OnEnter", function()
+    GameTooltip:SetOwner(this, "ANCHOR_LEFT")
+    GameTooltip:AddLine("BananaBank", C.gold[1], C.gold[2], C.gold[3])
+    local snap = BB:NewestSnapshot()
+    if snap then GameTooltip:AddLine(string.format(T("TT_MINIMAP_STAND"), BB.Date(snap.ts)), 0.8, 0.8, 0.8) end
+    GameTooltip:AddLine(T("TT_MINIMAP_HINT"), 0.6, 0.6, 0.6)
+    GameTooltip:Show()
+  end)
+  b:SetScript("OnLeave", function() GameTooltip:Hide() end)
+  self:PlaceMinimap()
+  if BananaBankDB.minimap.hide then b:Hide() end
+end
+
+function UI:PlaceMinimap()
+  local a = math.rad(BananaBankDB.minimap.angle or 200)
+  local x = math.cos(a) * 80
+  local y = math.sin(a) * 80
+  self.minimap:ClearAllPoints()
+  self.minimap:SetPoint("CENTER", Minimap, "CENTER", x, y)
+end
