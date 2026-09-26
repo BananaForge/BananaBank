@@ -227,15 +227,97 @@ Base36 with a DJB2 checksum. No characters that Discord would reformat or that w
 
 ## 📸 Screenshots
 
-| | |
-|---|---|
-| **Stock** | Grid with quality borders, search, filters and cart |
-| **Requests** | Status pills from Open to Sent |
-| **Ledger** | Top donors, withdrawals per member, recent entries |
-| **Prices** | AH prices, source and date per item |
-| **Bank** | Redeem a code, confirm, fetch items, send |
+### Step 1 — Stock tab: browse the guild bank
 
-*(Screenshots to follow)*
+![Stock tab — full item grid with quality borders](screenshots/01-stock-browse.png)
+
+The bank character's entire stock at a glance. Quality borders (green, blue, epic), item counts, search field and quality filters. Click any item to add it to your request.
+
+---
+
+### Step 2 — Stock tab: items added to the cart
+
+![Stock tab — cart filled with two items](screenshots/02-stock-cart.png)
+
+Two items in the cart: 2× Mageweave Cloth and 1× Tough Jerky. The code reserves them the moment you hit **Create code** — no race against other members.
+
+---
+
+### Step 3 — Request created: Discord message ready
+
+![Request created — Discord message and code](screenshots/03-request-created.png)
+
+Code `BB1-ZGSNQ-Lumihunt-…` generated. The full Discord message is pre-written and selected — one Ctrl+C to copy. The code is also shown on its own for quick paste.
+
+---
+
+### Step 4 — Requests tab: open request
+
+![Requests tab — request status Open](screenshots/04-requests-open.png)
+
+After posting on Discord the request shows up as **Open** in the Requests tab. Status travels through the guild: Open → Confirmed → Sent.
+
+---
+
+### Step 5 — Bank tab: redeem the code
+
+![Bank tab — code pasted, request open](screenshots/05-bank-redeem.png)
+
+Bank character pastes the code (or the whole Discord message) and hits **Check**. The addon shows exactly what was requested, how many are in stock, and how many have already been sent.
+
+---
+
+### Step 6 — Bank tab: confirmed, fetch items
+
+![Bank tab — request confirmed, Fetch items active](screenshots/06-bank-confirmed.png)
+
+After **Confirm** the status turns green. Chat shows the whisper sent to the requester. Now **Fetch items** is active — the addon pulls exact stacks from the bank slots into the bags.
+
+---
+
+### Step 7 — Chat: confirmation whisper
+
+![Chat log — confirmation whisper and fetch log](screenshots/07-chat-confirmed.png)
+
+The requester gets an instant whisper. The bank character's chat shows the fetch progress: items found in bags, a note about what still needs to come from the bank.
+
+---
+
+### Step 8 — Mail helper: send 1 of 2
+
+![Mail helper — Send mail 1/2 at the mailbox](screenshots/08-mail-send.png)
+
+At the mailbox the send helper appears. Mail goes out in batches — the addon tracks how many attachments the client supports and packs accordingly.
+
+---
+
+### Step 9 — Chat: request fully sent
+
+![Chat log — request sent, whisper to recipient](screenshots/09-chat-sent.png)
+
+Both mails out, whisper sent: "Your request ZGSNQ is on its way. Check your mailbox." The request closes automatically.
+
+---
+
+### Step 10 — Ledger tab: donations and withdrawals
+
+![Ledger tab — top donors, withdrawals, recent entries](screenshots/10-ledger.png)
+
+Top donors on the left, withdrawals per member in the middle, recent entries on the right. Donations, withdrawals, and COD sales are all tracked automatically.
+
+---
+
+### Step 11 — Prices tab: AH prices and COD
+
+![Prices tab — BOE items with AH prices and source](screenshots/11-prices.png)
+
+Every BOE item in stock gets a guild price from the AH scan (average of cheapest 30%, divided by 2). Items not on the AH are marked "searched, not on AH". **Send as COD** charges the recipient on delivery.
+
+---
+
+### Step 12 — Prices tab: scan in progress
+
+*(see screenshot 11 for the finished result)*
 
 ---
 
@@ -338,4 +420,3 @@ MIT — see [LICENSE](LICENSE).
 - Development: **Lumihunt**, guild Banana Republic
 - Thanks to everyone in the guild who tested this and put up with broken mail
 - Thanks to the OctoWoW community
-# BananaBank
