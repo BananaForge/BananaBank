@@ -469,19 +469,8 @@ function BB:OnAddonMessage(prefix, msg, channel, sender)
     elseif kind == "Q" and meta == "full" then
       pushes["Q"] = nil
     elseif kind == "R" then
-    -- nur vom Gildenmeister annehmen, sonst koennte jeder die Sperre aushebeln
-    if not self:IsGM(sender) then
-      self:Debug("Rangname von " .. tostring(sender) .. " verworfen (kein Gildenmeister)")
-      return
-    end
-    local ts = tonumber(meta) or 0
-    if ts > (BananaBankDB.bankRankTs or 0) then
-      local old = BananaBankDB.bankRank
-      if self:SetBankRank(payload, ts, true) and BB.NormRank(old) ~= BB.NormRank(payload) then
-        self:Print(string.format(self.T("MSG_RANK_SYNCED"), payload, sender))
-      end
-    end
-  elseif kind == "P" then
+      pushes["R"] = nil
+    elseif kind == "P" then
       if (tonumber(meta) or 0) >= (BananaBankDB.priceTs or 0) then pushes["P"] = nil end
     end
   elseif t == "H~" then
