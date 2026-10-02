@@ -2,7 +2,7 @@
 
 **The guild bank for Vanilla WoW 1.12 — share your stock, request items, track donations.**
 
-[![Version](https://img.shields.io/badge/version-1.2.3-ffd100)](https://github.com/BananaForge/BananaBank/releases)
+[![Version](https://img.shields.io/badge/version-1.3.0-ffd100)](https://github.com/BananaForge/BananaBank/releases)
 [![Client](https://img.shields.io/badge/client-1.12.1-blue)](https://github.com/BananaForge/BananaBank)
 [![Server](https://img.shields.io/badge/server-OctoWoW-green)](https://github.com/BananaForge/BananaBank)
 [![License](https://img.shields.io/badge/license-MIT-lightgrey)](LICENSE)
@@ -57,10 +57,10 @@ Built for the guild **Banana Republic** on **OctoWoW**, runs on any 1.12 client.
 - Auction house mail never counts as a donation
 
 ### 🔒 Rank gate against abuse
-- The bank role hangs on a **guild rank**, not on a list inside the addon
+- The bank role hangs on the fixed guild rank **`Gildenbank`** (English: **`guildbank`**), not on a list inside the addon
+- Without that rank in the guild the addon does not work at all. There is no setting to use another rank
 - Ranks are handed out by the server, not the addon — so editing the files does not get you past it
 - Every member verifies the rank independently before accepting stock data
-- The rank name is distributed to the guild by the guild master
 - If a bank character loses the rank, its stock disappears for everyone within seconds
 
 ### 🎨 And the rest
@@ -136,7 +136,6 @@ Then walk to a banker and open the bank. The stock gets recorded and sent to the
 | `/bb sync` | Trigger a sync with the guild |
 | `/bb prices` | Open the Prices tab |
 | `/bb ahscan` | Fetch prices from the auction house |
-| `/bb bankrank <name>` | Set the guild rank that allows bank characters |
 | `/bb unhide` | Show hidden items again |
 | `/bb lang de\|en\|auto` | Language |
 | `/bb minimap` | Toggle the minimap button |
@@ -149,17 +148,13 @@ Then walk to a banker and open the bank. The stock gets recorded and sent to the
 
 ### Who may be a bank character
 
-So that not every member can turn themselves into a bank character, the role hangs on a guild rank. **Default: `Initiate`** — every client adopts that value automatically as long as nobody changes it. No guild master is needed to get started.
+BananaBank has one hard requirement: **the guild needs a guild rank called `Gildenbank`** (on English clients `guildbank` works as well, upper and lower case do not matter). Only characters holding that rank count as a verified guild bank.
 
-For permanent use, a dedicated rank is worth it:
-
-1. Create a rank in the guild window, for example `Gildenbank`
-2. Put the bank character into that rank
-3. Guild master: `/bb bankrank Gildenbank,Initiate`
-4. `/bb status` shows who has already picked up the setting
-5. Once nobody differs any more: `/bb bankrank Gildenbank`
-
-Several rank names are allowed, separated by commas. That way the switch needs no cutoff date and nobody loses their stock view in between.
+- The rank names are built into the addon. There is no command or option to change them or to add another rank.
+- If nobody in the guild holds the rank, the addon is locked: the window only shows a notice, no stock is shown, no requests can be created and nothing is sent or accepted.
+- Setup: the guild master creates the rank `Gildenbank` in the guild window and gives it to the bank character. Then run `/bb setbank` on that character.
+- Every member verifies the rank of a bank character in their own guild roster, so nobody can fake it by editing files.
+- `/bb status` shows the required rank, whether it exists and who holds it.
 
 ### Prices and COD
 
@@ -175,7 +170,7 @@ The scan searches specifically for every BOE item in stock. With 14 items that t
 
 ### Second bank character
 
-Run `/bb setbank` on another character holding the matching rank. Stocks are added up and the tooltip shows the amount per bank character. A request can be partly sent from character A and finished from character B.
+Run `/bb setbank` on another character holding the `Gildenbank` rank. Stocks are added up and the tooltip shows the amount per bank character. A request can be partly sent from character A and finished from character B.
 
 ### Hiding items
 
@@ -195,7 +190,7 @@ Run `/bb setbank` on another character holding the matching rank. Stocks are add
 
 ### Network protocol
 
-Throttled send queue with 0.3 seconds between messages, payloads under 250 bytes, UTF-8 safe chunking. Five kinds of data are synchronised:
+Throttled send queue with 0.3 seconds between messages, payloads under 250 bytes, UTF-8 safe chunking. Four kinds of data are synchronised:
 
 | Kind | Content |
 |---|---|
@@ -203,7 +198,6 @@ Throttled send queue with 0.3 seconds between messages, payloads under 250 bytes
 | `L` | Ledger entries |
 | `Q` | Requests and reservations |
 | `P` | Guild prices |
-| `R` | Bank rank name, guild master only |
 
 On login the clients compare their states. Whoever holds something newer answers after a random delay; if someone else answers first, the own reply is dropped. That keeps the channel quiet even when ten people log in at once.
 
@@ -343,6 +337,12 @@ lua50 tools/test_all.lua
 
 ## 📝 Changelog
 
+### 1.3.0
+- The bank rank is fixed: `Gildenbank` or `guildbank`, no other rank, no setting
+- Without that rank in the guild the addon is locked (lock screen instead of the tabs)
+- Removed `/bb bankrank`, the rank sync (`R`) and the `Initiate` default
+- Fixed misplaced rank/price handling in the transfer header
+
 ### 1.2.3
 - `/bb status` shows which members have already adopted the rank setting
 
@@ -357,7 +357,6 @@ lua50 tools/test_all.lua
 
 ### 1.2.0
 - AH scan searches per item instead of paging through the whole auction house
-- The rank name is distributed to the guild by the guild master
 - Blocked bank characters are dropped from already stored stock as well
 
 ### 1.1.x
@@ -387,7 +386,7 @@ Another mail addon is in the way. Disable it for the bank character and `/reload
 It is not on the auction house right now. Set it by hand on the **Prices** tab.
 
 **Can anyone make themselves a bank character?**
-Only characters holding the configured guild rank. `/bb status` shows who holds it.
+Only characters holding the guild rank `Gildenbank` / `guildbank`. `/bb status` shows who holds it.
 
 ---
 

@@ -168,7 +168,7 @@ function BB:PriceTargets()
 end
 
 function BB:StartAHScan()
-  if not self:IsBank() then
+  if not self:BankActive() then
     self:Print(self.T("ERR_NOT_BANK"))
     return
   end

@@ -44,14 +44,18 @@ end
 function BB:UpdateSnapshot(push)
   if not self:IsBank() then return end
   -- Rang verloren? Dann nicht mehr als Bank senden.
-  if self:MayBeBank(self:Me()) == false then
+  if not self:MayBeBank(self:Me()) then
     if not self.warnedRank then
       self.warnedRank = true
-      self:Print("|cffff4040" .. string.format(self.T("ERR_RANK_LOST"),
-        BananaBankDB.bankRank) .. "|r")
+      if self:Ready() then
+        self:Print("|cffff4040" .. string.format(self.T("ERR_RANK_LOST"), BB.BANK_RANK_LABEL) .. "|r")
+      else
+        self:Print("|cffff4040" .. string.format(self.T("ERR_RANK_MISSING"), BB.BANK_RANK_LABEL) .. "|r")
+      end
     end
     return
   end
+  self.warnedRank = nil
   local db = BananaBankDB
   local me = self:Me()
   -- nach dem Schliessen liefert der Client fuer Bankfaecher 0 Plaetze: dann Cache behalten
@@ -118,6 +122,10 @@ function BB:Notify(r, key)
 end
 
 function BB:ConfirmRequest(r)
+  if not self:BankActive() then
+    self:Print("|cffff4040" .. string.format(self.T("ERR_RANK_LOST"), BB.BANK_RANK_LABEL) .. "|r")
+    return
+  end
   if not r or r.s ~= "open" then return end
   self:SetStatus(r, "confirmed")
   self:Print(string.format(self.T("MSG_CONFIRMED"), r.id, r.p))
@@ -177,6 +185,10 @@ local function findStack(bags, id, used)
 end
 
 function BB:StartPrepare(r)
+  if not self:BankActive() then
+    self:Print("|cffff4040" .. string.format(self.T("ERR_RANK_LOST"), BB.BANK_RANK_LABEL) .. "|r")
+    return
+  end
   if not r or r.s ~= "confirmed" then
     self:Print(self.T("ERR_NOT_CONFIRMED"))
     return

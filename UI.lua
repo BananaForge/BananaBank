@@ -435,10 +435,51 @@ function UI:Init()
   self:BuildExport()
   self:BuildThanks()
   self:BuildMailHelper()
+  self:BuildGate(f)
 
   self:OnBankModeChanged()
   self:UpdateLangButtons()
   self:ShowPage("stock")
+end
+
+-- Sperrschirm: ohne den Bank-Rang in der Gilde ist das Addon nicht nutzbar
+function UI:BuildGate(f)
+  local g = CreateFrame("Frame", nil, f)
+  g:SetPoint("TOPLEFT", f, "TOPLEFT", 14, -72)
+  g:SetPoint("BOTTOMRIGHT", f, "BOTTOMRIGHT", -14, 14)
+  g:SetFrameLevel(f:GetFrameLevel() + 30)
+  g:EnableMouse(true)
+  local bg = g:CreateTexture(nil, "BACKGROUND")
+  bg:SetTexture(WHITE)
+  bg:SetAllPoints(g)
+  bg:SetVertexColor(C.bg[1], C.bg[2], C.bg[3], 1)
+  g.title = self:Font(g, 18, C.red)
+  g.title:SetPoint("TOP", g, "TOP", 0, -120)
+  g.text = self:Font(g, 13, C.muted)
+  g.text:SetPoint("TOP", g.title, "BOTTOM", 0, -16)
+  g.text:SetWidth(520)
+  g.text:SetJustifyH("CENTER")
+  g:Hide()
+  self.gate = g
+end
+
+function UI:UpdateGate()
+  local g = self.gate
+  if not g then return false end
+  if BB:Ready() then
+    g:Hide()
+    return false
+  end
+  g.title:SetText(T("GATE_TITLE"))
+  if not IsInGuild() then
+    g.text:SetText(T("GATE_NO_GUILD"))
+  elseif not BB.rosterReady then
+    g.text:SetText(T("GATE_LOADING"))
+  else
+    g.text:SetText(T("GATE_NO_RANK"))
+  end
+  g:Show()
+  return true
 end
 
 function UI:ShowPage(page)
@@ -499,6 +540,7 @@ function UI:Refresh()
   if not self.frame then return end
   self:RefreshMailHelper()
   if not self.frame:IsVisible() then return end
+  if self:UpdateGate() then return end
   local snap = BB:NewestSnapshot()
   if snap then
     local stock = BB:GetStock()
@@ -843,6 +885,7 @@ function UI:RefreshCart()
 end
 
 function UI:MakeCode()
+  if not BB:Ready() then return end
   local basket = BananaBankDB.basket
   -- Verfuegbarkeit erneut pruefen (Reservierungen anderer koennen inzwischen da sein)
   local items = {}

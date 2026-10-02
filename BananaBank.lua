@@ -3,6 +3,16 @@
 local BB = BananaBank
 local started = false
 
+-- Hello erst senden, wenn die Gildenliste da ist und den Bank-Rang zeigt
+function BB:TryHello(n)
+  if self:Ready() then
+    self:SendHello()
+  elseif n < 12 then
+    self:RequestRoster()
+    self:After(5, function() BB:TryHello(n + 1) end, "hello")
+  end
+end
+
 local ev = CreateFrame("Frame", "BananaBankEvents")
 local EVENTS = {
   "ADDON_LOADED", "PLAYER_ENTERING_WORLD", "CHAT_MSG_ADDON",
@@ -32,7 +42,7 @@ ev:SetScript("OnEvent", function()
     BB:CheckModules()
     BB:RequestRoster()
     BB:After(6, function() BB:RequestRoster() end, "roster")
-    BB:After(12, function() BB:SendHello() end, "hello")
+    BB:After(12, function() BB:TryHello(1) end, "hello")
 
   elseif event == "CHAT_MSG_ADDON" then
     BB:OnAddonMessage(arg1, arg2, arg3, arg4)
@@ -124,29 +134,6 @@ SlashCmdList["BANANABANK"] = function(msg)
     BB:SetBank(false)
   elseif cmd == "scan" then
     if BB:IsBank() then BB:UpdateSnapshot(true) else BB:Print(BB.T("ERR_NOT_BANK")) end
-  elseif cmd == "bankrank" then
-    if rest ~= "" then
-      BB:SetBankRank(rest)
-      BB:Print(string.format(BB.T("MSG_RANK_SET"), rest))
-      local holders = BB:RankHolders(rest)
-      local nh = table.getn(holders)
-      if nh == 0 then
-        BB:Print("|cffff8000" .. string.format(BB.T("MSG_RANK_NOBODY"), rest) .. "|r")
-      else
-        BB:Print(string.format(BB.T("MSG_RANK_HOLDERS"), nh, table.concat(holders, ", ")))
-        if nh > 2 then
-          BB:Print("|cffff8000" .. BB.T("MSG_RANK_TOO_MANY") .. "|r")
-        end
-      end
-      if BB:IsGM() then
-        BB:Print(BB.T("MSG_RANK_SHARED"))
-      else
-        BB:Print("|cffff8000" .. BB.T("MSG_RANK_LOCAL") .. "|r")
-      end
-    else
-      BB:Print(string.format(BB.T("MSG_RANK_CURRENT"), BananaBankDB.bankRank))
-    end
-    BB.UI:Refresh()
   elseif cmd == "status" then
     BB:Status()
   elseif cmd == "unhide" then
@@ -160,6 +147,7 @@ SlashCmdList["BANANABANK"] = function(msg)
     BB.UI.frame:Show()
     BB.UI:ShowPage("prices")
   elseif cmd == "sync" then
+    if not BB:Ready() then BB:Print("|cffff4040" .. string.format(BB.T("ERR_RANK_MISSING"), BB.BANK_RANK_LABEL) .. "|r") return end
     BB:SendHello()
     BB:Print(BB.T("MSG_SYNC"))
   elseif cmd == "lang" then

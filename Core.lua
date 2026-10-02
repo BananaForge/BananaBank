@@ -10,13 +10,13 @@
 BananaBank = {}
 local BB = BananaBank
 
-BB.VERSION = "1.2.3"
+BB.VERSION = "1.3.0"
 BB.PREFIX = "BBNK"
 BB.DONATE_NAME = "Lumihunt"
--- Voreinstellung fuer den Bank-Rang. Solange sie niemand bewusst aendert,
--- uebernimmt jeder Client sie automatisch. So brauchen wir fuer die
--- Testphase keinen Gildenmeister, der die Einstellung verteilt.
-BB.DEFAULT_BANK_RANK = "Initiate"
+-- Einziger erlaubter Bank-Rang, deutsch und englisch. Fest eingebaut, es gibt
+-- keine Einstellung dafuer. Ohne diesen Gildenrang arbeitet das Addon nicht.
+BB.BANK_RANKS = { "gildenbank", "guildbank" }
+BB.BANK_RANK_LABEL = "Gildenbank / Guildbank"
 BB.REQ_EXPIRE = 7 * 86400      -- offene Anfragen verfallen nach 7 Tagen
 BB.REQ_KEEP = 30 * 86400       -- abgeschlossene Anfragen bleiben 30 Tage sichtbar
 BB.IGNORE_IDS = { [6948] = true } -- Ruhestein
@@ -201,12 +201,8 @@ function BB:InitDB()
   db.priceScan = db.priceScan or { ts = 0, seen = 0, set = 0 }
   db.cod = db.cod ~= false        -- Nachnahme beim Versand verwenden
   db.ranks = db.ranks or {}       -- zuletzt gesehener Gildenrang je Name
-  db.bankRankTs = db.bankRankTs or 0  -- Stand der Rang-Einstellung
-  -- Hat niemand den Rang bewusst gesetzt, gilt die Voreinstellung. Damit
-  -- haben alle Clients denselben Wert, ohne dass jemand etwas tun muss.
-  if db.bankRankTs == 0 or db.bankRank == nil then
-    db.bankRank = BB.DEFAULT_BANK_RANK
-  end
+  -- Altlasten aus Version 1.2.x: der Rang war frueher einstellbar
+  db.bankRank, db.bankRankTs, db.rankSeenEver = nil, nil, nil
   db.basket = db.basket or {}     -- aktueller Warenkorb
   db.minimap = db.minimap or { angle = 200, hide = false }
   db.auto = db.auto or false      -- Briefe automatisch nacheinander senden
@@ -214,10 +210,12 @@ function BB:InitDB()
 end
 
 -- ------------------------------------------------------------
--- Gildenraenge
+-- Gildenrang
 -- Die Rangliste kommt vom Server. Ein Client kann seinen eigenen Rang
--- lokal nicht faelschen, ohne dass die anderen es merken: jeder prueft
--- in seiner EIGENEN Liste nach.
+-- nicht faelschen, darum schaut jeder Client den Rang eines Bank-Chars
+-- in seiner EIGENEN Gildenliste nach.
+-- Es gibt genau zwei erlaubte Rangnamen (BB.BANK_RANKS). Der Rang muss in
+-- der Gilde existieren, sonst ist das Addon gesperrt.
 -- ------------------------------------------------------------
 local function norm(s)
   s = string.lower(tostring(s or ""))
@@ -226,6 +224,14 @@ local function norm(s)
   return s
 end
 BB.NormRank = norm
+
+local function isBankRank(rank)
+  local r = norm(rank)
+  for i = 1, getn(BB.BANK_RANKS) do
+    if BB.BANK_RANKS[i] == r then return true end
+  end
+  return false
+end
 
 function BB:ReadRoster()
   if not IsInGuild() then return end
@@ -236,50 +242,31 @@ function BB:ReadRoster()
     n = GetNumGuildMembers(1) or GetNumGuildMembers() or 0
   end
   if n <= 0 then return end
-  local seen = {}
+  local exists = false
   for i = 1, n do
     local name, rank, rankIndex = GetGuildRosterInfo(i)
     if name and rank then
       db.ranks[name] = { r = rank, i = rankIndex or 99 }
-      seen[norm(rank)] = true
+      if isBankRank(rank) then exists = true end
     end
   end
-  self.rankSeen = seen
+  self.rankExists = exists
   self.rosterReady = true
-  -- Einmal gesehen bleibt die Sperre an. Sonst faellt sie aus, sobald der
-  -- einzige Bank-Char den Rang verliert oder offline ist, und dann duerfte
-  -- ploetzlich wieder jeder senden.
-  local list = self:BankRankList()
-  for i = 1, table.getn(list) do
-    if seen[list[i]] then db.rankSeenEver = list[i] end
-  end
 end
 
 function BB:RequestRoster()
   if IsInGuild() and GuildRoster then GuildRoster() end
 end
 
--- Es duerfen mehrere Raenge erlaubt sein, mit Komma getrennt. Das macht
--- den Wechsel spaeter moeglich, ohne dass alle gleichzeitig umstellen.
-function BB:BankRankList()
-  local out = {}
-  for _, part in ipairs(BB.Split(BananaBankDB.bankRank or "", ",")) do
-    local r = norm(part)
-    if r ~= "" then table.insert(out, r) end
-  end
-  return out
+-- Gibt es den Bank-Rang in dieser Gilde, also traegt ihn jemand in der
+-- aktuellen Gildenliste?
+function BB:BankRankExists()
+  return self.rankExists == true
 end
 
--- Gibt es einen der Bank-Raenge in dieser Gilde ueberhaupt? Solange nicht,
--- bleibt die Sperre aus, damit das Addon nutzbar bleibt.
-function BB:BankRankExists()
-  local list = self:BankRankList()
-  if table.getn(list) == 0 then return false end
-  for i = 1, table.getn(list) do
-    if BananaBankDB.rankSeenEver == list[i] then return true end
-    if self.rankSeen and self.rankSeen[list[i]] then return true end
-  end
-  return false
+-- Das Addon arbeitet nur in einer Gilde, die den Bank-Rang hat.
+function BB:Ready()
+  return IsInGuild() and self:BankRankExists()
 end
 
 function BB:RankOf(name)
@@ -288,66 +275,28 @@ function BB:RankOf(name)
   return e.r, e.i
 end
 
--- Darf dieser Char als Bank gelten? Drei Antworten:
---   true  = ja
---   false = nein, Rang passt nicht
---   nil   = unbekannt (Rang nie gesehen oder Sperre inaktiv)
+-- Darf dieser Char als Bank gelten? Nur wenn er einen der beiden Raenge
+-- nachweislich traegt. Unbekannt zaehlt als nein.
 function BB:MayBeBank(name)
-  if not self:BankRankExists() then return nil end
+  if not self:Ready() then return false end
   local rank = self:RankOf(name)
-  if not rank then return nil end
-  local mine = norm(rank)
-  local list = self:BankRankList()
-  for i = 1, table.getn(list) do
-    if list[i] == mine then return true end
-  end
-  return false
+  if not rank then return false end
+  return isBankRank(rank)
 end
 
--- Wer in der Gilde hat welche Bank-Rang-Einstellung? Zeigt beim Wechsel,
--- ob die neue Einstellung schon ueberall angekommen ist.
-function BB:PeerRanks()
-  local same, diff = {}, {}
-  local mine = norm(BananaBankDB.bankRank or "")
-  for name, e in pairs(self.peers or {}) do
-    if norm(e.rank) == mine then
-      table.insert(same, name)
-    else
-      table.insert(diff, name .. " (" .. e.rank .. ")")
-    end
-  end
-  table.sort(same)
-  table.sort(diff)
-  return same, diff
+-- Ist dieser Char ein verifizierter Bank-Char (gesetzt und mit dem Rang)?
+function BB:BankActive()
+  return self:IsBank() and self:MayBeBank(self:Me())
 end
 
--- Wer traegt diesen Rang? Ein Rang, den halbe Gilde hat, sperrt nichts.
-function BB:RankHolders(rankName)
-  local want = {}
-  if rankName then
-    for _, part in ipairs(BB.Split(rankName, ",")) do
-      local r = norm(part)
-      if r ~= "" then want[r] = true end
-    end
-  else
-    local list = self:BankRankList()
-    for i = 1, table.getn(list) do want[list[i]] = true end
-  end
+-- Wer traegt den Bank-Rang?
+function BB:RankHolders()
   local names = {}
   for name, e in pairs(BananaBankDB.ranks) do
-    if want[norm(e.r)] then table.insert(names, name) end
+    if isBankRank(e.r) then table.insert(names, name) end
   end
   table.sort(names)
   return names
-end
-
--- Ist dieser Name der Gildenmeister? Der Rang kommt aus dem Roster,
--- also vom Server. Absender von Nachrichten sind immer online und
--- stehen damit in der Liste.
-function BB:IsGM(name)
-  name = name or self:Me()
-  local _, idx = self:RankOf(name)
-  return idx == 0
 end
 
 -- Wer bekommt Warnungen zu sehen: oberste zwei Raenge und Bank-Chars
@@ -355,27 +304,6 @@ function BB:IsOfficer()
   if self:IsBank() then return true end
   local _, idx = self:RankOf(self:Me())
   return idx ~= nil and idx <= 1
-end
-
--- Rangname setzen. Der Gildenmeister verteilt ihn an die Gilde, damit
--- nicht jeder eine andere Einstellung hat und Bestaende verwirft.
-function BB:SetBankRank(name, ts, fromSync)
-  local db = BananaBankDB
-  name = BB.Clean(name or "")
-  if name == "" then return false end
-  if not ts then
-    ts = time()
-    if db.bankRankTs >= ts then ts = db.bankRankTs + 1 end
-  end
-  if ts <= db.bankRankTs and not fromSync then return false end
-  db.bankRank = name
-  db.bankRankTs = ts
-  db.rankSeenEver = nil
-  self:RequestRoster()
-  self:ReadRoster()
-  if not fromSync then self:ScheduleRankPush() end
-  if self.UI then self.UI:Refresh() end
-  return true
 end
 
 function BB:Me()
@@ -389,18 +317,17 @@ end
 function BB:SetBank(on)
   local me = self:Me()
   if on then
-    local may = self:MayBeBank(me)
-    if may == false then
+    if not self:Ready() then
+      self:Print("|cffff4040" .. string.format(self.T("ERR_RANK_MISSING"), BB.BANK_RANK_LABEL) .. "|r")
+      return
+    end
+    if not self:MayBeBank(me) then
       self:Print("|cffff4040" .. string.format(self.T("ERR_RANK_REQUIRED"),
-        BananaBankDB.bankRank, (self:RankOf(me)) or "?") .. "|r")
+        BB.BANK_RANK_LABEL, (self:RankOf(me)) or "?") .. "|r")
       return
     end
     BananaBankDB.banks[me] = true
     self:Print(string.format(self.T("MSG_BANK_SET"), me))
-    if may == nil then
-      self:Print("|cffff8000" .. string.format(self.T("MSG_RANK_UNGATED"),
-        BananaBankDB.bankRank) .. "|r")
-    end
   else
     BananaBankDB.banks[me] = nil
     self:Print(string.format(self.T("MSG_BANK_REMOVED"), me))
@@ -418,7 +345,7 @@ function BB:GetStock()
   for bank, snap in pairs(db.snaps) do
    -- Bestaende von Chars ohne den Bank-Rang zaehlen nicht mit, auch wenn
    -- sie frueher einmal angenommen wurden.
-   if self:MayBeBank(bank) ~= false then
+   if self:MayBeBank(bank) then
     for id, it in pairs(snap.items) do
       if not db.hidden[id] then
         local e = out[id]
@@ -473,7 +400,7 @@ end
 function BB:NewestSnapshot()
   local best
   for bank, snap in pairs(BananaBankDB.snaps) do
-    if self:MayBeBank(bank) ~= false then
+    if self:MayBeBank(bank) then
       if not best or snap.ts > best.ts then best = snap end
     end
   end
@@ -483,7 +410,7 @@ end
 function BB:TotalGold()
   local g = 0
   for bank, snap in pairs(BananaBankDB.snaps) do
-    if self:MayBeBank(bank) ~= false then g = g + (snap.gold or 0) end
+    if self:MayBeBank(bank) then g = g + (snap.gold or 0) end
   end
   return g
 end
@@ -547,6 +474,7 @@ end
 BB.RANK = { open = 1, confirmed = 2, rejected = 3, cancelled = 3, sent = 4 }
 
 function BB:CreateRequest(items)
+  if not self:Ready() then return nil end
   local clean = {}
   for id, n in pairs(items) do
     if n and n > 0 then clean[id] = n end
@@ -753,30 +681,20 @@ function BB:Status()
   self:Print(string.format(self.T("ST_GUILD"), IsInGuild() and self.T("YES") or self.T("NO"),
     BB.Count(db.reqs), BB.Count(db.ledger)))
   local myRank = self:RankOf(me) or "?"
-  local gate
-  if self:BankRankExists() then gate = self.T("YES") else gate = self.T("ST_GATE_OFF") end
-  self:Print(string.format(self.T("ST_RANK"), myRank, db.bankRank, gate))
+  self:Print(string.format(self.T("ST_RANK"), myRank, BB.BANK_RANK_LABEL,
+    self:BankRankExists() and self.T("YES") or self.T("NO")))
   local holders = self:RankHolders()
-  if table.getn(holders) > 0 then
-    self:Print(string.format(self.T("ST_RANK_HOLDERS"), table.getn(holders),
-      table.concat(holders, ", ")))
-  end
-  local same, diff = self:PeerRanks()
-  if table.getn(same) + table.getn(diff) == 0 then
-    self:Print(self.T("ST_PEERS_NONE"))
-  else
-    self:Print(string.format(self.T("ST_PEERS_SAME"), table.getn(same)))
-    if table.getn(diff) > 0 then
-      self:Print("|cffff8000" .. string.format(self.T("ST_PEERS_DIFF"),
-        table.getn(diff), table.concat(diff, ", ")) .. "|r")
-    end
+  if getn(holders) > 0 then
+    self:Print(string.format(self.T("ST_RANK_HOLDERS"), getn(holders), table.concat(holders, ", ")))
   end
 
   -- konkreter Rat
-  if self:IsBank() and self:MayBeBank(me) == false then
-    self:Print("|cffff4040" .. string.format(self.T("ERR_RANK_LOST"), db.bankRank) .. "|r")
-  elseif self:IsBank() and not self:BankRankExists() then
-    self:Print("|cffff8000" .. string.format(self.T("ST_HINT_RANK"), db.bankRank) .. "|r")
+  if not IsInGuild() then
+    self:Print("|cffff4040" .. self.T("GATE_NO_GUILD") .. "|r")
+  elseif not self:BankRankExists() then
+    self:Print("|cffff4040" .. string.format(self.T("ST_HINT_RANK"), BB.BANK_RANK_LABEL) .. "|r")
+  elseif self:IsBank() and not self:MayBeBank(me) then
+    self:Print("|cffff4040" .. string.format(self.T("ERR_RANK_LOST"), BB.BANK_RANK_LABEL) .. "|r")
   elseif not self:IsBank() and snaps == 0 then
     self:Print("|cffff8000" .. self.T("ST_HINT_SETBANK") .. "|r")
   elseif self:IsBank() and not cache then

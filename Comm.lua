@@ -184,18 +184,7 @@ function BB:RejectBank(bank, sender)
   if not self:IsOfficer() then return end
   local rank = self:RankOf(bank) or "?"
   self:Print("|cffff8000" .. string.format(self.T("MSG_BANK_BLOCKED"), bank, rank,
-    BananaBankDB.bankRank) .. "|r")
-end
-
-function BB:PushBankRank()
-  if not self:IsGM() then return end
-  pushes["R"] = nil
-  self:SendTransfer("R", tostring(BananaBankDB.bankRankTs or 0), BB.Clean(BananaBankDB.bankRank))
-end
-
-function BB:ScheduleRankPush()
-  if not self:IsGM() then return end
-  self:After(4, function() BB:PushBankRank() end, "rankpush")
+    BB.BANK_RANK_LABEL) .. "|r")
 end
 
 function BB:PushAll()
@@ -208,7 +197,7 @@ function BB:PushSnapshot(bank)
   local snap = BananaBankDB.snaps[bank]
   if not snap then return end
   -- kein erlaubter Rang mehr: auch auf Nachfrage nichts herausgeben
-  if self:MayBeBank(bank) == false then
+  if not self:MayBeBank(bank) then
     pushes["S:" .. bank] = nil
     return
   end
@@ -273,14 +262,13 @@ end
 -- Hallo / Abgleich
 -- ------------------------------------------------------------
 function BB:SendHello()
-  if not IsInGuild() then return end
+  if not self:Ready() then return end
   local snaps, seqs = {}, {}
   for bank, s in pairs(BananaBankDB.snaps) do table.insert(snaps, bank .. "," .. s.ts) end
   for origin, s in pairs(BananaBankDB.seqs) do table.insert(seqs, origin .. "," .. s) end
   local qn, qs = self:RequestDigest()
   self:Send("H~" .. self.VERSION .. "~" .. qn .. "~" .. qs .. "~" .. table.concat(snaps, ";") ..
-    "~" .. table.concat(seqs, ";") .. "~" .. (BananaBankDB.priceTs or 0) ..
-    "~" .. (BananaBankDB.bankRankTs or 0) .. "~" .. BB.Clean(BananaBankDB.bankRank or ""))
+    "~" .. table.concat(seqs, ";") .. "~" .. (BananaBankDB.priceTs or 0))
 end
 
 local function parseList(s)
@@ -297,12 +285,7 @@ local function versionNum(v)
   return (tonumber(f[1]) or 0) * 10000 + (tonumber(f[2]) or 0) * 100 + (tonumber(f[3]) or 0)
 end
 
-function BB:OnHello(sender, ver, qn, qs, snapStr, seqStr, priceTs, rankTs, rankName)
-  -- merken, welche Einstellung die anderen haben, damit man den Rollout sieht
-  if rankName and rankName ~= "" then
-    self.peers = self.peers or {}
-    self.peers[sender] = { rank = rankName, ts = tonumber(rankTs) or 0, seen = GetTime() }
-  end
+function BB:OnHello(sender, ver, qn, qs, snapStr, seqStr, priceTs)
   if not versionWarned and versionNum(ver) > versionNum(self.VERSION) then
     versionWarned = true
     self:Print(string.format(self.T("MSG_NEW_VERSION"), ver))
@@ -342,14 +325,6 @@ function BB:OnHello(sender, ver, qn, qs, snapStr, seqStr, priceTs, rankTs, rankN
     behind = true
   end
 
-  -- Rangname: nur der Gildenmeister verteilt ihn
-  local theirRank = tonumber(rankTs) or 0
-  if (BananaBankDB.bankRankTs or 0) > theirRank and self:IsGM() then
-    schedulePush("R", function() BB:PushBankRank() end)
-  elseif theirRank > (BananaBankDB.bankRankTs or 0) then
-    behind = true
-  end
-
   local myN, mySum = self:RequestDigest()
   if myN ~= tonumber(qn) or mySum ~= tonumber(qs) then
     if myN > 0 then schedulePush("Q", function() BB:PushRequests() end) end
@@ -374,7 +349,7 @@ function BB:OnTransfer(sender, kind, meta, payload)
     if not bank then return end
     -- Rang des Bank-Chars in der EIGENEN Gildenliste pruefen, nicht den Absender:
     -- Bestaende duerfen von jedem Mitglied weitergereicht werden.
-    if self:MayBeBank(bank) == false then
+    if not self:MayBeBank(bank) then
       self:RejectBank(bank, sender)
       return
     end
@@ -398,19 +373,6 @@ function BB:OnTransfer(sender, kind, meta, payload)
       end
     end
     self:Debug(n .. " neue Buchungen von " .. sender)
-  elseif kind == "R" then
-    -- nur vom Gildenmeister annehmen, sonst koennte jeder die Sperre aushebeln
-    if not self:IsGM(sender) then
-      self:Debug("Rangname von " .. tostring(sender) .. " verworfen (kein Gildenmeister)")
-      return
-    end
-    local ts = tonumber(meta) or 0
-    if ts > (BananaBankDB.bankRankTs or 0) then
-      local old = BananaBankDB.bankRank
-      if self:SetBankRank(payload, ts, true) and BB.NormRank(old) ~= BB.NormRank(payload) then
-        self:Print(string.format(self.T("MSG_RANK_SYNCED"), payload, sender))
-      end
-    end
   elseif kind == "P" then
     local n = self:MergePrices(self:ParsePrices(payload))
     self:Debug(n .. " Preise von " .. sender)
@@ -438,6 +400,8 @@ end
 function BB:OnAddonMessage(prefix, msg, channel, sender)
   if prefix ~= self.PREFIX or not msg then return end
   if sender == self:Me() then return end
+  -- ohne Bank-Rang in der Gilde ist das Addon gesperrt
+  if not self:Ready() then return end
 
   local t = string.sub(msg, 1, 2)
   if t == "D~" then
@@ -468,14 +432,12 @@ function BB:OnAddonMessage(prefix, msg, channel, sender)
       pushes["L:" .. meta] = nil
     elseif kind == "Q" and meta == "full" then
       pushes["Q"] = nil
-    elseif kind == "R" then
-      pushes["R"] = nil
     elseif kind == "P" then
       if (tonumber(meta) or 0) >= (BananaBankDB.priceTs or 0) then pushes["P"] = nil end
     end
   elseif t == "H~" then
     local f = BB.Split(msg, "~")
-    self:OnHello(sender, f[2], f[3], f[4], f[5], f[6], f[7], f[8], f[9])
+    self:OnHello(sender, f[2], f[3], f[4], f[5], f[6], f[7])
   end
 end
 

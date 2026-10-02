@@ -613,16 +613,12 @@ function UI:RefreshBank()
     BB.bankOpen and T("YES") or T("NO"),
     BB.mailOpen and T("YES") or T("NO")))
 
-  local may = BB:MayBeBank(BB:Me())
-  if may == false then
-    Bk.rankFs:SetText(string.format(T("BANK_RANK_BAD"), BananaBankDB.bankRank))
-    Bk.rankFs:SetTextColor(C.red[1], C.red[2], C.red[3])
-  elseif BB:BankRankExists() then
-    Bk.rankFs:SetText(string.format(T("BANK_RANK_OK"), BananaBankDB.bankRank))
+  if BB:MayBeBank(BB:Me()) then
+    Bk.rankFs:SetText(string.format(T("BANK_RANK_OK"), BB.BANK_RANK_LABEL))
     Bk.rankFs:SetTextColor(C.green[1], C.green[2], C.green[3])
   else
-    Bk.rankFs:SetText(string.format(T("BANK_RANK_OFF"), BananaBankDB.bankRank))
-    Bk.rankFs:SetTextColor(C.orange[1], C.orange[2], C.orange[3])
+    Bk.rankFs:SetText(string.format(T("BANK_RANK_BAD"), BB.BANK_RANK_LABEL))
+    Bk.rankFs:SetTextColor(C.red[1], C.red[2], C.red[3])
   end
 
   if not r then
@@ -751,7 +747,7 @@ end
 function UI:RefreshMailHelper()
   local m = self.mail
   if not m then return end
-  if not BB:IsBank() or not BB.mailOpen then
+  if not BB:BankActive() or not BB.mailOpen then
     m:Hide()
     return
   end
