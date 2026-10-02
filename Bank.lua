@@ -623,6 +623,23 @@ function BB:TradeCapture()
   tr.mout = GetPlayerTradeMoney() or 0
 end
 
+-- Per Handel uebergebene Ware auf eine bestaetigte Anfrage dieser Person anrechnen.
+-- Gibt die Anfrage zurueck, wenn etwas angerechnet wurde.
+function BB:TradeCredit(player, id, count)
+  if not id or id == 0 then return nil end
+  for _, r in pairs(BananaBankDB.reqs) do
+    if r.p == player and r.s == "confirmed" and r.items[id] then
+      r.sent = r.sent or {}
+      local open = r.items[id] - (r.sent[id] or 0)
+      if open > 0 then
+        r.sent[id] = (r.sent[id] or 0) + math.min(open, count)
+        return r
+      end
+    end
+  end
+  return nil
+end
+
 function BB:TradeCommit()
   local tr = self.trade
   self.trade = nil
@@ -633,9 +650,26 @@ function BB:TradeCommit()
     local it = tr.tin[i]
     self:AddLedger({ k = "in", p = tr.p, n = it.n, c = it.c, q = it.q, i = self:IdByName(it.n) })
   end
+  local touched = {}
   for i = 1, getn(tr.tout) do
     local it = tr.tout[i]
-    self:AddLedger({ k = "out", p = tr.p, n = it.n, c = it.c, q = it.q, i = self:IdByName(it.n), code = "TRADE" })
+    local id = self:IdByName(it.n)
+    local r = self:TradeCredit(tr.p, id, it.c)
+    if r then touched[r.id] = r end
+    self:AddLedger({ k = "out", p = tr.p, n = it.n, c = it.c, q = it.q, i = id,
+      code = r and r.id or "TRADE" })
+  end
+  for _, r in pairs(touched) do
+    r.u = time()
+    if self:RequestComplete(r) then
+      if self.prep and self.prep.r == r then self.prep = nil end
+      self:SetStatus(r, "sent")
+      self:Print(string.format(self.T("MSG_REQUEST_DONE"), r.id, r.p))
+      self:Notify(r, "WHISPER_SENT")
+    else
+      self:PushRequests({ r })
+      self:Print(string.format(self.T("MSG_REQUEST_PARTIAL"), r.id))
+    end
   end
   if tr.min > 0 then self:AddLedger({ k = "gold", p = tr.p, m = tr.min }) end
   if tr.mout > 0 then self:AddLedger({ k = "gout", p = tr.p, m = tr.mout }) end

@@ -172,6 +172,10 @@ The scan searches specifically for every BOE item in stock. With 14 items that t
 
 Run `/bb setbank` on another character holding the `Gildenbank` rank. Stocks are added up and the tooltip shows the amount per bank character. A request can be partly sent from character A and finished from character B.
 
+### Handing over by trade
+
+Items the bank character hands over in a trade window are booked as withdrawals. If the recipient has a **confirmed** request for those items, the trade is credited to it. Once everything is covered the request closes as **Sent** and the recipient gets the whisper, just like with mail.
+
 ### Hiding items
 
 `Alt+click` in the stock view hides an item for everyone, useful for the bank character's own consumables. `/bb unhide` brings everything back.
@@ -263,8 +267,6 @@ Bank character pastes the code (or the whole Discord message) and hits **Check**
 
 ### Step 6 — Bank tab: confirmed, fetch items
 
-![Bank tab — request confirmed, Fetch items active](screenshots/06-bank-confirmed.png)
-
 After **Confirm** the status turns green. Chat shows the whisper sent to the requester. Now **Fetch items** is active — the addon pulls exact stacks from the bank slots into the bags.
 
 ---
@@ -309,10 +311,6 @@ Every BOE item in stock gets a guild price from the AH scan (average of cheapest
 
 ---
 
-### Step 12 — Prices tab: scan in progress
-
-*(see screenshot 11 for the finished result)*
-
 ---
 
 ## 🤝 Contributing
@@ -332,6 +330,10 @@ Pull requests welcome. There is no automated test suite yet; changes are tested 
 ## 📝 Changelog
 
 ### 1.3.0
+- Trades with a requester count towards the confirmed request
+- COD price is frozen per stack when the mail goes out; returned mail reduces withdrawals
+- Transfers between bank characters (mail, trade) are no longer booked as donations
+- Fixed attachment index in the inbox hook for clients with several attachments
 - The bank rank is fixed: `Gildenbank` or `guildbank`, no other rank, no setting
 - Without that rank in the guild the addon is locked (lock screen instead of the tabs)
 - Removed `/bb bankrank`, the rank sync (`R`) and the `Initiate` default
