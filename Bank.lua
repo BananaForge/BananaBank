@@ -441,7 +441,11 @@ function BB:SendMailStep2()
 
   p.batch = batch
   local cod = 0
-  for i = 1, table.getn(batch) do cod = cod + self:MailCod(p.slots[batch[i]]) end
+  for i = 1, table.getn(batch) do
+    local e = p.slots[batch[i]]
+    e.cod = self:MailCod(e)   -- Preis jetzt festhalten, spaetere Preisaenderungen zaehlen nicht
+    cod = cod + e.cod
+  end
   p.cod = cod
   p.subject = "BananaBank " .. p.r.id .. " (" .. p.idx .. "/" .. table.getn(p.slots) .. ")"
   if SendMailNameEditBox then SendMailNameEditBox:SetText(p.r.p) end
@@ -463,7 +467,7 @@ function BB:OnMailSent()
       r.sent[e.id] = (r.sent[e.id] or 0) + e.c
       local name, q = self:ItemInfo(e.id)
       self:AddLedger({ k = "out", p = r.p, i = e.id, n = name, c = e.c, q = q,
-        m = self:MailCod(e), code = r.id })
+        m = e.cod or 0, code = r.id })
     end
   end
   r.u = time()
@@ -540,26 +544,35 @@ end
 
 local lastTake = { key = "", t = 0 }
 
-function BB:OnTakeInbox(i, isItem)
+function BB:OnTakeInbox(i, isItem, j)
   if not self:IsBank() then return end
   local _, _, sender, subject, money, cod, daysLeft, hasItem, _, wasReturned = GetInboxHeaderInfo(i)
   if not sender or (cod and cod > 0) then return end
-  if BananaBankDB.banks[sender] or BB.SYSTEM_SENDERS[sender] then return end
+  -- Uebergaben zwischen Bank-Chars sind keine Spenden
+  if BananaBankDB.banks[sender] or self:MayBeBank(sender) or BB.SYSTEM_SENDERS[sender] then return end
 
+  local name, count, q
+  if isItem then
+    if not hasItem then return end
+    name, _, count, q = GetInboxItem(i, j)
+    if not name or not self:HasFreeBagSlot() then return end
+  else
+    if not money or money <= 0 then return end
+  end
+
+  -- doppelte Aufrufe fuer dieselbe Entnahme ignorieren; Inhalt gehoert zum Schluessel,
+  -- damit mehrere gleiche Briefe hintereinander nicht verschluckt werden
   local key = sender .. "|" .. tostring(subject) .. "|" .. tostring(daysLeft) .. "|" .. tostring(isItem)
-  if key == lastTake.key and GetTime() - lastTake.t < 2 then return end
+    .. "|" .. tostring(j) .. "|" .. tostring(name) .. "|" .. tostring(count) .. "|" .. tostring(money)
+  if key == lastTake.key and GetTime() - lastTake.t < 0.5 then return end
   lastTake.key, lastTake.t = key, GetTime()
 
   if isItem then
-    if not hasItem then return end
-    local name, _, count, q = GetInboxItem(i)
-    if not name or not self:HasFreeBagSlot() then return end
     local kind = "in"
     if wasReturned then kind = "back" end
     self:AddLedger({ k = kind, p = sender, n = name, c = count or 1, q = q or 1, i = self:IdByName(name) })
     self:ScheduleSnapshot(4)
   else
-    if not money or money <= 0 then return end
     -- Gold aus einer Nachnahme ist ein Verkaufserloes, keine Spende
     local kind = "gold"
     if subject and string.find(subject, "BananaBank", 1, true) then kind = "cod" end
@@ -573,9 +586,9 @@ function BB:HookMail()
   if self.mailHooked then return end
   self.mailHooked = true
   local origItem = TakeInboxItem
-  TakeInboxItem = function(i)
-    BB:OnTakeInbox(i, true)
-    return origItem(i)
+  TakeInboxItem = function(i, j)
+    BB:OnTakeInbox(i, true, j)
+    return origItem(i, j)
   end
   local origMoney = TakeInboxMoney
   TakeInboxMoney = function(i)
@@ -592,12 +605,13 @@ function BB:TradeShow()
     self.trade = nil
     return
   end
-  self.trade = { p = UnitName("NPC") or "?", tin = {}, tout = {}, min = 0, mout = 0 }
+  self.trade = { p = UnitName("NPC") or UnitName("target") or "?", tin = {}, tout = {}, min = 0, mout = 0 }
 end
 
 function BB:TradeCapture()
   local tr = self.trade
   if not tr then return end
+  if tr.p == "?" then tr.p = UnitName("NPC") or UnitName("target") or "?" end
   tr.tin, tr.tout = {}, {}
   for i = 1, 6 do
     local name, _, num, q = GetTradeTargetItemInfo(i)
@@ -613,6 +627,8 @@ function BB:TradeCommit()
   local tr = self.trade
   self.trade = nil
   if not tr then return end
+  -- Handel mit einem anderen Bank-Char ist keine Spende
+  if BananaBankDB.banks[tr.p] or self:MayBeBank(tr.p) then return end
   for i = 1, getn(tr.tin) do
     local it = tr.tin[i]
     self:AddLedger({ k = "in", p = tr.p, n = it.n, c = it.c, q = it.q, i = self:IdByName(it.n) })

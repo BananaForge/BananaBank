@@ -317,13 +317,7 @@ Every BOE item in stock gets a guild price from the AH scan (average of cheapest
 
 ## 🤝 Contributing
 
-Pull requests welcome. Please run the tests before submitting:
-
-```bash
-lua50 tools/test_all.lua
-```
-
-`tools/wowstub.lua` reimplements the 1.12 API and allows **only methods that actually exist in 1.12**. A stray `SetSize` or `SetColorTexture` fails immediately instead of in-game.
+Pull requests welcome. There is no automated test suite yet; changes are tested in-game on a 1.12 client.
 
 ### Coding rules for Vanilla 1.12
 

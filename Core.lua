@@ -620,6 +620,17 @@ function BB:LedgerTotals(kind)
       t.m = t.m + (e.m or 0)
     end
   end
+  -- Rueckblaeufer (Post kam zurueck) mindern die Ausgaben dieser Person
+  if kind == "out" then
+    for _, e in pairs(BananaBankDB.ledger) do
+      local t = e.k == "back" and tot[e.p]
+      if t then
+        t.c = math.max(0, t.c - (e.c or 0))
+        local u = e.i and e.i ~= 0 and self:GetPrice(e.i)
+        if u then t.m = math.max(0, t.m - u * (e.c or 0)) end
+      end
+    end
+  end
   local list = {}
   for _, t in pairs(tot) do table.insert(list, t) end
   table.sort(list, function(a, b)
