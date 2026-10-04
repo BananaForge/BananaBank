@@ -551,10 +551,10 @@ function BB:OnTakeInbox(i, isItem, j)
   -- Uebergaben zwischen Bank-Chars sind keine Spenden
   if BananaBankDB.banks[sender] or self:MayBeBank(sender) or BB.SYSTEM_SENDERS[sender] then return end
 
-  local name, count, q
+  local name, tex, count, q
   if isItem then
     if not hasItem then return end
-    name, _, count, q = GetInboxItem(i, j)
+    name, tex, count, q = GetInboxItem(i, j)
     if not name or not self:HasFreeBagSlot() then return end
   else
     if not money or money <= 0 then return end
@@ -570,7 +570,11 @@ function BB:OnTakeInbox(i, isItem, j)
   if isItem then
     local kind = "in"
     if wasReturned then kind = "back" end
-    self:AddLedger({ k = kind, p = sender, n = name, c = count or 1, q = q or 1, i = self:IdByName(name) })
+    if kind == "in" then
+      self:BookDonation(sender, name, count or 1, q or 1, self:IdByName(name), tex)
+    else
+      self:AddLedger({ k = kind, p = sender, n = name, c = count or 1, q = q or 1, i = self:IdByName(name) })
+    end
     self:ScheduleSnapshot(4)
   else
     -- Gold aus einer Nachnahme ist ein Verkaufserloes, keine Spende
@@ -614,8 +618,8 @@ function BB:TradeCapture()
   if tr.p == "?" then tr.p = UnitName("NPC") or UnitName("target") or "?" end
   tr.tin, tr.tout = {}, {}
   for i = 1, 6 do
-    local name, _, num, q = GetTradeTargetItemInfo(i)
-    if name then table.insert(tr.tin, { n = name, c = num or 1, q = q or 1 }) end
+    local name, tex, num, q = GetTradeTargetItemInfo(i)
+    if name then table.insert(tr.tin, { n = name, t = tex, c = num or 1, q = q or 1 }) end
     local pname, _, pnum, pq = GetTradePlayerItemInfo(i)
     if pname then table.insert(tr.tout, { n = pname, c = pnum or 1, q = pq or 1 }) end
   end
@@ -648,7 +652,7 @@ function BB:TradeCommit()
   if BananaBankDB.banks[tr.p] or self:MayBeBank(tr.p) then return end
   for i = 1, getn(tr.tin) do
     local it = tr.tin[i]
-    self:AddLedger({ k = "in", p = tr.p, n = it.n, c = it.c, q = it.q, i = self:IdByName(it.n) })
+    self:BookDonation(tr.p, it.n, it.c, it.q, self:IdByName(it.n), it.t)
   end
   local touched = {}
   for i = 1, getn(tr.tout) do

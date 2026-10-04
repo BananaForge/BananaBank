@@ -387,6 +387,7 @@ function UI:Init()
     { key = "TAB_REQUESTS", page = "requests" },
     { key = "TAB_LEDGER", page = "ledger" },
     { key = "TAB_PRICES", page = "prices" },
+    { key = "TAB_QUESTS", page = "quests" },
     { key = "TAB_BANK", page = "bank" },
   }
   local prev
@@ -431,6 +432,7 @@ function UI:Init()
   self:BuildRequests(content)
   self:BuildLedger(content)
   if self.BuildPrices then self:BuildPrices(content) end
+  if self.BuildQuests then self:BuildQuests(content) end
   self:BuildBank(content)
   self:BuildExport()
   self:BuildThanks()
@@ -485,11 +487,13 @@ end
 function UI:ShowPage(page)
   if page == "bank" and not BB:IsBank() then page = "stock" end
   if page == "prices" and not self.pages.prices then page = "stock" end
+  if page == "quests" and not self.pages.quests then page = "stock" end
   self.page = page
   for name, p in pairs(self.pages) do
     if name == page then p:Show() else p:Hide() end
   end
   if self.tabs.prices and not self.pages.prices then self.tabs.prices:Hide() end
+  if self.tabs.quests and not self.pages.quests then self.tabs.quests:Hide() end
   for name, tb in pairs(self.tabs) do
     if name == page then
       tb.fs:SetTextColor(C.gold[1], C.gold[2], C.gold[3])
@@ -539,6 +543,7 @@ end
 function UI:Refresh()
   if not self.frame then return end
   self:RefreshMailHelper()
+  if self.RefreshQuestTracker then self:RefreshQuestTracker() end
   if not self.frame:IsVisible() then return end
   if self:UpdateGate() then return end
   local snap = BB:NewestSnapshot()
@@ -562,6 +567,8 @@ function UI:Refresh()
   elseif p == "ledger" then self:RefreshLedger()
   elseif p == "prices" then
     if self.RefreshPrices then self:RefreshPrices() end
+  elseif p == "quests" then
+    if self.RefreshQuests then self:RefreshQuests() end
   elseif p == "bank" then self:RefreshBank() end
 end
 
@@ -801,6 +808,10 @@ end
 function UI:OnSlotClick(slot, button)
   local id = slot.id
   if not id then return end
+  if IsControlKeyDown() and self.qe and self.qe:IsVisible() then
+    self:QuestAddItem(id)
+    return
+  end
   if button == "RightButton" then
     self:CartAdd(id, -1)
   elseif IsAltKeyDown() and BB:IsBank() then

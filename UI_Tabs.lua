@@ -424,7 +424,12 @@ function UI:RefreshLedger()
       end
       row.txt:SetText(e.p .. ": " .. what)
       local sub = BB.Date(e.t) .. "  " .. T("KIND_" .. string.upper(e.k))
-      if e.code ~= "" and e.code ~= "TRADE" then sub = sub .. "  " .. e.code end
+      local qq = e.code ~= "" and BananaBankDB.quests[e.code]
+      if qq then
+        sub = sub .. "  |cffffd100" .. qq.title .. "|r"
+      elseif e.code ~= "" and e.code ~= "TRADE" then
+        sub = sub .. "  " .. e.code
+      end
       row.sub:SetText(sub)
       row:Show()
     else

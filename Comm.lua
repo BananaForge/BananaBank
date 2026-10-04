@@ -191,6 +191,7 @@ function BB:PushAll()
   for bank in pairs(BananaBankDB.snaps) do self:PushSnapshot(bank) end
   self:PushRequests()
   self:PushPrices()
+  self:PushQuests()
 end
 
 function BB:PushSnapshot(bank)
@@ -267,8 +268,9 @@ function BB:SendHello()
   for bank, s in pairs(BananaBankDB.snaps) do table.insert(snaps, bank .. "," .. s.ts) end
   for origin, s in pairs(BananaBankDB.seqs) do table.insert(seqs, origin .. "," .. s) end
   local qn, qs = self:RequestDigest()
+  local qn2, qs2 = self:QuestDigest()
   self:Send("H~" .. self.VERSION .. "~" .. qn .. "~" .. qs .. "~" .. table.concat(snaps, ";") ..
-    "~" .. table.concat(seqs, ";") .. "~" .. (BananaBankDB.priceTs or 0))
+    "~" .. table.concat(seqs, ";") .. "~" .. (BananaBankDB.priceTs or 0) .. "~" .. qn2 .. "~" .. qs2)
 end
 
 local function parseList(s)
@@ -285,7 +287,7 @@ local function versionNum(v)
   return (tonumber(f[1]) or 0) * 10000 + (tonumber(f[2]) or 0) * 100 + (tonumber(f[3]) or 0)
 end
 
-function BB:OnHello(sender, ver, qn, qs, snapStr, seqStr, priceTs)
+function BB:OnHello(sender, ver, qn, qs, snapStr, seqStr, priceTs, gn, gs)
   if not versionWarned and versionNum(ver) > versionNum(self.VERSION) then
     versionWarned = true
     self:Print(string.format(self.T("MSG_NEW_VERSION"), ver))
@@ -323,6 +325,15 @@ function BB:OnHello(sender, ver, qn, qs, snapStr, seqStr, priceTs)
     schedulePush("P", function() BB:PushPrices() end)
   elseif theirPrice > (BananaBankDB.priceTs or 0) then
     behind = true
+  end
+
+  -- Gildenquests (aeltere Versionen senden keine Pruefsumme)
+  if gn and gs then
+    local myGN, myGS = self:QuestDigest()
+    if myGN ~= tonumber(gn) or myGS ~= tonumber(gs) then
+      if myGN > 0 then schedulePush("G", function() BB:PushQuests() end) end
+      behind = true
+    end
   end
 
   local myN, mySum = self:RequestDigest()
@@ -366,13 +377,34 @@ function BB:OnTransfer(sender, kind, meta, payload)
     local n = 0
     for _, e in ipairs(self:ParseLedger(payload)) do
       if not db.ledger[e.id] then
-        db.ledger[e.id] = e
-        n = n + 1
         local o, s = seqOf(e.id)
-        if s and s > (db.seqs[o] or 0) then db.seqs[o] = s end
+        -- Buchungen, die eine Quest voranbringen, zaehlen nur von verifizierten Bank-Chars.
+        -- Sonst koennte jedes Mitglied sich Fortschritt und Platz im Ranking schreiben.
+        local forged = e.code ~= "" and (e.k ~= "in" or not self:MayBeBank(o))
+          and string.len(e.code) == 6 and string.sub(e.code, 1, 1) == "G"
+        if forged then
+          self:Debug("Quest-Buchung " .. e.id .. " verworfen (Herkunft ist keine Bank)")
+        else
+          db.ledger[e.id] = e
+          n = n + 1
+          if s and s > (db.seqs[o] or 0) then db.seqs[o] = s end
+          local q = e.code ~= "" and db.quests[e.code]
+          if q and e.k == "in" then
+            self:QLog("deliver", q, o, string.format("%s: %dx %s", e.p, e.c, e.n), e.id)
+          end
+        end
       end
     end
+    self.qDirty = true
     self:Debug(n .. " neue Buchungen von " .. sender)
+    self:QuestTick()
+  elseif kind == "G" then
+    local n = 0
+    for _, r in ipairs(self:ParseQuests(payload)) do
+      if self:MergeQuest(r) then n = n + 1 end
+    end
+    self:Debug(n .. " Quests von " .. sender)
+    self:QuestTick()
   elseif kind == "P" then
     local n = self:MergePrices(self:ParsePrices(payload))
     self:Debug(n .. " Preise von " .. sender)
@@ -434,10 +466,12 @@ function BB:OnAddonMessage(prefix, msg, channel, sender)
       pushes["Q"] = nil
     elseif kind == "P" then
       if (tonumber(meta) or 0) >= (BananaBankDB.priceTs or 0) then pushes["P"] = nil end
+    elseif kind == "G" and meta == "full" then
+      pushes["G"] = nil
     end
   elseif t == "H~" then
     local f = BB.Split(msg, "~")
-    self:OnHello(sender, f[2], f[3], f[4], f[5], f[6], f[7])
+    self:OnHello(sender, f[2], f[3], f[4], f[5], f[6], f[7], f[8], f[9])
   end
 end
 

@@ -2,7 +2,7 @@
 
 **Guild bank for Vanilla WoW 1.12 (OctoWoW): share your stock, request items, track donations.**
 
-![Version](https://img.shields.io/badge/version-1.3.0-ffd100) ![Client](https://img.shields.io/badge/client-1.12.1-blue) ![License](https://img.shields.io/badge/license-MIT-lightgrey)
+![Version](https://img.shields.io/badge/version-1.4.0-ffd100) ![Client](https://img.shields.io/badge/client-1.12.1-blue) ![License](https://img.shields.io/badge/license-MIT-lightgrey)
 
 Vanilla WoW has no guild bank, so nobody knows what the bank character holds or who donated what. BananaBank fixes that: the bank character shares its stock over the guild channel, members request items with a code, the bank mails them out, and every donation and withdrawal lands in a ledger. Built for the guild **Banana Republic**. Lua 5.0, no libraries.
 
@@ -21,6 +21,7 @@ BananaBank only works in a guild that has a guild rank called **`Gildenbank`** (
 - **Mail and trade:** *Fetch items* prepares exact stacks, the send helper mails them (several attachments if the client allows). A trade with a requester counts towards their confirmed request.
 - **Prices and COD:** targeted auction house scan for BOE items (average of the cheapest 30 %, divided by 2). Prices can be set by hand. Mail goes out cash on delivery if you want.
 - **Ledger:** donations by mail and trade, withdrawals, COD sales and returned mail are booked automatically. Transfers between bank characters are not donations.
+- **Guild quests:** officers post farm quests ("60 Runecloth for bags", several items per quest, optional deadline). Progress is counted from the ledger whenever the bank character accepts a delivery by mail or trade. Top helpers per quest, a permanent points ranking, a tracker window and a toast when a quest is complete. Delivered items can be locked for requests.
 - German and English, minimap button, `/bb status` diagnostics.
 
 ## Screenshots
@@ -51,16 +52,27 @@ When updating, delete the old folder first, otherwise an old `BananaBank.toc` ca
 | `/bb setbank` / `removebank` | Set or remove the bank role for this character |
 | `/bb scan` / `sync` | Record and send stock / sync with the guild |
 | `/bb prices` / `ahscan` | Prices tab / fetch prices at the auction house |
+| `/bb quests` / `tracker` | Open the Guild quests tab / show or hide the quest tracker |
 | `/bb unhide` | Show hidden items again (Alt+click hides an item) |
 | `/bb lang de\|en\|auto` | Language |
 | `/bb minimap` / `support` / `debug` | Minimap button / donation window / debug output |
 
 A second bank character works the same way: any character with the rank can run `/bb setbank`. Stocks are added up, and a request can be filled from both.
 
+## Guild quests
+
+- **Who may create and manage quests:** guild master (rank 1), the `Gildenbank` rank and the officers (ranks 2 and 3). Everybody else sees quests and progress.
+- **Creating:** *Guild quests* tab, **+ New quest**. Add items with Shift-click on an item in your bags (or Ctrl-click in the stock), set amounts, optional deadline in days, and whether delivered items are locked for requests.
+- **Delivering:** by mail or trade to a bank character. A delivery counts when the bank accepts it. Overflow beyond the need is booked as a normal donation, older quests are filled first.
+- **Points:** your share of each quest, added up (a whole quest alone = 10 points). Ranking is permanent, with a monthly view.
+- **Tracker:** *Track* on a quest puts it into a small movable window. `/bb tracker` hides or shows it.
+- Only deliveries booked by a verified bank character count, other clients discard anything else.
+- Quest managers' activity is kept in a hidden local log for officers.
+
 ## Technical notes
 
 - Client 1.12.1 (Interface 11200), saved variables `BananaBankDB`, addon prefix `BBNK` on the guild channel.
-- Throttled send queue (0.3 s), messages under 250 bytes. Synchronised: stock, ledger, requests, prices.
+- Throttled send queue (0.3 s), messages under 250 bytes. Synchronised: stock, ledger, requests, prices, guild quests.
 - Code format: `BB1-<ID>-<Player>-<ItemID>x<Amount>.<...>-<Checksum>` (Base36, DJB2 checksum).
 - Limits: stock can only be read while the bank is open (the last scan is used in between). Other mail addons such as TurtleMail can interfere with attachments. Someone editing their own files can only fool themselves: other clients discard the data, and mail only goes to the name in the code.
 
@@ -70,6 +82,7 @@ Pull requests welcome, tested in-game on a 1.12 client. Lua 5.0 rules: no `#`, `
 
 ## Changelog
 
+- **1.4.0:** guild quests (several items, optional deadline, top helpers, points ranking, tracker, toast, item reservation, hidden manager log). Ledger entries that advance a quest are only accepted from verified bank characters.
 - **1.3.0:** fixed bank rank `Gildenbank` / `guildbank` as a hard requirement (lock screen, no rank setting), trades count towards confirmed requests, COD price frozen per stack, returned mail reduces withdrawals, bank-to-bank transfers are no longer donations.
 - **1.2.x:** AH scan per item, price dialog, COD, rank sync (removed in 1.3.0).
 - **1.0.0:** first release.

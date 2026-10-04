@@ -42,6 +42,7 @@ ev:SetScript("OnEvent", function()
     BB:CheckModules()
     BB:RequestRoster()
     BB:After(6, function() BB:RequestRoster() end, "roster")
+    BB:After(5, function() BB:QuestTick() end, "questbase")
     BB:After(12, function() BB:TryHello(1) end, "hello")
 
   elseif event == "CHAT_MSG_ADDON" then
@@ -134,6 +135,14 @@ SlashCmdList["BANANABANK"] = function(msg)
     BB:SetBank(false)
   elseif cmd == "scan" then
     if BB:IsBank() then BB:UpdateSnapshot(true) else BB:Print(BB.T("ERR_NOT_BANK")) end
+  elseif cmd == "quests" or cmd == "quest" then
+    BB.UI:Init()
+    BB.UI.frame:Show()
+    BB.UI:ShowPage("quests")
+  elseif cmd == "tracker" then
+    BB.UI:ToggleQuestTracker()
+  elseif cmd == "questlog" then
+    BB:PrintQuestLog(rest)
   elseif cmd == "status" then
     BB:Status()
   elseif cmd == "unhide" then

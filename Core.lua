@@ -10,7 +10,7 @@
 BananaBank = {}
 local BB = BananaBank
 
-BB.VERSION = "1.3.0"
+BB.VERSION = "1.4.0"
 BB.PREFIX = "BBNK"
 BB.DONATE_NAME = "Lumihunt"
 -- Einziger erlaubter Bank-Rang, deutsch und englisch. Fest eingebaut, es gibt
@@ -203,6 +203,9 @@ function BB:InitDB()
   db.ranks = db.ranks or {}       -- zuletzt gesehener Gildenrang je Name
   -- Altlasten aus Version 1.2.x: der Rang war frueher einstellbar
   db.bankRank, db.bankRankTs, db.rankSeenEver = nil, nil, nil
+  db.quests = db.quests or {}     -- Gildenquests nach ID
+  db.qlog = db.qlog or {}         -- verstecktes Quest-Log
+  db.qtrack = db.qtrack or {}     -- verfolgte Quests (Tracker)
   db.basket = db.basket or {}     -- aktueller Warenkorb
   db.minimap = db.minimap or { angle = 200, hide = false }
   db.auto = db.auto or false      -- Briefe automatisch nacheinander senden
@@ -384,6 +387,7 @@ function BB:GetReserved(exceptCode)
       end
     end
   end
+  self:QuestReserved(res)
   return res
 end
 
@@ -589,8 +593,22 @@ function BB:AddLedger(e)
   e.q = e.q or 1
   e.code = BB.Clean(e.code or "")
   db.ledger[e.id] = e
+  self.qDirty = true
   self:ScheduleLedgerPush()
   return e
+end
+
+-- Item-Spende buchen. Gehoert die Lieferung zu einer offenen Gildenquest, steht die Quest
+-- im Buchungseintrag (code); ein Ueberschuss wird als normale Spende gebucht.
+function BB:BookDonation(sender, name, count, q, id, tex)
+  local iid = id
+  if not iid or iid == 0 then iid = self:ResolveQuestItem(name, tex) or 0 end
+  local parts = self:QuestSplit(iid, count)
+  for i = 1, getn(parts) do
+    local e = self:AddLedger({ k = "in", p = sender, n = name, c = parts[i].c, q = q, i = iid, code = parts[i].code })
+    if parts[i].code ~= "" then self:OnQuestDelivery(e) end
+  end
+  if self.QuestTick then self:QuestTick() end
 end
 
 function BB:LedgerSorted()
@@ -667,6 +685,18 @@ function BB:StartAHScan() self:Print(self.T("ERR_MODULE_MISSING")) end
 function BB:StopAHScan() end
 function BB:OnAuctionUpdate() end
 
+-- Platzhalter fuer Quests.lua (siehe oben, gleiche Idee)
+function BB:QuestReserved() end
+function BB:QuestSplit(id, count) return { { code = "", c = count } } end
+function BB:ResolveQuestItem() return nil end
+function BB:OnQuestDelivery() end
+function BB:QuestTick() end
+function BB:QuestDigest() return 0, 0 end
+function BB:PushQuests() end
+function BB:MergeQuest() return false end
+function BB:ParseQuests() return {} end
+function BB:CanManageQuests() return false end
+
 -- Zeigt in ein paar Zeilen, warum kein Bestand da ist
 function BB:Status()
   local db = BananaBankDB
@@ -718,6 +748,8 @@ end
 function BB:CheckModules()
   local missing = {}
   if not self.priceModule then table.insert(missing, "Prices.lua") end
+  if not self.questModule then table.insert(missing, "Quests.lua") end
+  if not (self.UI and self.UI.questModule) then table.insert(missing, "UI_Quests.lua") end
   if not (self.UI and self.UI.priceModule) then table.insert(missing, "UI_Prices.lua") end
   if table.getn(missing) > 0 then
     self:Print("|cffff4040" .. string.format(self.T("ERR_FILES_MISSING"), table.concat(missing, ", ")) .. "|r")
