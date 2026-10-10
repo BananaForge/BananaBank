@@ -72,6 +72,7 @@ A second bank character works the same way: any character with the rank can run 
 ## Technical notes
 
 - Client 1.12.1 (Interface 11200), saved variables `BananaBankDB`, addon prefix `BBNK` on the guild channel.
+- Analytics: once per login the addon reports its name and version invisibly to the guild dashboard BananaGuild (guild addon channel, prefix `BGLD`, via `BananaPresence.lua`). Nothing is shown in chat.
 - Throttled send queue (0.3 s), messages under 250 bytes. Synchronised: stock, ledger, requests, prices, guild quests.
 - Code format: `BB1-<ID>-<Player>-<ItemID>x<Amount>.<...>-<Checksum>` (Base36, DJB2 checksum).
 - Limits: stock can only be read while the bank is open (the last scan is used in between). Other mail addons such as TurtleMail can interfere with attachments. Someone editing their own files can only fool themselves: other clients discard the data, and mail only goes to the name in the code.
