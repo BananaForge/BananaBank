@@ -139,6 +139,8 @@ SlashCmdList["BANANABANK"] = function(msg)
     BB.UI:Init()
     BB.UI.frame:Show()
     BB.UI:ShowPage("quests")
+  elseif cmd == "totals" or cmd == "summen" then
+    BB.UI:OpenTotalsWindow("in")
   elseif cmd == "tracker" then
     BB.UI:ToggleQuestTracker()
   elseif cmd == "questlog" then

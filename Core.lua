@@ -10,7 +10,7 @@
 BananaBank = {}
 local BB = BananaBank
 
-BB.VERSION = "1.4.0"
+BB.VERSION = "1.5.0"
 BB.PREFIX = "BBNK"
 BB.DONATE_NAME = "Lumihunt"
 -- Einziger erlaubter Bank-Rang, deutsch und englisch. Fest eingebaut, es gibt
@@ -592,6 +592,7 @@ function BB:AddLedger(e)
   e.i = e.i or 0
   e.q = e.q or 1
   e.code = BB.Clean(e.code or "")
+  e.g = BB.Clean(e.g or "")
   db.ledger[e.id] = e
   self.qDirty = true
   self:ScheduleLedgerPush()
@@ -604,8 +605,14 @@ function BB:BookDonation(sender, name, count, q, id, tex)
   local iid = id
   if not iid or iid == 0 then iid = self:ResolveQuestItem(name, tex) or 0 end
   local parts = self:QuestSplit(iid, count)
+  local group
   for i = 1, getn(parts) do
-    local e = self:AddLedger({ k = "in", p = sender, n = name, c = parts[i].c, q = q, i = iid, code = parts[i].code })
+    local e = self:AddLedger({ k = "in", p = sender, n = name, c = parts[i].c, q = q, i = iid, code = parts[i].code, g = group })
+    -- Teile einer aufgeteilten Lieferung gehoeren zu einem Stack (Gruppe = ID des ersten Teils)
+    if i == 1 and getn(parts) > 1 then
+      group = e.id
+      e.g = group
+    end
     if parts[i].code ~= "" then self:OnQuestDelivery(e) end
   end
   if self.QuestTick then self:QuestTick() end
@@ -749,6 +756,8 @@ function BB:CheckModules()
   local missing = {}
   if not self.priceModule then table.insert(missing, "Prices.lua") end
   if not self.questModule then table.insert(missing, "Quests.lua") end
+  if not self.summaryModule then table.insert(missing, "Summary.lua") end
+  if not (self.UI and self.UI.summaryModule) then table.insert(missing, "UI_Summary.lua") end
   if not (self.UI and self.UI.questModule) then table.insert(missing, "UI_Quests.lua") end
   if not (self.UI and self.UI.priceModule) then table.insert(missing, "UI_Prices.lua") end
   if table.getn(missing) > 0 then

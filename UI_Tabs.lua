@@ -268,17 +268,39 @@ function UI:BuildLedger(parent)
 
   Lg.totals = self:Font(p, 11, C.text)
   Lg.totals:SetPoint("TOPLEFT", p, "TOPLEFT", 8, -4)
-  Lg.totals:SetWidth(700)
+  Lg.totals:SetWidth(600)
+  Lg.sumBtn = self:Button(p, 120, 18, "MW_BTN_TOTALS", function() UI:OpenTotalsWindow("in") end, "primary")
+  Lg.sumBtn:SetPoint("TOPRIGHT", p, "TOPRIGHT", 0, -2)
 
-  local function topPanel(key, x, w, color)
+  local function topPanel(key, x, w, color, mode)
     local pnl = makeListPanel(self, p, w, key)
     pnl:SetPoint("TOPLEFT", p, "TOPLEFT", x, -24)
     pnl:SetPoint("BOTTOMLEFT", p, "BOTTOMLEFT", x, 0)
     for i = 1, TOP_ROWS do
-      local row = CreateFrame("Frame", nil, pnl)
+      local row = CreateFrame("Button", nil, pnl)
       row:SetHeight(24)
       row:SetPoint("TOPLEFT", pnl, "TOPLEFT", 10, -36 - (i - 1) * 25)
       row:SetPoint("TOPRIGHT", pnl, "TOPRIGHT", -10, -36 - (i - 1) * 25)
+      -- Klick oeffnet das Mitglieder-Fenster mit allen Spenden bzw. Entnahmen
+      local hl = row:CreateTexture(nil, "HIGHLIGHT")
+      hl:SetTexture(UI.WHITE)
+      hl:SetAllPoints(row)
+      hl:SetVertexColor(1, 0.82, 0.3, 0.10)
+      row.mode = mode
+      row:SetScript("OnClick", function()
+        if this.who then
+          PlaySound("igMainMenuOptionCheckBoxOn")
+          UI:OpenMemberWindow(this.who, this.mode)
+        end
+      end)
+      row:SetScript("OnEnter", function()
+        if not this.who then return end
+        GameTooltip:SetOwner(this, "ANCHOR_RIGHT")
+        GameTooltip:AddLine(this.who, C.gold[1], C.gold[2], C.gold[3])
+        GameTooltip:AddLine(T("MW_CLICK"), 0.8, 0.8, 0.8)
+        GameTooltip:Show()
+      end)
+      row:SetScript("OnLeave", function() GameTooltip:Hide() end)
       row.rank = self:Font(row, 12, C.goldDim, UI.FONT_TITLE)
       row.rank:SetPoint("LEFT", row, "LEFT", 0, 0)
       row.rank:SetWidth(22)
@@ -303,8 +325,8 @@ function UI:BuildLedger(parent)
     self:Loc(pnl.empty, "LEDGER_EMPTY")
     return pnl
   end
-  Lg.inPanel = topPanel("LEDGER_TOP_IN", 0, 234, C.green)
-  Lg.outPanel = topPanel("LEDGER_TOP_OUT", 240, 234, C.orange)
+  Lg.inPanel = topPanel("LEDGER_TOP_IN", 0, 234, C.green, "in")
+  Lg.outPanel = topPanel("LEDGER_TOP_OUT", 240, 234, C.orange, "out")
 
   local rp = makeListPanel(self, p, 0, "LEDGER_RECENT")
   rp:SetPoint("TOPLEFT", p, "TOPLEFT", 480, -24)
@@ -364,6 +386,7 @@ local function fillTop(pnl, list)
     local t = list[i]
     if t then
       row.rank:SetText(i .. ".")
+      row.who = t.p
       row.name:SetText(t.p)
       local v = t.c .. " " .. T("UNIT_ITEMS")
       if t.m > 0 then v = v .. "  " .. BB.Money(t.m) end
@@ -371,6 +394,7 @@ local function fillTop(pnl, list)
       row.bar:SetWidth(math.max(2, 180 * t.c / maxC))
       row:Show()
     else
+      row.who = nil
       row:Hide()
     end
   end

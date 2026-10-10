@@ -544,6 +544,7 @@ function UI:Refresh()
   if not self.frame then return end
   self:RefreshMailHelper()
   if self.RefreshQuestTracker then self:RefreshQuestTracker() end
+  if self.RefreshSummaryWindows then self:RefreshSummaryWindows() end
   if not self.frame:IsVisible() then return end
   if self:UpdateGate() then return end
   local snap = BB:NewestSnapshot()

@@ -2,7 +2,7 @@
 
 **Guild bank for Vanilla WoW 1.12 (OctoWoW): share your stock, request items, track donations.**
 
-![Version](https://img.shields.io/badge/version-1.4.0-ffd100) ![Client](https://img.shields.io/badge/client-1.12.1-blue) ![License](https://img.shields.io/badge/license-MIT-lightgrey)
+![Version](https://img.shields.io/badge/version-1.5.0-ffd100) ![Client](https://img.shields.io/badge/client-1.12.1-blue) ![License](https://img.shields.io/badge/license-MIT-lightgrey)
 
 Vanilla WoW has no guild bank, so nobody knows what the bank character holds or who donated what. BananaBank fixes that: the bank character shares its stock over the guild channel, members request items with a code, the bank mails them out, and every donation and withdrawal lands in a ledger. Built for the guild **Banana Republic**. Lua 5.0, no libraries.
 
@@ -20,7 +20,7 @@ BananaBank only works in a guild that has a guild rank called **`Gildenbank`** (
 - **Requests by code:** fill the cart, create a code, post it on Discord. The code reserves the items right away. Status: `Open → Confirmed → Sent`. Open requests expire after 7 days.
 - **Mail and trade:** *Fetch items* prepares exact stacks, the send helper mails them (several attachments if the client allows). A trade with a requester counts towards their confirmed request.
 - **Prices and COD:** targeted auction house scan for BOE items (average of the cheapest 30 %, divided by 2). Prices can be set by hand. Mail goes out cash on delivery if you want.
-- **Ledger:** donations by mail and trade, withdrawals, COD sales and returned mail are booked automatically. Transfers between bank characters are not donations.
+- **Ledger:** donations by mail and trade, withdrawals, COD sales and returned mail are booked automatically. Click a member in *Top donors* or *Withdrawals per member* to open a window with every stack (item, amount, date, source) in a scrollable list, switchable to totals per item. The **Totals** window shows how much of each material the whole guild donated or took, with search and top donors per material. Transfers between bank characters are not donations.
 - **Guild quests:** officers post farm quests ("60 Runecloth for bags", several items per quest, optional deadline). Progress is counted from the ledger whenever the bank character accepts a delivery by mail or trade. Top helpers per quest, a permanent points ranking, a tracker window and a toast when a quest is complete. Delivered items can be locked for requests.
 - German and English, minimap button, `/bb status` diagnostics.
 
@@ -52,6 +52,7 @@ When updating, delete the old folder first, otherwise an old `BananaBank.toc` ca
 | `/bb setbank` / `removebank` | Set or remove the bank role for this character |
 | `/bb scan` / `sync` | Record and send stock / sync with the guild |
 | `/bb prices` / `ahscan` | Prices tab / fetch prices at the auction house |
+| `/bb totals` | Open the donation totals window |
 | `/bb quests` / `tracker` | Open the Guild quests tab / show or hide the quest tracker |
 | `/bb unhide` | Show hidden items again (Alt+click hides an item) |
 | `/bb lang de\|en\|auto` | Language |
@@ -83,6 +84,7 @@ Pull requests welcome, tested in-game on a 1.12 client. Lua 5.0 rules: no `#`, `
 
 ## Changelog
 
+- **1.5.0:** clickable ledger members (stack-by-stack window with item tooltips, scrollable, totals per item) and a guild-wide totals window per material. Split deliveries are shown as one stack again.
 - **1.4.0:** guild quests (several items, optional deadline, top helpers, points ranking, tracker, toast, item reservation, hidden manager log). Ledger entries that advance a quest are only accepted from verified bank characters.
 - **1.3.0:** fixed bank rank `Gildenbank` / `guildbank` as a hard requirement (lock screen, no rank setting), trades count towards confirmed requests, COD price frozen per stack, returned mail reduces withdrawals, bank-to-bank transfers are no longer donations.
 - **1.2.x:** AH scan per item, price dialog, COD, rank sync (removed in 1.3.0).

@@ -2,7 +2,7 @@
 ## Title: |cffffd100BananaBank|r
 ## Notes: Gildenbank fuer OctoWoW: Bestand, Anfragen per Discord-Code, Versand per Post, Gildenpreise, Gildenquests und Spendenbuch. Teil von BananaForge.
 ## Author: BananaForge (Lumihunt)
-## Version: 1.4.0
+## Version: 1.5.0
 ## SavedVariables: BananaBankDB
 
 BananaPresence.lua
@@ -13,8 +13,10 @@ Comm.lua
 Bank.lua
 Prices.lua
 Quests.lua
+Summary.lua
 UI.lua
 UI_Tabs.lua
 UI_Prices.lua
 UI_Quests.lua
+UI_Summary.lua
 BananaBank.lua

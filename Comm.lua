@@ -145,7 +145,7 @@ function BB:SerializeLedger(list)
   for i = 1, getn(list) do
     local e = list[i]
     table.insert(recs, table.concat({
-      e.id, e.t, e.k, e.p, e.i or 0, e.n or "", e.c or 0, e.q or 1, e.m or 0, e.code or "",
+      e.id, e.t, e.k, e.p, e.i or 0, e.n or "", e.c or 0, e.q or 1, e.m or 0, e.code or "", e.g or "",
     }, "~"))
   end
   return table.concat(recs, "^")
@@ -159,7 +159,7 @@ function BB:ParseLedger(payload)
       table.insert(out, {
         id = f[1], t = tonumber(f[2]) or 0, k = f[3], p = f[4], i = tonumber(f[5]) or 0,
         n = f[6] or "", c = tonumber(f[7]) or 0, q = tonumber(f[8]) or 1, m = tonumber(f[9]) or 0,
-        code = f[10] or "",
+        code = f[10] or "", g = f[11] or "",
       })
     end
   end
