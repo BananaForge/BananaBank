@@ -30,13 +30,17 @@ end
 function UI:RefreshBankButton()
   local S = self.stock
   if not S or not S.bankBtn then return end
-  if S.bank and not BananaBankDB.snaps[S.bank] then S.bank = nil end
   if S.bank then
     S.bankBtn.fs:SetText(string.format(T("SB_BTN"), S.bank))
+    -- eine gewaehlte Bank sieht man dem Knopf an
+    S.bankBtn.fs:SetTextColor(1, 0.95, 0.7)
+    S.bankBtn:SetBackdropColor(0.42, 0.30, 0.05, 0.98)
     local info = BB:GetBankInfo(S.bank)
     S.role:SetText((info and info.role) or "")
   else
     S.bankBtn.fs:SetText(string.format(T("SB_BTN"), T("SB_ALL_SHORT")))
+    S.bankBtn.fs:SetTextColor(C.gold[1], C.gold[2], C.gold[3])
+    S.bankBtn:SetBackdropColor(0.05, 0.07, 0.14, 0.95)
     S.role:SetText("")
   end
 end
@@ -48,11 +52,19 @@ function UI:BuildBankMenu()
   catch:SetFrameStrata("DIALOG")
   catch:Hide()
   catch:SetScript("OnClick", function() UI:CloseBankMenu() end)
-  local m = self:Panel(UIParent, 330, 100)
+  -- voll deckend: eigener Hintergrund aus einfarbiger Flaeche statt des halbtransparenten Tooltip-Hintergrunds
+  local m = CreateFrame("Frame", nil, UIParent)
+  m:SetWidth(330)
+  m:SetHeight(100)
+  m:SetBackdrop({
+    bgFile = WHITE, edgeFile = "Interface\\Tooltips\\UI-Tooltip-Border",
+    tile = true, tileSize = 16, edgeSize = 14,
+    insets = { left = 3, right = 3, top = 3, bottom = 3 },
+  })
+  m:SetBackdropColor(0.015, 0.025, 0.06, 1)
+  m:SetBackdropBorderColor(C.gold[1], C.gold[2], C.gold[3], 1)
   m:SetFrameStrata("FULLSCREEN_DIALOG")
   m:EnableMouse(true)
-  self:Solid(m, 3, 1)
-  m:SetBackdropBorderColor(C.gold[1], C.gold[2], C.gold[3], 0.9)
   m:Hide()
   m.catch = catch
   m.rows = {}
@@ -80,14 +92,18 @@ function UI:BuildBankMenu()
     row.dot:SetWidth(8)
     row.dot:SetHeight(8)
     row.dot:SetPoint("TOPLEFT", row, "TOPLEFT", 6, -8)
-    row.name = self:Font(row, 12, C.text)
+    row.stripe = row:CreateTexture(nil, "BACKGROUND")
+    row.stripe:SetTexture(WHITE)
+    row.stripe:SetAllPoints(row)
+    row.stripe:SetVertexColor(1, 1, 1, mod(i, 2) == 0 and 0.07 or 0.0)
+    row.name = self:Font(row, 12, { 1, 1, 1 })
     row.name:SetPoint("TOPLEFT", row, "TOPLEFT", 20, -5)
     row.name:SetWidth(170)
     row.name:SetHeight(14)
-    row.cnt = self:Font(row, 10, C.muted)
+    row.cnt = self:Font(row, 10, { 0.80, 0.82, 0.90 })
     row.cnt:SetPoint("TOPRIGHT", row, "TOPRIGHT", -6, -7)
     row.cnt:SetJustifyH("RIGHT")
-    row.role = self:Font(row, 10, C.goldDim)
+    row.role = self:Font(row, 10, { 0.98, 0.80, 0.38 })
     row.role:SetPoint("TOPLEFT", row, "TOPLEFT", 20, -20)
     row.role:SetWidth(290)
     row.role:SetHeight(12)
@@ -143,7 +159,7 @@ function UI:ToggleBankMenu()
         local c = dotColor(e.bank)
         row.dot:SetVertexColor(c[1], c[2], c[3], 1)
         row.name:SetText(e.bank)
-        row.name:SetTextColor(sel and C.gold[1] or C.text[1], sel and C.gold[2] or C.text[2], sel and C.gold[3] or C.text[3])
+        if sel then row.name:SetTextColor(C.gold[1], C.gold[2], C.gold[3]) else row.name:SetTextColor(1, 1, 1) end
         local st = BB:BankStats(e.bank)
         row.cnt:SetText(st and string.format(T("SB_ITEMS"), st.items) or T("SB_NOSCAN"))
         local info = BB:GetBankInfo(e.bank)
@@ -151,7 +167,7 @@ function UI:ToggleBankMenu()
       else
         row.dot:SetVertexColor(C.gold[1], C.gold[2], C.gold[3], 1)
         row.name:SetText(T("SB_ALL"))
-        row.name:SetTextColor(sel and C.gold[1] or C.text[1], sel and C.gold[2] or C.text[2], sel and C.gold[3] or C.text[3])
+        if sel then row.name:SetTextColor(C.gold[1], C.gold[2], C.gold[3]) else row.name:SetTextColor(1, 1, 1) end
         row.cnt:SetText(string.format(T("SB_ALL_INFO"), total, getn(entries) - 1))
         row.role:SetText("")
       end
@@ -362,7 +378,7 @@ function UI:BuildBankEditor()
   f:SetScript("OnDragStart", function() this:StartMoving() end)
   f:SetScript("OnDragStop", function() this:StopMovingOrSizing() end)
   f:SetBackdrop({
-    bgFile = "Interface\\Tooltips\\UI-Tooltip-Background",
+    bgFile = WHITE,
     edgeFile = "Interface\\DialogFrame\\UI-DialogBox-Border",
     tile = true, tileSize = 16, edgeSize = 32,
     insets = { left = 11, right = 12, top = 12, bottom = 11 },

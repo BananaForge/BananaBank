@@ -338,6 +338,9 @@ BB.L.deDE = {
   TT_WRONG = "%d liegen auf %s (falsch gelagert)",
   BANK_ELSE_HEAD = "Der Rest liegt auf anderen Banken:",
   BANK_ELSE_LINE = "%dx %s: %s",
+  STOCK_BANK_NOSCAN = "%s hat noch keinen Bestand gemeldet. Der Bank-Char muss einmal die Bank öffnen.",
+  STOCK_BANK_EMPTY = "%s hält gerade keine Items.",
+  STOCK_INFO_BANK = "%s: %d verschiedene Items   -   Stand %s",
   YES = "ja",
   NO = "nein",
 
@@ -751,6 +754,9 @@ BB.L.enUS = {
   TT_WRONG = "%d are on %s (misplaced)",
   BANK_ELSE_HEAD = "The rest is on other banks:",
   BANK_ELSE_LINE = "%dx %s: %s",
+  STOCK_BANK_NOSCAN = "%s has not reported any stock yet. The bank character has to open the bank once.",
+  STOCK_BANK_EMPTY = "%s holds no items right now.",
+  STOCK_INFO_BANK = "%s: %d different items   -   as of %s",
   YES = "yes",
   NO = "no",
 

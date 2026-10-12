@@ -757,10 +757,11 @@ function UI:StockList()
   local res = BB:GetReserved()
   -- Einzelansicht: nur der Bestand dieser Bank, ohne Reservierungen
   if S.bank then
-    local snap = BananaBankDB.snaps[S.bank]
-    if snap and BB:MayBeBank(S.bank) then
+    if BB:MayBeBank(S.bank) then
       local one = {}
-      for id, it in pairs(snap.items) do
+      local snap = BananaBankDB.snaps[S.bank]
+      -- eine Bank ohne Scan zeigt eine leere Liste mit Hinweis, springt nicht zurueck
+      for id, it in pairs(snap and snap.items or {}) do
         if not BananaBankDB.hidden[id] then
           one[id] = { c = it.c, q = it.q, t = it.t, n = it.n, k = it.k, per = { [S.bank] = it.c } }
         end
@@ -815,7 +816,11 @@ function UI:RefreshStock()
     end
   end
   if getn(list) == 0 then
-    if BB:NewestSnapshot() then
+    if S.bank and not BananaBankDB.snaps[S.bank] then
+      S.empty:SetText(string.format(T("STOCK_BANK_NOSCAN"), S.bank))
+    elseif S.bank and BB.Count(stock) == 0 then
+      S.empty:SetText(string.format(T("STOCK_BANK_EMPTY"), S.bank))
+    elseif BB:NewestSnapshot() then
       S.empty:SetText(T("STOCK_NO_MATCH"))
     elseif BB:IsBank() then
       S.empty:SetText(T("STOCK_EMPTY_BANK"))
@@ -830,7 +835,12 @@ function UI:RefreshStock()
   local total, reserved = 0, 0
   for id, e in pairs(stock) do total = total + 1 end
   for id, n in pairs(res) do reserved = reserved + n end
-  S.info:SetText(string.format(T("STOCK_INFO"), total, reserved))
+  if S.bank then
+    local snap = BananaBankDB.snaps[S.bank]
+    S.info:SetText(string.format(T("STOCK_INFO_BANK"), S.bank, total, snap and BB.Date(snap.ts) or "-"))
+  else
+    S.info:SetText(string.format(T("STOCK_INFO"), total, reserved))
+  end
   self:RefreshCart()
 end
 

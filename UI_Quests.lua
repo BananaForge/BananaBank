@@ -771,7 +771,7 @@ function UI:BuildQuestEditor()
   f:SetScript("OnDragStart", function() this:StartMoving() end)
   f:SetScript("OnDragStop", function() this:StopMovingOrSizing() end)
   f:SetBackdrop({
-    bgFile = "Interface\\Tooltips\\UI-Tooltip-Background",
+    bgFile = WHITE,
     edgeFile = "Interface\\DialogFrame\\UI-DialogBox-Border",
     tile = true, tileSize = 16, edgeSize = 32,
     insets = { left = 11, right = 12, top = 12, bottom = 11 },
