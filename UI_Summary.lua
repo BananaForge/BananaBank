@@ -39,7 +39,8 @@ local function makeWindow(name, w, h)
     tile = true, tileSize = 16, edgeSize = 32,
     insets = { left = 11, right = 12, top = 12, bottom = 11 },
   })
-  f:SetBackdropColor(C.bg[1], C.bg[2], C.bg[3], 0.98)
+  f:SetBackdropColor(C.bg[1], C.bg[2], C.bg[3], 1)
+  UI:Solid(f, 12, 1)
   f:Hide()
   tinsert(UISpecialFrames, name)
   local head = f:CreateTexture(nil, "BORDER")

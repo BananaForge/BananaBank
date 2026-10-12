@@ -100,6 +100,17 @@ UI.BACKDROP_PANEL = {
   insets = { left = 3, right = 3, top = 3, bottom = 3 },
 }
 
+-- Deckender Untergrund: der Tooltip-Hintergrund ist halbtransparent, darunter schimmern
+-- sonst Raster und Texte durch (Menues, Fenster ueber dem Hauptfenster).
+function UI:Solid(f, inset, alpha)
+  local t = f:CreateTexture(nil, "BACKGROUND")
+  t:SetTexture(WHITE)
+  t:SetPoint("TOPLEFT", f, "TOPLEFT", inset, -inset)
+  t:SetPoint("BOTTOMRIGHT", f, "BOTTOMRIGHT", -inset, inset)
+  t:SetVertexColor(C.bg[1], C.bg[2], C.bg[3], alpha or 1)
+  return t
+end
+
 function UI:Panel(parent, w, h)
   local p = CreateFrame("Frame", nil, parent)
   if w then p:SetWidth(w) end
