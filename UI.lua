@@ -388,13 +388,14 @@ function UI:Init()
     { key = "TAB_LEDGER", page = "ledger" },
     { key = "TAB_PRICES", page = "prices" },
     { key = "TAB_QUESTS", page = "quests" },
+    { key = "TAB_BANKS", page = "banks" },
     { key = "TAB_BANK", page = "bank" },
   }
   local prev
   for i = 1, getn(tabDefs) do
     local d = tabDefs[i]
     local tb = CreateFrame("Button", nil, f)
-    tb:SetWidth(96)
+    tb:SetWidth(92)
     tb:SetHeight(26)
     if prev then tb:SetPoint("LEFT", prev, "RIGHT", 2, 0) else tb:SetPoint("TOPLEFT", f, "TOPLEFT", 84, -80) end
     local fs = self:Font(tb, 13, C.muted)
@@ -433,6 +434,7 @@ function UI:Init()
   self:BuildLedger(content)
   if self.BuildPrices then self:BuildPrices(content) end
   if self.BuildQuests then self:BuildQuests(content) end
+  if self.BuildBanks then self:BuildBanks(content) end
   self:BuildBank(content)
   self:BuildExport()
   self:BuildThanks()
@@ -488,12 +490,14 @@ function UI:ShowPage(page)
   if page == "bank" and not BB:IsBank() then page = "stock" end
   if page == "prices" and not self.pages.prices then page = "stock" end
   if page == "quests" and not self.pages.quests then page = "stock" end
+  if page == "banks" and not self.pages.banks then page = "stock" end
   self.page = page
   for name, p in pairs(self.pages) do
     if name == page then p:Show() else p:Hide() end
   end
   if self.tabs.prices and not self.pages.prices then self.tabs.prices:Hide() end
   if self.tabs.quests and not self.pages.quests then self.tabs.quests:Hide() end
+  if self.tabs.banks and not self.pages.banks then self.tabs.banks:Hide() end
   for name, tb in pairs(self.tabs) do
     if name == page then
       tb.fs:SetTextColor(C.gold[1], C.gold[2], C.gold[3])
@@ -570,6 +574,8 @@ function UI:Refresh()
     if self.RefreshPrices then self:RefreshPrices() end
   elseif p == "quests" then
     if self.RefreshQuests then self:RefreshQuests() end
+  elseif p == "banks" then
+    if self.RefreshBanks then self:RefreshBanks() end
   elseif p == "bank" then self:RefreshBank() end
 end
 
@@ -620,6 +626,15 @@ function UI:BuildStock(parent)
     UI:RefreshStock()
   end)
   avail:SetPoint("TOPLEFT", p, "TOPLEFT", 8, -28)
+  avail:SetWidth(112)
+  -- Bankwahl: Gesamtbestand oder Inhalt einer einzelnen Bank (Menue siehe UI_Banks.lua)
+  S.bank = nil
+  S.bankBtn = self:Button(p, 160, 18, "", function() UI:ToggleBankMenu() end, "flat")
+  S.bankBtn:SetPoint("TOPLEFT", p, "TOPLEFT", 126, -27)
+  S.role = self:Font(p, 10, C.goldDim)
+  S.role:SetPoint("LEFT", S.bankBtn, "RIGHT", 8, 0)
+  S.role:SetWidth(180)
+  S.role:SetHeight(12)
 
   -- Raster
   local grid = CreateFrame("Frame", nil, p)
@@ -729,6 +744,21 @@ function UI:StockList()
   local S = self.stock
   local stock = BB:GetStock()
   local res = BB:GetReserved()
+  -- Einzelansicht: nur der Bestand dieser Bank, ohne Reservierungen
+  if S.bank then
+    local snap = BananaBankDB.snaps[S.bank]
+    if snap and BB:MayBeBank(S.bank) then
+      local one = {}
+      for id, it in pairs(snap.items) do
+        if not BananaBankDB.hidden[id] then
+          one[id] = { c = it.c, q = it.q, t = it.t, n = it.n, k = it.k, per = { [S.bank] = it.c } }
+        end
+      end
+      stock, res = one, {}
+    else
+      S.bank = nil
+    end
+  end
   local list = {}
   for id, e in pairs(stock) do
     local avail = e.c - (res[id] or 0)
@@ -747,6 +777,7 @@ end
 function UI:RefreshStock()
   if not self.stock then return end
   local S = self.stock
+  if self.RefreshBankButton then self:RefreshBankButton() end
   for i = 1, getn(S.chips) do S.chips[i]:SetActive(S.chips[i].q == S.filter) end
   local list, stock, res = self:StockList()
   local per = COLS * ROWS
@@ -839,6 +870,10 @@ function UI:OnSlotEnter(slot)
   local e = BB.stockCache and BB.stockCache[id]
   if e and BB.Count(e.per) > 1 then
     for bank, c in pairs(e.per) do table.insert(lines, { "  " .. bank, c }) end
+  end
+  local hint = BB:BankHintLines(e)
+  if hint then
+    for i = 1, getn(hint) do table.insert(lines, hint[i]) end
   end
   local u, src, pts, samples = BB:GetPrice(id)
   if u then

@@ -532,6 +532,11 @@ function UI:BuildBank(parent)
     row.here:SetPoint("LEFT", row, "LEFT", 394, 0)
     table.insert(Bk.rows, row)
   end
+  -- was auf anderen Banken liegt (Platz direkt unter den Zeilen, siehe RefreshBank)
+  Bk.left = left
+  Bk.elsewhere = self:Font(left, 10, C.orange)
+  Bk.elsewhere:SetWidth(452)
+  Bk.elsewhere:SetJustifyV("TOP")
   Bk.hint = self:Font(left, 12, C.muted)
   Bk.hint:SetPoint("TOPLEFT", left, "TOPLEFT", 16, -110)
   Bk.hint:SetWidth(440)
@@ -652,6 +657,7 @@ function UI:RefreshBank()
 
   if not r then
     for i = 1, BANK_ROWS do Bk.rows[i]:Hide() end
+    Bk.elsewhere:SetText("")
     if Bk.error then Bk.head:SetText("|cffff5040" .. T(Bk.error) .. "|r") else Bk.head:SetText(T("BANK_NO_REQUEST")) end
     Bk.hint:Show()
     Bk.confirm:SetOn(false)
@@ -698,6 +704,40 @@ function UI:RefreshBank()
       row:Show()
     else
       row:Hide()
+    end
+  end
+
+  -- Rest, der auf anderen Banken liegt
+  do
+    local lines = {}
+    local shown = getn(ids)
+    if shown > BANK_ROWS then shown = BANK_ROWS end
+    for i = 1, shown do
+      local id = ids[i]
+      local missing = r.items[id] - ((r.sent and r.sent[id]) or 0) - BB:LocalCount(id)
+      if missing > 0 then
+        local others = BB:OtherBankCounts(id)
+        if getn(others) > 0 then
+          local parts = {}
+          for j = 1, getn(others) do table.insert(parts, others[j].bank .. " " .. others[j].c) end
+          local n2 = BB:ItemInfo(id)
+          table.insert(lines, string.format(T("BANK_ELSE_LINE"), missing, n2, table.concat(parts, ", ")))
+        end
+      end
+    end
+    local y = 104 + shown * 26 + 8
+    local room = floor((322 - y) / 12)
+    if getn(lines) > 0 and room >= 2 then
+      local out = { T("BANK_ELSE_HEAD") }
+      for i = 1, getn(lines) do
+        if getn(out) < room then table.insert(out, lines[i]) end
+      end
+      Bk.elsewhere:ClearAllPoints()
+      Bk.elsewhere:SetPoint("TOPLEFT", Bk.left, "TOPLEFT", 14, -y)
+      Bk.elsewhere:SetHeight(room * 12)
+      Bk.elsewhere:SetText(table.concat(out, "\n"))
+    else
+      Bk.elsewhere:SetText("")
     end
   end
 

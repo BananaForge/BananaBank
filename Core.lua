@@ -10,7 +10,7 @@
 BananaBank = {}
 local BB = BananaBank
 
-BB.VERSION = "1.5.0"
+BB.VERSION = "1.6.0"
 BB.PREFIX = "BBNK"
 BB.DONATE_NAME = "Lumihunt"
 -- Einziger erlaubter Bank-Rang, deutsch und englisch. Fest eingebaut, es gibt
@@ -203,6 +203,7 @@ function BB:InitDB()
   db.ranks = db.ranks or {}       -- zuletzt gesehener Gildenrang je Name
   -- Altlasten aus Version 1.2.x: der Rang war frueher einstellbar
   db.bankRank, db.bankRankTs, db.rankSeenEver = nil, nil, nil
+  db.binfo = db.binfo or {}       -- Rolle je Bank-Char (Rolle, Beschreibung, Kategorien)
   db.quests = db.quests or {}     -- Gildenquests nach ID
   db.qlog = db.qlog or {}         -- verstecktes Quest-Log
   db.qtrack = db.qtrack or {}     -- verfolgte Quests (Tracker)
@@ -247,9 +248,9 @@ function BB:ReadRoster()
   if n <= 0 then return end
   local exists = false
   for i = 1, n do
-    local name, rank, rankIndex = GetGuildRosterInfo(i)
+    local name, rank, rankIndex, _, _, _, _, _, online = GetGuildRosterInfo(i)
     if name and rank then
-      db.ranks[name] = { r = rank, i = rankIndex or 99 }
+      db.ranks[name] = { r = rank, i = rankIndex or 99, online = online and true or false }
       if isBankRank(rank) then exists = true end
     end
   end
@@ -356,6 +357,7 @@ function BB:GetStock()
           e = { c = 0, q = it.q, t = it.t, n = it.n, per = {} }
           out[id] = e
         end
+        if it.k and not e.k then e.k = it.k end
         e.c = e.c + it.c
         e.per[bank] = (e.per[bank] or 0) + it.c
       end
@@ -703,6 +705,15 @@ function BB:PushQuests() end
 function BB:MergeQuest() return false end
 function BB:ParseQuests() return {} end
 function BB:CanManageQuests() return false end
+-- Platzhalter fuer Banks.lua
+function BB:ItemCategory() return "other" end
+function BB:BankInfoDigest() return 0, 0 end
+function BB:PushBankInfo() end
+function BB:MergeBankInfo() return false end
+function BB:ParseBankInfo() return {} end
+function BB:BankHintLines() return nil end
+function BB:OtherBankCounts() return {} end
+function BB:BankList() return {} end
 
 -- Zeigt in ein paar Zeilen, warum kein Bestand da ist
 function BB:Status()
@@ -756,6 +767,8 @@ function BB:CheckModules()
   local missing = {}
   if not self.priceModule then table.insert(missing, "Prices.lua") end
   if not self.questModule then table.insert(missing, "Quests.lua") end
+  if not self.bankModule then table.insert(missing, "Banks.lua") end
+  if not (self.UI and self.UI.bankUIModule) then table.insert(missing, "UI_Banks.lua") end
   if not self.summaryModule then table.insert(missing, "Summary.lua") end
   if not (self.UI and self.UI.summaryModule) then table.insert(missing, "UI_Summary.lua") end
   if not (self.UI and self.UI.questModule) then table.insert(missing, "UI_Quests.lua") end

@@ -139,6 +139,10 @@ SlashCmdList["BANANABANK"] = function(msg)
     BB.UI:Init()
     BB.UI.frame:Show()
     BB.UI:ShowPage("quests")
+  elseif cmd == "banks" or cmd == "banken" then
+    BB.UI:Init()
+    BB.UI.frame:Show()
+    BB.UI:ShowPage("banks")
   elseif cmd == "totals" or cmd == "summen" then
     BB.UI:OpenTotalsWindow("in")
   elseif cmd == "tracker" then

@@ -30,7 +30,7 @@ function BB:ScanContainers(bags)
         if id and not BB.IGNORE_IDS[id] and bind ~= "soul" then
           local e = items[id]
           if not e then
-            e = { c = 0, q = q, t = BB.ShortTex(tex), n = name or ("#" .. id) }
+            e = { c = 0, q = q, t = BB.ShortTex(tex), n = name or ("#" .. id), k = self:ItemCategory(id, bind) }
             items[id] = e
           end
           e.c = e.c + (count or 1)
@@ -76,7 +76,8 @@ function BB:UpdateSnapshot(push)
     for id, it in pairs(src) do
       local e = items[id]
       if not e then
-        e = { c = 0, q = it.q, t = it.t, n = it.n }
+        local k = it.k or self:ItemCategory(id, db.bind and db.bind[id])
+        e = { c = 0, q = it.q, t = it.t, n = it.n, k = k }
         items[id] = e
       end
       e.c = e.c + it.c

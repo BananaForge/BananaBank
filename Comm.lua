@@ -80,7 +80,7 @@ end
 function BB:SerializeSnapshot(snap)
   local recs = {}
   for id, it in pairs(snap.items) do
-    table.insert(recs, id .. "~" .. it.c .. "~" .. (it.q or 1) .. "~" .. BB.Clean(it.t) .. "~" .. BB.Clean(it.n))
+    table.insert(recs, id .. "~" .. it.c .. "~" .. (it.q or 1) .. "~" .. BB.Clean(it.t) .. "~" .. BB.Clean(it.n) .. "~" .. (it.k or ""))
   end
   return table.concat(recs, "^")
 end
@@ -92,6 +92,7 @@ function BB:ParseSnapshot(payload)
     local id = tonumber(f[1])
     if id and tonumber(f[2]) then
       items[id] = { c = tonumber(f[2]), q = tonumber(f[3]) or 1, t = f[4] or "", n = f[5] or ("#" .. id) }
+      if f[6] and BB.CAT_SET and BB.CAT_SET[f[6]] then items[id].k = f[6] end
     end
   end
   return items
@@ -192,6 +193,7 @@ function BB:PushAll()
   self:PushRequests()
   self:PushPrices()
   self:PushQuests()
+  self:PushBankInfo()
 end
 
 function BB:PushSnapshot(bank)
@@ -269,8 +271,9 @@ function BB:SendHello()
   for origin, s in pairs(BananaBankDB.seqs) do table.insert(seqs, origin .. "," .. s) end
   local qn, qs = self:RequestDigest()
   local qn2, qs2 = self:QuestDigest()
+  local bn2, bs2 = self:BankInfoDigest()
   self:Send("H~" .. self.VERSION .. "~" .. qn .. "~" .. qs .. "~" .. table.concat(snaps, ";") ..
-    "~" .. table.concat(seqs, ";") .. "~" .. (BananaBankDB.priceTs or 0) .. "~" .. qn2 .. "~" .. qs2)
+    "~" .. table.concat(seqs, ";") .. "~" .. (BananaBankDB.priceTs or 0) .. "~" .. qn2 .. "~" .. qs2 .. "~" .. bn2 .. "~" .. bs2)
 end
 
 local function parseList(s)
@@ -287,7 +290,7 @@ local function versionNum(v)
   return (tonumber(f[1]) or 0) * 10000 + (tonumber(f[2]) or 0) * 100 + (tonumber(f[3]) or 0)
 end
 
-function BB:OnHello(sender, ver, qn, qs, snapStr, seqStr, priceTs, gn, gs)
+function BB:OnHello(sender, ver, qn, qs, snapStr, seqStr, priceTs, gn, gs, bn, bs)
   if not versionWarned and versionNum(ver) > versionNum(self.VERSION) then
     versionWarned = true
     self:Print(string.format(self.T("MSG_NEW_VERSION"), ver))
@@ -332,6 +335,15 @@ function BB:OnHello(sender, ver, qn, qs, snapStr, seqStr, priceTs, gn, gs)
     local myGN, myGS = self:QuestDigest()
     if myGN ~= tonumber(gn) or myGS ~= tonumber(gs) then
       if myGN > 0 then schedulePush("G", function() BB:PushQuests() end) end
+      behind = true
+    end
+  end
+
+  -- Bank-Rollen
+  if bn and bs then
+    local myBN, myBS = self:BankInfoDigest()
+    if myBN ~= tonumber(bn) or myBS ~= tonumber(bs) then
+      if myBN > 0 then schedulePush("I", function() BB:PushBankInfo() end) end
       behind = true
     end
   end
@@ -398,6 +410,12 @@ function BB:OnTransfer(sender, kind, meta, payload)
     self.qDirty = true
     self:Debug(n .. " neue Buchungen von " .. sender)
     self:QuestTick()
+  elseif kind == "I" then
+    local n = 0
+    for _, r in ipairs(self:ParseBankInfo(payload)) do
+      if self:MergeBankInfo(r) then n = n + 1 end
+    end
+    self:Debug(n .. " Bank-Rollen von " .. sender)
   elseif kind == "G" then
     local n = 0
     for _, r in ipairs(self:ParseQuests(payload)) do
@@ -468,10 +486,12 @@ function BB:OnAddonMessage(prefix, msg, channel, sender)
       if (tonumber(meta) or 0) >= (BananaBankDB.priceTs or 0) then pushes["P"] = nil end
     elseif kind == "G" and meta == "full" then
       pushes["G"] = nil
+    elseif kind == "I" and meta == "full" then
+      pushes["I"] = nil
     end
   elseif t == "H~" then
     local f = BB.Split(msg, "~")
-    self:OnHello(sender, f[2], f[3], f[4], f[5], f[6], f[7], f[8], f[9])
+    self:OnHello(sender, f[2], f[3], f[4], f[5], f[6], f[7], f[8], f[9], f[10], f[11])
   end
 end
 
