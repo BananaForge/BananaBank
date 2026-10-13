@@ -1788,10 +1788,47 @@ function UI:ConfirmQuestClose()
   end
 end
 
+function UI:QuestLinkTooltip(id)
+  local q = BananaBankDB.quests[id]
+  if not ItemRefTooltip then return end
+  ShowUIPanel(ItemRefTooltip)
+  ItemRefTooltip:SetOwner(UIParent, "ANCHOR_PRESERVE")
+  if not q then
+    ItemRefTooltip:AddLine(T("QX_LINK_UNKNOWN"), 1, 0.65, 0.2, 1)
+    ItemRefTooltip:Show()
+    return
+  end
+  local s = BB:QuestStats()[q.id]
+  local done, need = s and s.done or 0, s and s.need or BB:QuestNeed(q)
+  ItemRefTooltip:AddLine(q.title, C.gold[1], C.gold[2], C.gold[3])
+  if q.text and q.text ~= "" then ItemRefTooltip:AddLine(q.text, 1, 1, 1, 1) end
+  ItemRefTooltip:AddLine(" ")
+  local ids = {}
+  for iid in pairs(q.items) do table.insert(ids, iid) end
+  table.sort(ids)
+  for i = 1, getn(ids) do
+    local iid = ids[i]
+    local n, qual = BB:QuestItemInfo(q, iid)
+    local col = BB.QUALITY_COLOR[qual or 1] or BB.QUALITY_COLOR[1]
+    local got = s and s.eff[iid] or 0
+    ItemRefTooltip:AddDoubleLine(n, got .. " / " .. q.items[iid], col[1], col[2], col[3], 0.8, 0.8, 0.8)
+  end
+  ItemRefTooltip:AddLine(" ")
+  local pc = (need > 0 and done >= need) and STATE_COLOR.complete or STATE_COLOR.open
+  ItemRefTooltip:AddLine(string.format(T("QX_TT_PROGRESS"), done, need), pc[1], pc[2], pc[3])
+  if q.due and q.due > 0 then ItemRefTooltip:AddLine(string.format(T("QD_DUE_LEFT"), date("%d.%m.", q.due)), 0.8, 0.8, 0.8) end
+  ItemRefTooltip:Show()
+end
+
 -- Shift-Klick auf einen Item-Link im Chat uebernimmt das Item in den offenen Quest-Editor
 local origSetItemRef = SetItemRef
 if origSetItemRef then
   SetItemRef = function(link, text, button)
+    -- Klick auf [Gildenquest: ...] im Chat: Tooltip mit Beschreibung und Fortschritt
+    if link and string.sub(link, 1, 8) == "bbquest:" then
+      UI:QuestLinkTooltip(string.sub(link, 9))
+      return
+    end
     if IsShiftKeyDown() and UI.qe and UI.qe:IsVisible() and link and string.sub(link, 1, 5) == "item:" then
       local id, name, quality = BB.ParseLink(text or link)
       if id then

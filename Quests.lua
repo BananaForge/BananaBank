@@ -498,7 +498,7 @@ end
 
 -- kurzer Text fuer die Eingabezeile (Shift-Klick auf die Quest)
 function BB:QuestChatText(q)
-  return "[" .. self.T("QCHAT_TAG") .. ": " .. q.title .. "]"
+  return "|cffffd100|Hbbquest:" .. q.id .. "|h[" .. self.T("QCHAT_TAG") .. ": " .. q.title .. "]|h|r"
 end
 
 -- Zeilen fuer den Gildenchat (je unter 250 Byte)
