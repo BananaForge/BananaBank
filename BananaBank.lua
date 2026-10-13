@@ -1,6 +1,7 @@
 -- BananaBank Einstieg: Events und Befehle
 
 local BB = BananaBank
+local getn = table.getn
 local started = false
 
 -- Hello erst senden, wenn die Gildenliste da ist und den Bank-Rang zeigt
@@ -10,6 +11,24 @@ function BB:TryHello(n)
   elseif n < 12 then
     self:RequestRoster()
     self:After(5, function() BB:TryHello(n + 1) end, "hello")
+  end
+end
+
+-- Taschen oeffnen loest bei Bank-Chars eine Pruefung des Bestands aus (gesendet wird nur bei Aenderung)
+function BB:HookBags()
+  if self.bagsHooked then return end
+  self.bagsHooked = true
+  local names = { "ToggleBackpack", "ToggleBag", "OpenAllBags" }
+  for i = 1, getn(names) do
+    local name = names[i]
+    local orig = getglobal(name)
+    if type(orig) == "function" then
+      setglobal(name, function(a, b, c)
+        local r = orig(a, b, c)
+        if BB:IsBank() and BB.worldReady then BB:ScheduleSnapshot(1) end
+        return r
+      end)
+    end
   end
 end
 
@@ -31,6 +50,7 @@ ev:SetScript("OnEvent", function()
     BB:InitDB()
     BB:ApplyLanguage()
     BB:HookMail()
+    BB:HookBags()
     math.randomseed(time())
 
   elseif event == "PLAYER_ENTERING_WORLD" then
@@ -43,6 +63,11 @@ ev:SetScript("OnEvent", function()
     BB:RequestRoster()
     BB:After(6, function() BB:RequestRoster() end, "roster")
     BB:After(5, function() BB:QuestTick() end, "questbase")
+    -- ab jetzt zaehlen Taschen-Ereignisse; einmal pruefen, ob sich seit dem Abmelden etwas geaendert hat
+    BB:After(6, function()
+      BB.worldReady = true
+      BB:ScheduleSnapshot(1)
+    end, "worldready")
     BB:After(12, function() BB:TryHello(1) end, "hello")
 
   elseif event == "CHAT_MSG_ADDON" then
@@ -61,7 +86,8 @@ ev:SetScript("OnEvent", function()
     BB.UI:Refresh()
 
   elseif event == "BAG_UPDATE" or event == "PLAYERBANKSLOTS_CHANGED" then
-    if BB:IsBank() and BB.bankOpen and not BB.job then BB:ScheduleSnapshot(3) end
+    -- auch bei geschlossener Bank: Post verschicken, Taschen oeffnen, Items abgeben ...
+    if BB:IsBank() and BB.worldReady and not BB.job then BB:ScheduleSnapshot(3) end
     if BB.UI.page == "bank" then BB:After(0.5, function() BB.UI:Refresh() end, "bagrefresh") end
 
   elseif event == "PLAYER_MONEY" then
@@ -81,6 +107,7 @@ ev:SetScript("OnEvent", function()
 
   elseif event == "MAIL_SEND_SUCCESS" then
     BB:OnMailSent()
+    if BB:IsBank() then BB:ScheduleSnapshot(2) end
 
   elseif event == "MAIL_FAILED" then
     BB:OnMailFailed()

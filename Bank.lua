@@ -41,7 +41,19 @@ function BB:ScanContainers(bags)
   return items
 end
 
-function BB:UpdateSnapshot(push)
+local function sameItems(a, b)
+  for id, it in pairs(a or {}) do
+    local o = b[id]
+    if not o or o.c ~= it.c then return false end
+  end
+  for id in pairs(b or {}) do
+    if not a[id] then return false end
+  end
+  return true
+end
+
+-- onlyIfChanged: nichts senden, wenn sich der Inhalt nicht veraendert hat (Taschen-Ereignisse)
+function BB:UpdateSnapshot(push, onlyIfChanged)
   if not self:IsBank() then return end
   -- Rang verloren? Dann nicht mehr als Bank senden.
   if not self:MayBeBank(self:Me()) then
@@ -87,15 +99,29 @@ function BB:UpdateSnapshot(push)
   add(self:ScanContainers(BB.BAG_LIST))
   local ts = time()
   local old = db.snaps[me]
+  local changed = not old or (old.partial and true or false) ~= partial or not sameItems(old.items, items)
+  if onlyIfChanged and not changed then
+    -- unveraendert: hoechstens noch nachsenden, was bisher nur lokal gespeichert war
+    if push and self.snapUnsent then
+      self.snapUnsent = false
+      self:PushSnapshot(me)
+    end
+    return
+  end
   if old and old.ts >= ts then ts = old.ts + 1 end
   db.snaps[me] = { ts = ts, gold = GetMoney(), items = items, from = me, partial = partial }
-  if push then self:PushSnapshot(me) end
+  if push then
+    self.snapUnsent = false
+    self:PushSnapshot(me)
+  else
+    self.snapUnsent = true
+  end
   if self.UI then self.UI:Refresh() end
 end
 
 function BB:ScheduleSnapshot(delay)
   if not self:IsBank() then return end
-  self:After(delay or 3, function() BB:UpdateSnapshot(true) end, "snapshot")
+  self:After(delay or 3, function() BB:UpdateSnapshot(true, true) end, "snapshot")
 end
 
 -- Bestand an diesem Char (Taschen + Bank, Bank nur live wenn offen, sonst Cache)
