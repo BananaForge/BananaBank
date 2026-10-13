@@ -14,6 +14,7 @@ BB.QUEST_MAX_ITEMS = 6
 BB.QUEST_MAX_OPEN = 8
 BB.QUEST_TITLE_LEN = 40
 BB.QUEST_TEXT_LEN = 180
+BB.QUEST_TIP_LEN = 200        -- eigener Tooltip-Text einer Quest
 BB.QUEST_LOG_MAX = 400
 BB.QUEST_POINTS = 10          -- eine ganze Quest allein erledigt = 10 Punkte
 BB.QRANK = { open = 1, closed = 2, cancelled = 3 }
@@ -51,6 +52,14 @@ local function cleanText(s, len)
   return cutUtf8(s, len)
 end
 BB.QuestClean = cleanText
+
+-- Icon einer Quest: nur der Dateiname unter Interface\\Icons, ohne Sonderzeichen
+local function cleanIcon(s)
+  s = BB.ShortTex(s or "")
+  s = string.gsub(s, "[^%w_%-]", "")
+  return string.sub(s, 1, 60)
+end
+BB.QuestCleanIcon = cleanIcon
 
 local function cleanName(s)
   s = cleanText(s, 60)
@@ -327,7 +336,7 @@ function BB:CountOpenQuests()
 end
 
 -- items = { [id] = Bedarf }, meta = { [id] = { n=, q=, t= } }
-function BB:CreateQuest(title, text, items, meta, days, reserve)
+function BB:CreateQuest(title, text, items, meta, days, reserve, icon, tip)
   if not self:CanManageQuests() then noPerm(self) return nil end
   title = cleanText(title, BB.QUEST_TITLE_LEN)
   text = cleanText(text, BB.QUEST_TEXT_LEN)
@@ -344,6 +353,7 @@ function BB:CreateQuest(title, text, items, meta, days, reserve)
     id = id, c = self:Me(), ts = now, s = "open", u = now, by = self:Me(),
     due = (days and days > 0) and (now + days * 86400) or 0, rs = reserve and 1 or 0,
     title = title, text = text, items = items, meta = meta or {},
+    ic = cleanIcon(icon), tip = cleanText(tip or "", BB.QUEST_TIP_LEN),
   }
   BananaBankDB.quests[id] = q
   self.qDirty = true
@@ -353,7 +363,7 @@ function BB:CreateQuest(title, text, items, meta, days, reserve)
   return q
 end
 
-function BB:EditQuest(q, title, text, items, meta, days, reserve)
+function BB:EditQuest(q, title, text, items, meta, days, reserve, icon, tip)
   if not self:CanManageQuests() then noPerm(self) return false end
   if q.s ~= "open" then return false end
   title = cleanText(title, BB.QUEST_TITLE_LEN)
@@ -361,6 +371,8 @@ function BB:EditQuest(q, title, text, items, meta, days, reserve)
   if title == "" then self:Print("|cffff4040" .. self.T("ERR_QUEST_TITLE") .. "|r") return false end
   if BB.Count(items) == 0 then self:Print("|cffff4040" .. self.T("ERR_QUEST_ITEMS") .. "|r") return false end
   q.title, q.text, q.items, q.meta = title, text, items, meta or {}
+  if icon ~= nil then q.ic = cleanIcon(icon) end
+  if tip ~= nil then q.tip = cleanText(tip, BB.QUEST_TIP_LEN) end
   q.rs = reserve and 1 or 0
   if days and days >= 0 then
     if days == 0 then q.due = 0 else q.due = time() + days * 86400 end
@@ -424,6 +436,110 @@ function BB:CreateQuestPayout(q, recipient)
 end
 
 -- ------------------------------------------------------------
+-- Neu ausschreiben ("Wiederholen"): gleiche Items, Icon und Tooltip, neuer Name, Fortschritt 0
+-- ------------------------------------------------------------
+-- "Name #2" -> "Name #3": die hoechste vorhandene Nummer mit gleichem Namen plus 1
+function BB:NextQuestTitle(title)
+  local base = (string.gsub(title or "", "%s*#%d+$", ""))
+  local n = 1
+  for _, o in pairs(BananaBankDB.quests) do
+    local ob = (string.gsub(o.title or "", "%s*#%d+$", ""))
+    if ob == base then
+      local _, _, num = string.find(o.title or "", "#(%d+)$")
+      local nn = tonumber(num) or 1
+      if nn > n then n = nn end
+    end
+  end
+  local suffix = " #" .. (n + 1)
+  return cutUtf8(base, BB.QUEST_TITLE_LEN - string.len(suffix)) .. suffix
+end
+
+-- Tage der urspruenglichen Laufzeit (0 = keine Frist)
+function BB:QuestSpanDays(q)
+  if q.due and q.due > 0 and q.ts and q.due > q.ts then
+    return math.max(1, math.ceil((q.due - q.ts) / 86400))
+  end
+  return 0
+end
+
+-- closeOld: die alte Quest vorher abschliessen (gibt ihren Platz unter den aktiven Quests frei)
+function BB:RepeatQuest(q, title, days, reserve, closeOld)
+  if not q then return nil end
+  if not self:CanManageQuests() then noPerm(self) return nil end
+  title = cleanText(title, BB.QUEST_TITLE_LEN)
+  if title == "" then self:Print("|cffff4040" .. self.T("ERR_QUEST_TITLE") .. "|r") return nil end
+  local freed = (closeOld and q.s == "open") and 1 or 0
+  if self:CountOpenQuests() - freed >= BB.QUEST_MAX_OPEN then
+    self:Print("|cffff4040" .. string.format(self.T("ERR_QUEST_MAX"), BB.QUEST_MAX_OPEN) .. "|r")
+    return nil
+  end
+  local items, meta = {}, {}
+  for id, need in pairs(q.items) do
+    items[id] = need
+    local m = q.meta and q.meta[id]
+    if m then meta[id] = { n = m.n, q = m.q, t = m.t } end
+  end
+  if closeOld and q.s == "open" then self:SetQuestStatus(q, "closed") end
+  return self:CreateQuest(title, q.text or "", items, meta, days, reserve, q.ic, q.tip)
+end
+
+-- ------------------------------------------------------------
+-- Chat: Quest als Text, Items als echte Item-Links
+-- ------------------------------------------------------------
+function BB:ItemLinkText(id, name, quality)
+  local c = BB.QUALITY_COLOR[quality or 1] or BB.QUALITY_COLOR[1]
+  return "|cff" .. c[4] .. "|Hitem:" .. id .. ":0:0:0|h[" .. name .. "]|h|r"
+end
+
+function BB:QuestItemLink(q, id)
+  local name, quality = self:QuestItemInfo(q, id)
+  return self:ItemLinkText(id, name, quality)
+end
+
+-- kurzer Text fuer die Eingabezeile (Shift-Klick auf die Quest)
+function BB:QuestChatText(q)
+  return "[" .. self.T("QCHAT_TAG") .. ": " .. q.title .. "]"
+end
+
+-- Zeilen fuer den Gildenchat (je unter 250 Byte)
+function BB:QuestChatLines(q)
+  local s = self:QuestStats()[q.id]
+  local lines = {}
+  local head = string.format(self.T("QCHAT_HEAD"), q.title, s and s.done or 0, s and s.need or self:QuestNeed(q))
+  if q.due and q.due > 0 then head = head .. string.format(self.T("QCHAT_DUE"), date("%d.%m.", q.due)) end
+  table.insert(lines, head)
+  local prefix = self.T("QCHAT_ITEMS")
+  local cur = prefix
+  local ids = {}
+  for id in pairs(q.items) do table.insert(ids, id) end
+  table.sort(ids)
+  for i = 1, getn(ids) do
+    local part = self:QuestItemLink(q, ids[i]) .. " x" .. q.items[ids[i]]
+    if cur ~= prefix and string.len(cur) + string.len(part) + 2 > 245 then
+      table.insert(lines, cur)
+      cur = prefix
+    end
+    cur = (cur == prefix) and (cur .. part) or (cur .. ", " .. part)
+  end
+  if cur ~= prefix then table.insert(lines, cur) end
+  table.insert(lines, self.T("QCHAT_HOW"))
+  return lines
+end
+
+function BB:PostQuestToGuild(q)
+  if not q then return false end
+  if not self:CanManageQuests() then noPerm(self) return false end
+  if not IsInGuild or not IsInGuild() then self:Print("|cffff4040" .. self.T("QCHAT_NOGUILD") .. "|r") return false end
+  local lines = self:QuestChatLines(q)
+  for i = 1, getn(lines) do
+    local line = lines[i]
+    self:After((i - 1) * 0.5, function() SendChatMessage(line, "GUILD") end)
+  end
+  self:Print(self.T("QCHAT_SENT"))
+  return true
+end
+
+-- ------------------------------------------------------------
 -- Netz: Quests serialisieren und zusammenfuehren
 -- ------------------------------------------------------------
 function BB:SerializeQuests(list)
@@ -439,6 +555,7 @@ function BB:SerializeQuests(list)
       q.id, BB.Clean(q.c), q.ts or 0, q.s, q.u or 0, BB.Clean(q.by or ""), q.due or 0, q.rs or 0,
       cleanText(q.title, BB.QUEST_TITLE_LEN), cleanText(q.text or "", BB.QUEST_TEXT_LEN),
       table.concat(its, ","),
+      cleanIcon(q.ic or ""), cleanText(q.tip or "", BB.QUEST_TIP_LEN),
     }, "~"))
   end
   return table.concat(recs, "^")
@@ -465,6 +582,8 @@ function BB:ParseQuests(payload)
           by = f[6], due = tonumber(f[7]) or 0, rs = tonumber(f[8]) or 0,
           title = cleanText(f[9], BB.QUEST_TITLE_LEN), text = cleanText(f[10] or "", BB.QUEST_TEXT_LEN),
           items = items, meta = meta,
+          -- Felder 12/13 kennen nur Versionen ab 1.8.0; fehlen sie, bleibt der alte Wert erhalten (nil)
+          ic = f[12] and cleanIcon(f[12]) or nil, tip = f[13] and cleanText(f[13], BB.QUEST_TIP_LEN) or nil,
         })
       end
     end
@@ -519,6 +638,8 @@ function BB:MergeQuest(r)
     if rn == rc and rn == 1 then
       cur.title, cur.text, cur.items, cur.meta = r.title, r.text, r.items, r.meta
       cur.due, cur.rs = r.due, r.rs
+      if r.ic ~= nil then cur.ic = r.ic end
+      if r.tip ~= nil then cur.tip = r.tip end
       self:QLog("edit", cur, r.by, nil, r.id .. ":open:" .. r.u)
     end
     cur.u, cur.by = r.u, r.by

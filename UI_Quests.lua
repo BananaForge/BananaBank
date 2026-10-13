@@ -114,12 +114,15 @@ end
 local function itemTooltip(owner, q, id)
   if GetItemInfo(id) then
     UI:ItemTooltip(owner, id)
-    return
+  else
+    local n, qual = BB:QuestItemInfo(q, id)
+    local col = BB.QUALITY_COLOR[qual or 1] or BB.QUALITY_COLOR[1]
+    GameTooltip:SetOwner(owner, "ANCHOR_RIGHT")
+    GameTooltip:AddLine(n, col[1], col[2], col[3])
   end
-  local n, qual = BB:QuestItemInfo(q, id)
-  local col = BB.QUALITY_COLOR[qual or 1] or BB.QUALITY_COLOR[1]
-  GameTooltip:SetOwner(owner, "ANCHOR_RIGHT")
-  GameTooltip:AddLine(n, col[1], col[2], col[3])
+  GameTooltip:AddLine(" ")
+  GameTooltip:AddLine(T("QX_ITEM_HINT"), 0.5, 0.7, 1)
+  GameTooltip:AddLine(T("QX_ITEM_HINT2"), 0.5, 0.7, 1)
   GameTooltip:Show()
 end
 
@@ -128,6 +131,67 @@ local function sortedItemIds(q)
   for id in pairs(q.items) do table.insert(ids, id) end
   table.sort(ids)
   return ids
+end
+
+-- Icon einer Quest: das gewaehlte, sonst das Icon des ersten Items
+function UI:QuestIconTex(q)
+  if q.ic and q.ic ~= "" then return BB.FullTex(q.ic) end
+  local ids = sortedItemIds(q)
+  if ids[1] then
+    local _, _, tex = BB:QuestItemInfo(q, ids[1])
+    return BB.FullTex(tex)
+  end
+  return BB.FullTex("")
+end
+
+-- Tooltip der Quest: eigener Text, darunter Bedarf und Fortschritt
+function UI:QuestTooltip(owner, q)
+  if not q then return end
+  local s = BB:QuestStats()[q.id]
+  local done, need = s and s.done or 0, s and s.need or BB:QuestNeed(q)
+  GameTooltip:SetOwner(owner, "ANCHOR_RIGHT")
+  GameTooltip:AddLine(q.title, C.gold[1], C.gold[2], C.gold[3])
+  if q.tip and q.tip ~= "" then GameTooltip:AddLine(q.tip, 1, 1, 1, 1) end
+  GameTooltip:AddLine(" ")
+  GameTooltip:AddLine(string.format(T("QX_TT_NEED"), BB.Count(q.items)), 0.62, 0.64, 0.74)
+  local pc = (need > 0 and done >= need) and STATE_COLOR.complete or STATE_COLOR.open
+  GameTooltip:AddLine(string.format(T("QX_TT_PROGRESS"), done, need), pc[1], pc[2], pc[3])
+  GameTooltip:AddLine(T("QX_TT_HINT"), 0.5, 0.7, 1)
+  GameTooltip:Show()
+end
+
+-- Text in die Chat-Eingabezeile legen (oeffnet sie, falls noetig)
+function UI:ChatInsert(text)
+  local eb = ChatFrameEditBox
+  if eb and eb:IsVisible() then
+    eb:Insert(text)
+    return true
+  end
+  if ChatFrame_OpenChat then
+    ChatFrame_OpenChat(text)
+    return true
+  end
+  return false
+end
+
+-- Klick auf ein Quest-Item: Shift = in den Chat bzw. den offenen Editor, Strg = in eine neue Quest
+function UI:ItemClick(q, id, button)
+  if button ~= "LeftButton" or not id then return end
+  local name, quality, tex = BB:QuestItemInfo(q, id)
+  if IsShiftKeyDown() then
+    if self.qe and self.qe:IsVisible() then
+      self:QuestAddItem(id, { n = name, q = quality, t = tex })
+    else
+      self:ChatInsert(BB:ItemLinkText(id, name, quality))
+    end
+  elseif IsControlKeyDown() then
+    if not BB:CanManageQuests() then
+      BB:Print("|cffff4040" .. T("ERR_QUEST_NOPERM") .. "|r")
+      return
+    end
+    if not (self.qe and self.qe:IsVisible()) then self:OpenQuestEditor(nil) end
+    self:QuestAddItem(id, { n = name, q = quality, t = tex })
+  end
 end
 
 -- ------------------------------------------------------------
@@ -190,19 +254,34 @@ function UI:BuildQuests(parent)
     hl:SetTexture(WHITE)
     hl:SetAllPoints(row)
     hl:SetVertexColor(1, 0.82, 0.3, 0.10)
+    row.ico = self:Slot(row, 30)
+    row.ico:SetPoint("LEFT", row, "LEFT", 8, 0)
+    row.ico:SetQuality(1)
+    row.ico:SetScript("OnEnter", function() UI:QuestTooltip(this, BananaBankDB.quests[this.qid]) end)
+    row.ico:SetScript("OnLeave", function() GameTooltip:Hide() end)
+    row.ico:SetScript("OnClick", function()
+      -- Klick auf das Icon wirkt wie ein Klick auf die Zeile
+      local r = this:GetParent()
+      this = r
+      r:GetScript("OnClick")()
+    end)
     row.title = self:Font(row, 12, C.text)
-    row.title:SetPoint("TOPLEFT", row, "TOPLEFT", 10, -5)
-    row.title:SetWidth(140)
+    row.title:SetPoint("TOPLEFT", row, "TOPLEFT", 44, -5)
+    row.title:SetWidth(112)
     row.title:SetHeight(14)
     row.tag = self:Font(row, 10, C.muted)
     row.tag:SetPoint("TOPRIGHT", row, "TOPRIGHT", -4, -6)
     row.tag:SetJustifyH("RIGHT")
-    row.bar = self:QBar(row, 196, 12)
-    row.bar:SetPoint("BOTTOMLEFT", row, "BOTTOMLEFT", 10, 4)
+    row.bar = self:QBar(row, 166, 12)
+    row.bar:SetPoint("BOTTOMLEFT", row, "BOTTOMLEFT", 44, 4)
     row.index = i
     row:SetScript("OnClick", function()
       local e = Q.shown and Q.shown[this.index]
       if e then
+        if IsShiftKeyDown() then
+          UI:ChatInsert(BB:QuestChatText(e.q))
+          return
+        end
         Q.sel = e.q.id
         PlaySound("igMainMenuOptionCheckBoxOn")
         UI:RefreshQuests()
@@ -234,12 +313,21 @@ function UI:BuildQuests(parent)
   local dc = CreateFrame("Frame", nil, d)
   dc:SetAllPoints(d)
   Q.dc = dc
+  Q.ico = self:Slot(dc, 40)
+  Q.ico:SetPoint("TOPLEFT", dc, "TOPLEFT", 14, -9)
+  Q.ico:SetQuality(1)
+  Q.ico:SetScript("OnEnter", function() UI:QuestTooltip(this, BananaBankDB.quests[Q.sel]) end)
+  Q.ico:SetScript("OnLeave", function() GameTooltip:Hide() end)
+  Q.ico:SetScript("OnClick", function()
+    local q = BananaBankDB.quests[Q.sel]
+    if q and IsShiftKeyDown() then UI:ChatInsert(BB:QuestChatText(q)) end
+  end)
   Q.title = self:Font(dc, 17, C.gold)
-  Q.title:SetPoint("TOPLEFT", dc, "TOPLEFT", 14, -11)
-  Q.title:SetWidth(478)
+  Q.title:SetPoint("TOPLEFT", dc, "TOPLEFT", 62, -11)
+  Q.title:SetWidth(430)
   Q.title:SetHeight(20)
   Q.meta = self:Font(dc, 10, C.muted)
-  Q.meta:SetPoint("TOPLEFT", dc, "TOPLEFT", 14, -36)
+  Q.meta:SetPoint("TOPLEFT", dc, "TOPLEFT", 62, -36)
   Q.meta:SetWidth(250)
   Q.meta:SetHeight(12)
   Q.text = self:Font(dc, 11, { 0.82, 0.82, 0.78 })
@@ -249,16 +337,29 @@ function UI:BuildQuests(parent)
   Q.text:SetJustifyV("TOP")
   self:GlowLine(dc, -86, 14, -14)
 
+  -- Aktionen unter der Trennlinie: in den Gildenchat posten, neu ausschreiben
+  Q.postBtn = self:Button(dc, 150, 18, "QB_POST", function()
+    local q = BananaBankDB.quests[Q.sel]
+    if q then BB:PostQuestToGuild(q) end
+  end)
+  Q.postBtn:SetPoint("TOPLEFT", dc, "TOPLEFT", 14, -90)
+  Q.repeatBtn = self:Button(dc, 110, 18, "QB_REPEAT", function()
+    local q = BananaBankDB.quests[Q.sel]
+    if q then UI:OpenQuestCloseDialog(q, "repeat") end
+  end)
+  Q.repeatBtn:SetPoint("LEFT", Q.postBtn, "RIGHT", 6, 0)
+
   -- Verwalter-Knoepfe rechts auf der Meta-Zeile
   Q.cancelBtn = self:Button(dc, 66, 18, "QB_CANCEL_QUEST", function(b) UI:QuestConfirm(b, "QB_CANCEL_QUEST", function()
     local q = BananaBankDB.quests[Q.sel]
     if q then BB:SetQuestStatus(q, "cancelled") end
   end) end, "danger")
   Q.cancelBtn:SetPoint("TOPRIGHT", dc, "TOPRIGHT", -12, -33)
-  Q.closeBtn = self:Button(dc, 86, 18, "QB_CLOSE", function(b) UI:QuestConfirm(b, "QB_CLOSE", function()
+  -- Abschliessen oeffnet den Dialog: nur abschliessen oder direkt neu ausschreiben
+  Q.closeBtn = self:Button(dc, 86, 18, "QB_CLOSE", function()
     local q = BananaBankDB.quests[Q.sel]
-    if q then BB:SetQuestStatus(q, "closed") end
-  end) end, "ok")
+    if q then UI:OpenQuestCloseDialog(q, "close") end
+  end, "ok")
   Q.closeBtn:SetPoint("RIGHT", Q.cancelBtn, "LEFT", -4, 0)
   Q.editBtn = self:Button(dc, 66, 18, "QB_EDIT", function()
     local q = BananaBankDB.quests[Q.sel]
@@ -275,9 +376,9 @@ function UI:BuildQuests(parent)
   Q.items = {}
   for i = 1, ITEM_ROWS do
     local r = CreateFrame("Frame", nil, dc)
-    r:SetHeight(26)
-    r:SetPoint("TOPLEFT", dc, "TOPLEFT", 14, -94 - (i - 1) * 27)
-    r:SetPoint("TOPRIGHT", dc, "TOPRIGHT", -14, -94 - (i - 1) * 27)
+    r:SetHeight(24)
+    r:SetPoint("TOPLEFT", dc, "TOPLEFT", 14, -112 - (i - 1) * 26)
+    r:SetPoint("TOPRIGHT", dc, "TOPRIGHT", -14, -112 - (i - 1) * 26)
     r.slot = self:Slot(r, 24)
     r.slot:SetPoint("LEFT", r, "LEFT", 0, 0)
     r.slot:SetScript("OnEnter", function()
@@ -285,6 +386,21 @@ function UI:BuildQuests(parent)
       if q and this.id then itemTooltip(this, q, this.id) end
     end)
     r.slot:SetScript("OnLeave", function() GameTooltip:Hide() end)
+    -- normale Item-Tooltips und Shift-/Strg-Klick, auch ueber dem ganzen Zeilenbereich
+    r.slot:SetScript("OnClick", function()
+      local q = BananaBankDB.quests[Q.sel]
+      if q then UI:ItemClick(q, this.id, arg1) end
+    end)
+    r:EnableMouse(true)
+    r:SetScript("OnEnter", function()
+      local q = BananaBankDB.quests[Q.sel]
+      if q and this.slot.id then itemTooltip(this.slot, q, this.slot.id) end
+    end)
+    r:SetScript("OnLeave", function() GameTooltip:Hide() end)
+    r:SetScript("OnMouseUp", function()
+      local q = BananaBankDB.quests[Q.sel]
+      if q then UI:ItemClick(q, this.slot.id, arg1) end
+    end)
     r.name = self:Font(r, 11, C.text)
     r.name:SetPoint("LEFT", r, "LEFT", 32, 0)
     r.name:SetWidth(146)
@@ -524,6 +640,9 @@ function UI:RefreshQuests()
       local col = STATE_COLOR[st]
       row.accent:SetVertexColor(col[1], col[2], col[3], 1)
       row.title:SetText(q.title)
+      row.qid = q.id
+      row.ico.qid = q.id
+      row.ico.icon:SetTexture(UI:QuestIconTex(q))
       local selected = q.id == Q.sel
       if selected then
         row.title:SetTextColor(C.gold[1], C.gold[2], C.gold[3])
@@ -565,6 +684,7 @@ function UI:RefreshQuestDetail()
   local col = STATE_COLOR[st]
 
   Q.title:SetText(q.title)
+  Q.ico.icon:SetTexture(UI:QuestIconTex(q))
   local meta = "|cff" .. hex(col) .. T("QS_" .. string.upper(st)) .. "|r"
   meta = meta .. "  -  " .. string.format(T("QD_BY"), q.c or "?")
   if q.due and q.due > 0 then
@@ -597,6 +717,11 @@ function UI:RefreshQuestDetail()
     Q.editBtn:Hide()
     Q.payBtn:Hide()
   end
+
+  -- Posten (nur aktive Quests) und Wiederholen (jede Quest) fuer Quest-Verwalter
+  local canManage = BB:CanManageQuests()
+  if canManage and BB:QuestIsActive(q) then Q.postBtn:Show() else Q.postBtn:Hide() end
+  if canManage then Q.repeatBtn:Show() else Q.repeatBtn:Hide() end
 
   -- Items
   local ids = sortedItemIds(q)
@@ -769,7 +894,7 @@ function UI:BuildQuestEditor()
   local f = CreateFrame("Frame", "BananaBankQuestEditor", UIParent)
   self.qe = f
   f:SetWidth(540)
-  f:SetHeight(528)
+  f:SetHeight(606)
   f:SetPoint("CENTER", UIParent, "CENTER", 0, 10)
   f:SetFrameStrata("DIALOG")
   f:SetMovable(true)
@@ -805,9 +930,24 @@ function UI:BuildQuestEditor()
   end
 
   label("QE_NAME", -66)
-  f.name = self:EditBox("BananaBankQuestName", f, 478)
+  f.name = self:EditBox("BananaBankQuestName", f, 424)
   f.name:SetPoint("TOPLEFT", f, "TOPLEFT", 30, -80)
   f.name:SetMaxLetters(BB.QUEST_TITLE_LEN)
+
+  -- Icon der Quest (Klick oeffnet die Auswahl)
+  local iconL = self:Font(f, 10, C.goldDim)
+  iconL:SetPoint("TOPLEFT", f, "TOPLEFT", 470, -66)
+  self:Loc(iconL, "QX_ICON")
+  f.iconBtn = self:Slot(f, 36)
+  f.iconBtn:SetPoint("TOPLEFT", f, "TOPLEFT", 472, -76)
+  f.iconBtn:SetQuality(1)
+  f.iconBtn:SetScript("OnEnter", function()
+    GameTooltip:SetOwner(this, "ANCHOR_RIGHT")
+    GameTooltip:AddLine(T("QX_ICON_TIP"), 1, 1, 1)
+    GameTooltip:Show()
+  end)
+  f.iconBtn:SetScript("OnLeave", function() GameTooltip:Hide() end)
+  f.iconBtn:SetScript("OnClick", function() UI:OpenIconPicker() end)
 
   label("QE_TEXT", -108)
   local tp = self:Panel(f, 488, 62)
@@ -824,14 +964,30 @@ function UI:BuildQuestEditor()
   tp:EnableMouse(true)
   tp:SetScript("OnMouseDown", function() f.text:SetFocus() end)
 
-  label("QE_ITEMS", -194)
+  -- eigener Tooltip-Text (wie bei einem Makro)
+  label("QX_TIP", -194)
+  local tip = self:Panel(f, 488, 62)
+  tip:SetPoint("TOPLEFT", f, "TOPLEFT", 26, -208)
+  f.tip = CreateFrame("EditBox", "BananaBankQuestTip", tip)
+  f.tip:SetMultiLine(true)
+  f.tip:SetAutoFocus(false)
+  f.tip:SetFontObject("ChatFontNormal")
+  f.tip:SetMaxLetters(BB.QUEST_TIP_LEN)
+  f.tip:SetWidth(466)
+  f.tip:SetHeight(50)
+  f.tip:SetPoint("TOPLEFT", tip, "TOPLEFT", 10, -7)
+  f.tip:SetScript("OnEscapePressed", function() this:ClearFocus() end)
+  tip:EnableMouse(true)
+  tip:SetScript("OnMouseDown", function() f.tip:SetFocus() end)
+
+  label("QE_ITEMS", -280)
   local hint = self:Font(f, 9, { 0.62, 0.64, 0.74 })
-  hint:SetPoint("TOPRIGHT", f, "TOPRIGHT", -26, -195)
+  hint:SetPoint("TOPRIGHT", f, "TOPRIGHT", -26, -281)
   hint:SetJustifyH("RIGHT")
   self:Loc(hint, "QE_ITEMS_HINT")
 
   local ip = self:Panel(f, 488, 6 * 28 + 10)
-  ip:SetPoint("TOPLEFT", f, "TOPLEFT", 26, -208)
+  ip:SetPoint("TOPLEFT", f, "TOPLEFT", 26, -294)
   f.empty = self:Font(ip, 11, C.muted)
   f.empty:SetPoint("CENTER", ip, "CENTER", 0, 0)
   self:Loc(f.empty, "QE_ITEMS_EMPTY")
@@ -844,6 +1000,23 @@ function UI:BuildQuestEditor()
     r:SetPoint("TOPRIGHT", ip, "TOPRIGHT", -10, -7 - (i - 1) * 28)
     r.slot = self:Slot(r, 24)
     r.slot:SetPoint("LEFT", r, "LEFT", 0, 0)
+    r.slot:SetScript("OnEnter", function()
+      if this.id then
+        UI:ItemTooltip(this, this.id)
+        GameTooltip:AddLine(" ")
+        GameTooltip:AddLine(T("QX_ITEM_HINT"), 0.5, 0.7, 1)
+        GameTooltip:Show()
+      end
+    end)
+    r.slot:SetScript("OnLeave", function() GameTooltip:Hide() end)
+    r.slot:SetScript("OnClick", function()
+      -- im Editor selbst: Shift-Klick legt den Item-Link in die Chat-Eingabezeile
+      if arg1 == "LeftButton" and IsShiftKeyDown() and this.id then
+        local it
+        for k = 1, getn(f.items) do if f.items[k].id == this.id then it = f.items[k] end end
+        if it then UI:ChatInsert(BB:ItemLinkText(it.id, it.n, it.q)) end
+      end
+    end)
     r.name = self:Font(r, 12, C.text)
     r.name:SetPoint("LEFT", r, "LEFT", 34, 0)
     r.name:SetWidth(250)
@@ -868,17 +1041,17 @@ function UI:BuildQuestEditor()
 
   -- Frist und Reservierung
   local dueL = self:Font(f, 11, C.text)
-  dueL:SetPoint("TOPLEFT", f, "TOPLEFT", 30, -420)
+  dueL:SetPoint("TOPLEFT", f, "TOPLEFT", 30, -506)
   self:Loc(dueL, "QE_DUE")
   f.due = self:EditBox("BananaBankQuestDue", f, 46)
-  f.due:SetPoint("TOPLEFT", f, "TOPLEFT", 296, -415)
+  f.due:SetPoint("TOPLEFT", f, "TOPLEFT", 296, -501)
   f.due:SetNumeric(true)
   f.due:SetMaxLetters(3)
   f.due:SetJustifyH("CENTER")
   f.reserve = true
   f.chk = self:Check(f, "QE_RESERVE", function() return f.reserve end, function(v) f.reserve = v end)
   f.chk:SetWidth(440)
-  f.chk:SetPoint("TOPLEFT", f, "TOPLEFT", 28, -446)
+  f.chk:SetPoint("TOPLEFT", f, "TOPLEFT", 28, -532)
 
   f.cancel = self:Button(f, 110, 26, "QE_CANCEL", function() f:Hide() end)
   f.cancel:SetPoint("BOTTOMRIGHT", f, "BOTTOMRIGHT", -154, 22)
@@ -900,6 +1073,8 @@ function UI:OpenQuestEditor(q)
     f.heading:SetText(T("QE_TITLE_EDIT"))
     f.name:SetText(q.title)
     f.text:SetText(q.text or "")
+    f.tip:SetText(q.tip or "")
+    f.icon = (q.ic and q.ic ~= "") and q.ic or nil
     f.reserve = q.rs == 1
     local ids = sortedItemIds(q)
     for i = 1, getn(ids) do
@@ -914,6 +1089,8 @@ function UI:OpenQuestEditor(q)
     f.heading:SetText(T("QE_TITLE_NEW"))
     f.name:SetText("")
     f.text:SetText("")
+    f.tip:SetText("")
+    f.icon = nil
     f.reserve = true
     f.dueOrig = nil
     f.due:SetText("")
@@ -944,10 +1121,16 @@ function UI:RefreshQuestEditor()
     end
   end
   if f.items[1] then f.empty:Hide() else f.empty:Show() end
+  -- Icon: gewaehltes, sonst das des ersten Items
+  local tex
+  if f.icon and f.icon ~= "" then tex = BB.FullTex(f.icon)
+  elseif f.items[1] then tex = BB.FullTex(f.items[1].t)
+  else tex = BB.FullTex("") end
+  f.iconBtn.icon:SetTexture(tex)
 end
 
 -- Item einfuegen (Shift-Klick in der Tasche, Strg-Klick im Bestand)
-function UI:QuestAddItem(id)
+function UI:QuestAddItem(id, meta)
   local f = self.qe
   if not f or not id then return end
   for i = 1, getn(f.items) do
@@ -963,8 +1146,12 @@ function UI:QuestAddItem(id)
   end
   local name, quality, tex = BB:ItemInfo(id)
   if string.sub(name, 1, 1) == "#" then
-    BB:Print("|cffff4040" .. T("ERR_QUEST_ITEM_UNKNOWN") .. "|r")
-    return
+    if meta and meta.n and string.sub(meta.n, 1, 1) ~= "#" then
+      name, quality, tex = meta.n, meta.q or 1, meta.t or ""
+    else
+      BB:Print("|cffff4040" .. T("ERR_QUEST_ITEM_UNKNOWN") .. "|r")
+      return
+    end
   end
   table.insert(f.items, { id = id, need = 1, n = name, q = quality, t = tex })
   self:RefreshQuestEditor()
@@ -988,9 +1175,9 @@ function UI:SaveQuestEditor()
   if f.editing then
     local dueArg = days
     if f.dueOrig and days == f.dueOrig then dueArg = nil end
-    if BB:EditQuest(f.editing, title, text, items, meta, dueArg, f.reserve) then q = f.editing end
+    if BB:EditQuest(f.editing, title, text, items, meta, dueArg, f.reserve, f.icon or "", f.tip:GetText()) then q = f.editing end
   else
-    q = BB:CreateQuest(title, text, items, meta, days, f.reserve)
+    q = BB:CreateQuest(title, text, items, meta, days, f.reserve, f.icon or "", f.tip:GetText())
   end
   if q then
     f:Hide()
@@ -1066,14 +1253,26 @@ function UI:BuildQuestTracker()
     local b = CreateFrame("Button", nil, f)
     b:SetWidth(214)
     b:SetHeight(15)
+    b.ico = b:CreateTexture(nil, "ARTWORK")
+    b.ico:SetWidth(14)
+    b.ico:SetHeight(14)
+    b.ico:SetPoint("LEFT", b, "LEFT", 0, 0)
+    b.ico:SetTexCoord(0.07, 0.93, 0.07, 0.93)
     b.fs = self:Font(b, 11, C.gold)
-    b.fs:SetPoint("LEFT", b, "LEFT", 0, 0)
-    b.fs:SetWidth(214)
+    b.fs:SetPoint("LEFT", b, "LEFT", 18, 0)
+    b.fs:SetWidth(196)
     b.fs:SetHeight(13)
     b.index = i
+    b:SetScript("OnEnter", function() UI:QuestTooltip(this, BananaBankDB.quests[this.qid]) end)
+    b:SetScript("OnLeave", function() GameTooltip:Hide() end)
     b:SetScript("OnClick", function()
       local id = this.qid
       if not id then return end
+      if IsShiftKeyDown() then
+        local tq = BananaBankDB.quests[id]
+        if tq then UI:ChatInsert(BB:QuestChatText(tq)) end
+        return
+      end
       UI:Init()
       UI.q.sel = id
       UI.q.view = "quests"
@@ -1126,6 +1325,7 @@ function UI:RefreshQuestTracker()
       local stats = BB:QuestStats()[q.id]
       local done = stats and stats.complete
       b.qid = q.id
+      b.ico:SetTexture(UI:QuestIconTex(q))
       b.fs:SetText(q.title)
       if done then b.fs:SetTextColor(STATE_COLOR.complete[1], STATE_COLOR.complete[2], STATE_COLOR.complete[3])
       else b.fs:SetTextColor(C.gold[1], C.gold[2], C.gold[3]) end
@@ -1290,4 +1490,315 @@ function UI:OpenPayoutDialog(q)
   f.hint:SetText(T("PAY_HINT"))
   f.edit:SetText(q.c or "")
   f:Show()
+end
+
+-- ------------------------------------------------------------
+-- Icon-Auswahl (die Icon-Liste der Makro-Oberflaeche des Spiels)
+-- ------------------------------------------------------------
+local PICK_COLS, PICK_ROWS, PICK_SIZE = 8, 6, 34
+
+local function pickList()
+  if UI.pickList then return UI.pickList end
+  local list = {}
+  if GetNumMacroIcons and GetMacroIconInfo then
+    for i = 1, GetNumMacroIcons() do
+      local tex = GetMacroIconInfo(i)
+      if tex then table.insert(list, BB.ShortTex(tex)) end
+    end
+  end
+  UI.pickList = list
+  return list
+end
+
+local function pickTile(parent, x, y)
+  local b = CreateFrame("Button", nil, parent)
+  b:SetWidth(PICK_SIZE - 2)
+  b:SetHeight(PICK_SIZE - 2)
+  b:SetPoint("TOPLEFT", parent, "TOPLEFT", x, y)
+  b.icon = b:CreateTexture(nil, "ARTWORK")
+  b.icon:SetAllPoints(b)
+  b.icon:SetTexCoord(0.07, 0.93, 0.07, 0.93)
+  local hl = b:CreateTexture(nil, "HIGHLIGHT")
+  hl:SetTexture("Interface\\Buttons\\ButtonHilight-Square")
+  hl:SetBlendMode("ADD")
+  hl:SetAllPoints(b)
+  b:SetScript("OnClick", function() UI:PickIcon(this.tex) end)
+  b:SetScript("OnEnter", function()
+    GameTooltip:SetOwner(this, "ANCHOR_RIGHT")
+    GameTooltip:AddLine(this.tex or "", 1, 1, 1)
+    GameTooltip:Show()
+  end)
+  b:SetScript("OnLeave", function() GameTooltip:Hide() end)
+  return b
+end
+
+function UI:BuildIconPicker()
+  if self.picker then return end
+  local f = CreateFrame("Frame", "BananaBankIconPicker", UIParent)
+  self.picker = f
+  f:SetWidth(PICK_COLS * PICK_SIZE + 36)
+  f:SetHeight(122 + PICK_ROWS * PICK_SIZE + 36)
+  f:SetPoint("CENTER", UIParent, "CENTER", 240, 10)
+  f:SetFrameStrata("FULLSCREEN_DIALOG")
+  f:EnableMouse(true)
+  f:SetBackdrop({
+    bgFile = WHITE, edgeFile = "Interface\\Tooltips\\UI-Tooltip-Border",
+    tile = true, tileSize = 16, edgeSize = 14,
+    insets = { left = 3, right = 3, top = 3, bottom = 3 },
+  })
+  f:SetBackdropColor(0.015, 0.025, 0.06, 1)
+  f:SetBackdropBorderColor(C.gold[1], C.gold[2], C.gold[3], 1)
+  f:Hide()
+  tinsert(UISpecialFrames, "BananaBankIconPicker")
+  f.page = 1
+
+  local title = self:Font(f, 13, C.gold)
+  title:SetPoint("TOPLEFT", f, "TOPLEFT", 14, -12)
+  self:Loc(title, "QX_PICK_TITLE")
+  local def = self:Button(f, PICK_COLS * PICK_SIZE, 18, "QX_PICK_DEFAULT", function() UI:PickIcon(nil) end)
+  def:SetPoint("TOPLEFT", f, "TOPLEFT", 16, -34)
+  local il = self:Font(f, 10, C.goldDim)
+  il:SetPoint("TOPLEFT", f, "TOPLEFT", 16, -60)
+  self:Loc(il, "QX_PICK_ITEMS")
+  f.itemTiles = {}
+  for i = 1, BB.QUEST_MAX_ITEMS do
+    table.insert(f.itemTiles, pickTile(f, 16 + (i - 1) * PICK_SIZE, -76))
+  end
+  f.tiles = {}
+  for r = 0, PICK_ROWS - 1 do
+    for c = 0, PICK_COLS - 1 do
+      table.insert(f.tiles, pickTile(f, 16 + c * PICK_SIZE, -122 - r * PICK_SIZE))
+    end
+  end
+  f.prev = self:Button(f, 24, 18, "<", function() f.page = f.page - 1 UI:RefreshIconPicker() end)
+  f.prev:SetPoint("BOTTOMLEFT", f, "BOTTOMLEFT", 16, 12)
+  f.next = self:Button(f, 24, 18, ">", function() f.page = f.page + 1 UI:RefreshIconPicker() end)
+  f.next:SetPoint("LEFT", f.prev, "RIGHT", 4, 0)
+  f.pageFs = self:Font(f, 10, C.muted)
+  f.pageFs:SetPoint("LEFT", f.next, "RIGHT", 8, 0)
+  local close = self:Button(f, 80, 18, "QX_PICK_CLOSE", function() f:Hide() end)
+  close:SetPoint("BOTTOMRIGHT", f, "BOTTOMRIGHT", -16, 12)
+end
+
+function UI:RefreshIconPicker()
+  local f = self.picker
+  if not f then return end
+  local ed = self.qe
+  for i = 1, BB.QUEST_MAX_ITEMS do
+    local t = f.itemTiles[i]
+    local it = ed and ed.items[i]
+    if it and it.t and it.t ~= "" then
+      t.tex = it.t
+      t.icon:SetTexture(BB.FullTex(it.t))
+      t:Show()
+    else
+      t:Hide()
+    end
+  end
+  local list = pickList()
+  local per = PICK_COLS * PICK_ROWS
+  local pages = math.max(1, math.ceil(getn(list) / per))
+  if f.page > pages then f.page = pages end
+  if f.page < 1 then f.page = 1 end
+  for i = 1, per do
+    local t = f.tiles[i]
+    local tex = list[(f.page - 1) * per + i]
+    if tex then
+      t.tex = tex
+      t.icon:SetTexture(BB.FullTex(tex))
+      t:Show()
+    else
+      t:Hide()
+    end
+  end
+  f.pageFs:SetText(string.format(T("QX_PICK_PAGE"), f.page, pages))
+  f.prev:SetOn(f.page > 1)
+  f.next:SetOn(f.page < pages)
+end
+
+function UI:OpenIconPicker()
+  if not self.qe then return end
+  self:BuildIconPicker()
+  self.picker.page = 1
+  self:RefreshIconPicker()
+  self.picker:Show()
+end
+
+-- tex = nil: zurueck zum Standard (Icon des ersten Items)
+function UI:PickIcon(tex)
+  local ed = self.qe
+  if ed then
+    ed.icon = tex
+    self:RefreshQuestEditor()
+  end
+  if self.picker then self.picker:Hide() end
+end
+
+-- ------------------------------------------------------------
+-- Dialog: Quest abschliessen und direkt neu ausschreiben / Quest wiederholen
+-- ------------------------------------------------------------
+function UI:OpenQuestCloseDialog(q, mode)
+  local f = self.closeDlg
+  if not f then
+    f = CreateFrame("Frame", "BananaBankCloseDlg", UIParent)
+    self.closeDlg = f
+    f:SetWidth(410)
+    f:SetHeight(300)
+    f:SetPoint("CENTER", UIParent, "CENTER", 0, 60)
+    f:SetFrameStrata("FULLSCREEN_DIALOG")
+    f:EnableMouse(true)
+    f:SetMovable(true)
+    f:RegisterForDrag("LeftButton")
+    f:SetScript("OnDragStart", function() this:StartMoving() end)
+    f:SetScript("OnDragStop", function() this:StopMovingOrSizing() end)
+    f:SetBackdrop({
+      bgFile = WHITE, edgeFile = "Interface\\Tooltips\\UI-Tooltip-Border",
+      tile = true, tileSize = 16, edgeSize = 14,
+      insets = { left = 3, right = 3, top = 3, bottom = 3 },
+    })
+    f:SetBackdropColor(0.015, 0.025, 0.06, 1)
+    f:SetBackdropBorderColor(C.gold[1], C.gold[2], C.gold[3], 1)
+    f:Hide()
+    tinsert(UISpecialFrames, "BananaBankCloseDlg")
+
+    f.title = self:Font(f, 15, C.gold, FONT_TITLE)
+    f.title:SetPoint("TOPLEFT", f, "TOPLEFT", 16, -14)
+    f.title:SetWidth(378)
+    f.title:SetHeight(18)
+    f.info = self:Font(f, 10, C.muted)
+    f.info:SetPoint("TOPLEFT", f, "TOPLEFT", 16, -38)
+    f.info:SetWidth(378)
+    f.info:SetHeight(28)
+    f.info:SetJustifyV("TOP")
+
+    f.again = true
+    f.optOnly = self:Check(f, "QX_OPT_ONLY", function() return not f.again end, function() f.again = false f.Sync() end)
+    f.optOnly:SetWidth(370)
+    f.optOnly:SetPoint("TOPLEFT", f, "TOPLEFT", 16, -72)
+    f.optAgain = self:Check(f, "QX_OPT_AGAIN", function() return f.again end, function() f.again = true f.Sync() end)
+    f.optAgain:SetWidth(370)
+    f.optAgain:SetPoint("TOPLEFT", f, "TOPLEFT", 16, -96)
+
+    f.nameL = self:Font(f, 11, C.text)
+    f.nameL:SetPoint("TOPLEFT", f, "TOPLEFT", 32, -134)
+    self:Loc(f.nameL, "QX_NEW_NAME")
+    f.nameE = self:EditBox("BananaBankCloseName", f, 230)
+    f.nameE:SetPoint("TOPLEFT", f, "TOPLEFT", 140, -130)
+    f.nameE:SetMaxLetters(BB.QUEST_TITLE_LEN)
+    f.nameE:SetScript("OnTextChanged", function() f.Sync() end)
+    f.daysL = self:Font(f, 11, C.text)
+    f.daysL:SetPoint("TOPLEFT", f, "TOPLEFT", 32, -164)
+    f.daysL:SetWidth(280)
+    self:Loc(f.daysL, "QX_DAYS")
+    f.daysE = self:EditBox("BananaBankCloseDays", f, 46)
+    f.daysE:SetPoint("TOPLEFT", f, "TOPLEFT", 336, -160)
+    f.daysE:SetNumeric(true)
+    f.daysE:SetMaxLetters(3)
+    f.daysE:SetJustifyH("CENTER")
+    f.daysE:SetScript("OnTextChanged", function() f.Sync() end)
+    f.reserve = true
+    f.chk = self:Check(f, "QE_RESERVE", function() return f.reserve end, function(v) f.reserve = v end)
+    f.chk:SetWidth(360)
+    f.chk:SetPoint("TOPLEFT", f, "TOPLEFT", 30, -190)
+
+    f.sum = self:Font(f, 10, C.muted)
+    f.sum:SetPoint("TOPLEFT", f, "TOPLEFT", 32, -220)
+    f.sum:SetWidth(356)
+    f.sum:SetHeight(30)
+    f.sum:SetJustifyV("TOP")
+
+    f.ok = self:Button(f, 230, 22, "QX_OK_BOTH", function() UI:ConfirmQuestClose() end, "ok")
+    f.ok:SetPoint("BOTTOMLEFT", f, "BOTTOMLEFT", 16, 14)
+    f.no = self:Button(f, 100, 22, "QE_CANCEL", function() f:Hide() end)
+    f.no:SetPoint("BOTTOMRIGHT", f, "BOTTOMRIGHT", -16, 14)
+
+    -- Felder nur aktiv, wenn neu ausgeschrieben wird; Zusammenfassung und Knopftext folgen der Auswahl
+    f.Sync = function()
+      f.optOnly.Update()
+      f.optAgain.Update()
+      local a = f.again and 1 or 0.35
+      f.nameE:SetAlpha(a)
+      f.daysE:SetAlpha(a)
+      f.nameL:SetAlpha(a)
+      f.daysL:SetAlpha(a)
+      f.chk:SetAlpha(a)
+      f.nameE:EnableMouse(f.again)
+      f.daysE:EnableMouse(f.again)
+      f.chk:EnableMouse(f.again)
+      if not f.again then
+        f.nameE:ClearFocus()
+        f.daysE:ClearFocus()
+        f.sum:SetText("")
+        f.ok.fs:SetText(T("QX_OK_CLOSE"))
+      else
+        local days = numberOf(f.daysE, 0)
+        local due = days > 0 and string.format(T("QX_SUM_DUE"), date("%d.%m.", time() + days * 86400)) or T("QX_SUM_NODUE")
+        local qq = f.q
+        f.sum:SetText(string.format(T("QX_SUMMARY"), qq and BB.Count(qq.items) or 0, due, qq and BB:QuestNeed(qq) or 0))
+        f.ok.fs:SetText(T(f.mode == "close" and "QX_OK_BOTH" or "QX_OK_REPEAT"))
+      end
+    end
+  end
+  if not BB:CanManageQuests() then
+    BB:Print("|cffff4040" .. T("ERR_QUEST_NOPERM") .. "|r")
+    return
+  end
+  f.q = q
+  f.mode = mode
+  f.again = true
+  f.reserve = q.rs == 1
+  f.title:SetText(T(mode == "close" and "QX_CLOSE_TITLE" or "QX_REPEAT_TITLE"))
+  f.info:SetText(T(mode == "close" and "QX_CLOSE_INFO" or "QX_REPEAT_INFO"))
+  if mode == "close" then
+    f.optOnly:Show()
+    f.optAgain:Show()
+  else
+    f.optOnly:Hide()
+    f.optAgain:Hide()
+  end
+  f.nameE:SetText(BB:NextQuestTitle(q.title))
+  local days = BB:QuestSpanDays(q)
+  f.daysE:SetText(days > 0 and tostring(days) or "")
+  f.chk.Update()
+  f.Sync()
+  f:Show()
+end
+
+function UI:ConfirmQuestClose()
+  local f = self.closeDlg
+  local q = f and f.q
+  if not q then return end
+  local Q = self.q
+  if f.mode == "close" and not f.again then
+    BB:SetQuestStatus(q, "closed")
+    f:Hide()
+    self:RefreshQuests()
+    return
+  end
+  local days = numberOf(f.daysE, 0)
+  if days < 0 then days = 0 end
+  local nq = BB:RepeatQuest(q, f.nameE:GetText(), days, f.reserve, f.mode == "close")
+  if nq then
+    f:Hide()
+    Q.sel = nq.id
+    Q.filter = "active"
+    Q.view = "quests"
+    BB:Print(string.format(T("QMSG_REPEATED"), nq.title))
+    self:RefreshQuests()
+  end
+end
+
+-- Shift-Klick auf einen Item-Link im Chat uebernimmt das Item in den offenen Quest-Editor
+local origSetItemRef = SetItemRef
+if origSetItemRef then
+  SetItemRef = function(link, text, button)
+    if IsShiftKeyDown() and UI.qe and UI.qe:IsVisible() and link and string.sub(link, 1, 5) == "item:" then
+      local id, name, quality = BB.ParseLink(text or link)
+      if id then
+        UI:QuestAddItem(id, { n = name, q = quality })
+        return
+      end
+    end
+    return origSetItemRef(link, text, button)
+  end
 end
