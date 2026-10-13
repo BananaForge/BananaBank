@@ -30,6 +30,15 @@ end
 function UI:RefreshBankButton()
   local S = self.stock
   if not S or not S.bankBtn then return end
+  -- Bankwahl nur auf Chars im Bank-Modus
+  if not BB:IsBank() then
+    S.bank = nil
+    S.bankBtn:Hide()
+    S.role:SetText("")
+    self:CloseBankMenu()
+    return
+  end
+  S.bankBtn:Show()
   if S.bank then
     S.bankBtn.fs:SetText(string.format(T("SB_BTN"), S.bank))
     -- eine gewaehlte Bank sieht man dem Knopf an
@@ -130,6 +139,7 @@ function UI:CloseBankMenu()
 end
 
 function UI:ToggleBankMenu()
+  if not BB:IsBank() then return end
   self:BuildBankMenu()
   local m = self.bmenu
   if m:IsVisible() then

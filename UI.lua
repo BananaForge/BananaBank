@@ -501,7 +501,7 @@ function UI:ShowPage(page)
   if page == "bank" and not BB:IsBank() then page = "stock" end
   if page == "prices" and not self.pages.prices then page = "stock" end
   if page == "quests" and not self.pages.quests then page = "stock" end
-  if page == "banks" and not self.pages.banks then page = "stock" end
+  if page == "banks" and (not self.pages.banks or not BB:IsBank()) then page = "stock" end
   self.page = page
   for name, p in pairs(self.pages) do
     if name == page then p:Show() else p:Hide() end
@@ -523,8 +523,12 @@ end
 
 function UI:OnBankModeChanged()
   if not self.frame then return end
+  -- Bank-Reiter und alles zum Bank-Verzeichnis gibt es nur auf Chars im Bank-Modus
   if BB:IsBank() then self.tabs.bank:Show() else self.tabs.bank:Hide() end
-  if self.page == "bank" and not BB:IsBank() then self:ShowPage("stock") end
+  if self.tabs.banks then
+    if BB:IsBank() and self.pages.banks then self.tabs.banks:Show() else self.tabs.banks:Hide() end
+  end
+  if (self.page == "bank" or self.page == "banks") and not BB:IsBank() then self:ShowPage("stock") end
   self:Refresh()
 end
 
@@ -756,6 +760,7 @@ function UI:StockList()
   local stock = BB:GetStock()
   local res = BB:GetReserved()
   -- Einzelansicht: nur der Bestand dieser Bank, ohne Reservierungen
+  if S.bank and not BB:IsBank() then S.bank = nil end
   if S.bank then
     if BB:MayBeBank(S.bank) then
       local one = {}
@@ -892,7 +897,7 @@ function UI:OnSlotEnter(slot)
   if e and BB.Count(e.per) > 1 then
     for bank, c in pairs(e.per) do table.insert(lines, { "  " .. bank, c }) end
   end
-  local hint = BB:BankHintLines(e)
+  local hint = BB:IsBank() and BB:BankHintLines(e)
   if hint then
     for i = 1, getn(hint) do table.insert(lines, hint[i]) end
   end

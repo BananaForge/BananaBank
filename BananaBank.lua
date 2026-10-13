@@ -140,6 +140,7 @@ SlashCmdList["BANANABANK"] = function(msg)
     BB.UI.frame:Show()
     BB.UI:ShowPage("quests")
   elseif cmd == "banks" or cmd == "banken" then
+    if not BB:IsBank() then BB:Print(BB.T("ERR_NOT_BANK")) return end
     BB.UI:Init()
     BB.UI.frame:Show()
     BB.UI:ShowPage("banks")
