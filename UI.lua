@@ -644,12 +644,14 @@ function UI:BuildStock(parent)
   avail:SetWidth(112)
   -- Bankwahl: Gesamtbestand oder Inhalt einer einzelnen Bank (Menue siehe UI_Banks.lua)
   S.bank = nil
-  S.bankBtn = self:Button(p, 160, 18, "", function() UI:ToggleBankMenu() end, "flat")
+  S.bankBtn = self:Button(p, 140, 18, "", function() UI:ToggleBankMenu() end, "flat")
   S.bankBtn:SetPoint("TOPLEFT", p, "TOPLEFT", 126, -27)
   S.role = self:Font(p, 10, C.goldDim)
   S.role:SetPoint("LEFT", S.bankBtn, "RIGHT", 8, 0)
   S.role:SetWidth(180)
   S.role:SetHeight(12)
+  S.role:Hide()
+  if self.BuildTypeButton then self:BuildTypeButton(p) end
 
   -- Raster
   local grid = CreateFrame("Frame", nil, p)
@@ -768,7 +770,7 @@ function UI:StockList()
       -- eine Bank ohne Scan zeigt eine leere Liste mit Hinweis, springt nicht zurueck
       for id, it in pairs(snap and snap.items or {}) do
         if not BananaBankDB.hidden[id] then
-          one[id] = { c = it.c, q = it.q, t = it.t, n = it.n, k = it.k, per = { [S.bank] = it.c } }
+          one[id] = { c = it.c, q = it.q, t = it.t, n = it.n, k = it.k, s = it.s, per = { [S.bank] = it.c } }
         end
       end
       stock, res = one, {}
@@ -777,11 +779,13 @@ function UI:StockList()
     end
   end
   local list = {}
+  local typeSpec = S.type and BB:FindTypeFilter(S.type) or nil
   for id, e in pairs(stock) do
     local avail = e.c - (res[id] or 0)
     local ok = (e.q or 1) >= S.filter
     if ok and S.search ~= "" and not string.find(string.lower(e.n or ""), S.search, 1, true) then ok = false end
     if ok and S.onlyAvail and avail <= 0 then ok = false end
+    if ok and typeSpec and not BB:MatchTypeFilter(typeSpec, e) then ok = false end
     if ok then table.insert(list, { id = id, e = e, res = res[id] or 0, avail = avail }) end
   end
   table.sort(list, function(a, b)
@@ -795,6 +799,7 @@ function UI:RefreshStock()
   if not self.stock then return end
   local S = self.stock
   if self.RefreshBankButton then self:RefreshBankButton() end
+  if self.RefreshTypeButton then self:RefreshTypeButton() end
   for i = 1, getn(S.chips) do S.chips[i]:SetActive(S.chips[i].q == S.filter) end
   local list, stock, res = self:StockList()
   local per = COLS * ROWS

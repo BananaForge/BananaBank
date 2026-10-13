@@ -68,9 +68,13 @@ function BB:BindOfItem(id, bag, slot)
   return here
 end
 
+-- verkaufsfaehig: bindet beim Anlegen (jede Itemart) oder ist ein Rezept. Die Kategorie kommt aus den
+-- Bestaenden aller Banken, nicht nur aus den Taschen dieses Chars.
 function BB:IsBOE(id)
   local db = BananaBankDB
-  return db.bind and db.bind[id] == "boe"
+  if db.bind and db.bind[id] == "boe" then return true end
+  local e = self.stockCache and self.stockCache[id]
+  return (e and (e.k == "boe" or e.k == "recipe")) and true or false
 end
 
 -- ------------------------------------------------------------

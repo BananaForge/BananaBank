@@ -388,6 +388,41 @@ function BB:SetQuestStatus(q, status)
   return true
 end
 
+-- Auszahlung: die gelieferten (reservierten) Mengen einer Quest als bestaetigte Anfrage an einen
+-- Empfaenger (z.B. den Schneider) schicken. Die Quest wird abgeschlossen, die Quest-Reservierung
+-- endet und die Anfrage haelt dieselben Mengen reserviert, bis die Bank sie verschickt hat.
+function BB:CreateQuestPayout(q, recipient)
+  if not q then return nil end
+  if not self:CanManageQuests() then noPerm(self) return nil end
+  if q.s == "closed" or q.s == "cancelled" then return nil, "CLOSED" end
+  recipient = BB.Clean(recipient or "")
+  if recipient == "" then return nil, "NAME" end
+  recipient = string.upper(string.sub(recipient, 1, 1)) .. string.lower(string.sub(recipient, 2))
+  local st = self:QuestStats()[q.id]
+  local items = {}
+  if st then
+    for iid, n in pairs(st.eff) do
+      if n > 0 then items[iid] = n end
+    end
+  end
+  if BB.Count(items) == 0 then return nil, "EMPTY" end
+  local id = self:NewCodeId()
+  while BananaBankDB.reqs[id] do id = self:NewCodeId() end
+  local me = self:Me()
+  local r = {
+    id = id, p = recipient, ts = time(), items = items, s = "confirmed", u = time(), by = me, sent = {},
+    qid = q.id,
+  }
+  r.code = self:BuildCode(id, recipient, items)
+  BananaBankDB.reqs[id] = r
+  self:PushRequests({ r })
+  if recipient ~= me then self:Notify(r, "WHISPER_CONFIRMED") end
+  self:QLog("payout", q, me, recipient .. " " .. id)
+  if q.s ~= "closed" and q.s ~= "cancelled" then self:SetQuestStatus(q, "closed") end
+  self.qDirty = true
+  return r
+end
+
 -- ------------------------------------------------------------
 -- Netz: Quests serialisieren und zusammenfuehren
 -- ------------------------------------------------------------

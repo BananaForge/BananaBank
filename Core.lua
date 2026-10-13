@@ -10,7 +10,7 @@
 BananaBank = {}
 local BB = BananaBank
 
-BB.VERSION = "1.6.6"
+BB.VERSION = "1.7.0"
 BB.PREFIX = "BBNK"
 BB.DONATE_NAME = "Lumihunt"
 -- Einziger erlaubter Bank-Rang, deutsch und englisch. Fest eingebaut, es gibt
@@ -373,6 +373,7 @@ function BB:GetStock()
           out[id] = e
         end
         if it.k and not e.k then e.k = it.k end
+        if it.s and not e.s then e.s = it.s end
         e.c = e.c + it.c
         e.per[bank] = (e.per[bank] or 0) + it.c
       end
@@ -721,7 +722,7 @@ function BB:MergeQuest() return false end
 function BB:ParseQuests() return {} end
 function BB:CanManageQuests() return false end
 -- Platzhalter fuer Banks.lua
-function BB:ItemCategory() return "other" end
+function BB:ItemCategory() return "other", nil end
 function BB:BankInfoDigest() return 0, 0 end
 function BB:PushBankInfo() end
 function BB:MergeBankInfo() return false end
@@ -784,6 +785,7 @@ function BB:CheckModules()
   if not self.questModule then table.insert(missing, "Quests.lua") end
   if not self.bankModule then table.insert(missing, "Banks.lua") end
   if not (self.UI and self.UI.bankUIModule) then table.insert(missing, "UI_Banks.lua") end
+  if not (self.UI and self.UI.filterModule) then table.insert(missing, "UI_Filter.lua") end
   if not self.summaryModule then table.insert(missing, "Summary.lua") end
   if not (self.UI and self.UI.summaryModule) then table.insert(missing, "UI_Summary.lua") end
   if not (self.UI and self.UI.questModule) then table.insert(missing, "UI_Quests.lua") end

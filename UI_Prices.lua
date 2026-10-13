@@ -188,7 +188,9 @@ function UI:RefreshPrices()
       local qc = BB.QUALITY_COLOR[entry.e.q or 1] or BB.QUALITY_COLOR[1]
       row.name:SetText(entry.e.n .. "  |cff888888x" .. entry.e.c .. "|r")
       row.name:SetTextColor(qc[1], qc[2], qc[3])
-      row.bind:SetText(BB:IsBOE(id) and T("BIND_BOE") or "-")
+      if entry.e.k == "recipe" then row.bind:SetText(T("BIND_RECIPE"))
+      elseif BB:IsBOE(id) then row.bind:SetText(T("BIND_BOE"))
+      else row.bind:SetText("-") end
       local u, src, ts, n = BB:GetPrice(id)
       if u then
         row.price:SetText(BB.Money(u))

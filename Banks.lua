@@ -19,7 +19,16 @@ for i = 1, getn(BB.CATS) do BB.CAT_SET[BB.CATS[i]] = true end
 -- ------------------------------------------------------------
 -- Item-Kategorie (laeuft auf dem Bank-Char beim Scan)
 -- Typnamen sind je nach Client deutsch oder englisch, darum beide Schreibweisen.
+-- Verkaufsfaehig: alles, was beim Anlegen bindet (jede Art von Item), und alle Rezepte.
+-- Zweite Angabe (sub): bei Rezepten der Beruf, bei BOE die Ruestungs-/Waffenposition.
 -- ------------------------------------------------------------
+BB.RECIPE_SUBS = { "alch", "bs", "ench", "eng", "lw", "tail", "cook", "fa" }
+BB.BOE_SUBS = { "head", "neck", "shoulder", "chest", "waist", "legs", "feet", "wrist", "hands", "finger",
+  "trinket", "back", "shield", "weapon" }
+BB.SUB_SET = { other = true }
+for i = 1, getn(BB.RECIPE_SUBS) do BB.SUB_SET[BB.RECIPE_SUBS[i]] = true end
+for i = 1, getn(BB.BOE_SUBS) do BB.SUB_SET[BB.BOE_SUBS[i]] = true end
+
 local T_CONTAINER = { "container", "behälter" }
 local T_RECIPE = { "recipe", "rezept" }
 local T_TRADE = { "trade goods", "handwerkswaren" }
@@ -29,6 +38,21 @@ local S_LEATHER = { "leather", "leder" }
 local S_HERB = { "herb", "kräuter" }
 local S_ORE = { "metal", "stone", "metall", "stein" }
 local N_POTION = { "potion", "elixir", "flask", "trank", "elixier", "fläschchen" }
+local PROF = {
+  { "alch", { "alchem", "alchim" } }, { "bs", { "blacksmith", "schmied" } },
+  { "ench", { "enchant", "verzauber" } }, { "eng", { "engineer", "ingenieur" } },
+  { "lw", { "leatherwork", "lederverarb" } }, { "tail", { "tailor", "schneider" } },
+  { "cook", { "cook", "koch" } }, { "fa", { "first aid", "erste hilfe" } },
+}
+local SLOT = {
+  INVTYPE_HEAD = "head", INVTYPE_NECK = "neck", INVTYPE_SHOULDER = "shoulder", INVTYPE_CHEST = "chest",
+  INVTYPE_ROBE = "chest", INVTYPE_BODY = "chest", INVTYPE_WAIST = "waist", INVTYPE_LEGS = "legs",
+  INVTYPE_FEET = "feet", INVTYPE_WRIST = "wrist", INVTYPE_HAND = "hands", INVTYPE_FINGER = "finger",
+  INVTYPE_TRINKET = "trinket", INVTYPE_CLOAK = "back", INVTYPE_SHIELD = "shield", INVTYPE_HOLDABLE = "shield",
+  INVTYPE_WEAPON = "weapon", INVTYPE_2HWEAPON = "weapon", INVTYPE_WEAPONMAINHAND = "weapon",
+  INVTYPE_WEAPONOFFHAND = "weapon", INVTYPE_RANGED = "weapon", INVTYPE_THROWN = "weapon",
+  INVTYPE_RANGEDRIGHT = "weapon",
+}
 
 local function has(s, list)
   for i = 1, getn(list) do
@@ -37,30 +61,96 @@ local function has(s, list)
   return false
 end
 
--- bind: "boe" | "bop" | "none" (vom Tooltip-Scan, siehe Prices.lua)
+-- bind: "boe" | "bop" | "none" (vom Tooltip-Scan, siehe Prices.lua). Gibt Kategorie und Unterart zurueck.
 function BB:ItemCategory(id, bind)
-  local name, _, _, _, itype, subtype = GetItemInfo(id)
+  local name, _, _, _, itype, subtype, _, equip = GetItemInfo(id)
   if not name then
-    if bind == "boe" then return "boe" end
-    return "other"
+    if bind == "boe" then return "boe", "other" end
+    return "other", nil
   end
   local t = string.lower(itype or "")
   local s = string.lower(subtype or "")
-  if has(t, T_CONTAINER) then return "bag" end
-  if has(t, T_RECIPE) then return "recipe" end
+  if has(t, T_RECIPE) then
+    for i = 1, getn(PROF) do
+      if has(s, PROF[i][2]) then return "recipe", PROF[i][1] end
+    end
+    return "recipe", "other"
+  end
+  if bind == "boe" then return "boe", SLOT[equip or ""] or "other" end
+  if has(t, T_CONTAINER) then return "bag", nil end
   if has(t, T_TRADE) then
-    if has(s, S_CLOTH) then return "cloth" end
-    if has(s, S_LEATHER) then return "leather" end
-    if has(s, S_HERB) then return "herb" end
-    if has(s, S_ORE) then return "ore" end
-    return "other"
+    if has(s, S_CLOTH) then return "cloth", nil end
+    if has(s, S_LEATHER) then return "leather", nil end
+    if has(s, S_HERB) then return "herb", nil end
+    if has(s, S_ORE) then return "ore", nil end
+    return "other", nil
   end
   if has(t, T_CONSUMABLE) then
-    if has(string.lower(name), N_POTION) then return "potion" end
-    return "other"
+    if has(string.lower(name), N_POTION) then return "potion", nil end
+    return "other", nil
   end
-  if bind == "boe" then return "boe" end
-  return "other"
+  return "other", nil
+end
+
+-- Filter im Bestand (fuer alle sichtbar): Typ auswaehlen, zum Beispiel alle Alchemie-Rezepte
+-- header = Ueberschrift im Menue; k = Kategorie ("sell" = BOE und Rezepte), s = Unterart
+BB.TYPE_FILTERS = {
+  { key = "all", label = "TF_ALL" },
+  { key = "sell", label = "TF_SELL", k = "sell" },
+  { header = "TF_H_RECIPES" },
+  { key = "rec", label = "TF_REC_ALL", k = "recipe" },
+  { key = "rec:alch", label = "SUB_ALCH", k = "recipe", s = "alch", grp = "TF_G_RECIPE" },
+  { key = "rec:bs", label = "SUB_BS", k = "recipe", s = "bs", grp = "TF_G_RECIPE" },
+  { key = "rec:ench", label = "SUB_ENCH", k = "recipe", s = "ench", grp = "TF_G_RECIPE" },
+  { key = "rec:eng", label = "SUB_ENG", k = "recipe", s = "eng", grp = "TF_G_RECIPE" },
+  { key = "rec:lw", label = "SUB_LW", k = "recipe", s = "lw", grp = "TF_G_RECIPE" },
+  { key = "rec:tail", label = "SUB_TAIL", k = "recipe", s = "tail", grp = "TF_G_RECIPE" },
+  { key = "rec:cook", label = "SUB_COOK", k = "recipe", s = "cook", grp = "TF_G_RECIPE" },
+  { key = "rec:fa", label = "SUB_FA", k = "recipe", s = "fa", grp = "TF_G_RECIPE" },
+  { key = "rec:other", label = "SUB_OTHER", k = "recipe", s = "other", grp = "TF_G_RECIPE" },
+  { header = "TF_H_BOE" },
+  { key = "boe", label = "TF_BOE_ALL", k = "boe" },
+  { key = "boe:head", label = "SUB_HEAD", k = "boe", s = "head", grp = "TF_G_BOE" },
+  { key = "boe:neck", label = "SUB_NECK", k = "boe", s = "neck", grp = "TF_G_BOE" },
+  { key = "boe:shoulder", label = "SUB_SHOULDER", k = "boe", s = "shoulder", grp = "TF_G_BOE" },
+  { key = "boe:chest", label = "SUB_CHEST", k = "boe", s = "chest", grp = "TF_G_BOE" },
+  { key = "boe:waist", label = "SUB_WAIST", k = "boe", s = "waist", grp = "TF_G_BOE" },
+  { key = "boe:legs", label = "SUB_LEGS", k = "boe", s = "legs", grp = "TF_G_BOE" },
+  { key = "boe:feet", label = "SUB_FEET", k = "boe", s = "feet", grp = "TF_G_BOE" },
+  { key = "boe:wrist", label = "SUB_WRIST", k = "boe", s = "wrist", grp = "TF_G_BOE" },
+  { key = "boe:hands", label = "SUB_HANDS", k = "boe", s = "hands", grp = "TF_G_BOE" },
+  { key = "boe:back", label = "SUB_BACK", k = "boe", s = "back", grp = "TF_G_BOE" },
+  { key = "boe:finger", label = "SUB_FINGER", k = "boe", s = "finger", grp = "TF_G_BOE" },
+  { key = "boe:trinket", label = "SUB_TRINKET", k = "boe", s = "trinket", grp = "TF_G_BOE" },
+  { key = "boe:shield", label = "SUB_SHIELD", k = "boe", s = "shield", grp = "TF_G_BOE" },
+  { key = "boe:weapon", label = "SUB_WEAPON", k = "boe", s = "weapon", grp = "TF_G_BOE" },
+  { key = "boe:other", label = "SUB_OTHER", k = "boe", s = "other", grp = "TF_G_BOE" },
+  { header = "TF_H_MATS" },
+  { key = "cloth", label = "CAT_CLOTH", k = "cloth" },
+  { key = "leather", label = "CAT_LEATHER", k = "leather" },
+  { key = "herb", label = "CAT_HERB", k = "herb" },
+  { key = "ore", label = "CAT_ORE", k = "ore" },
+  { key = "potion", label = "CAT_POTION", k = "potion" },
+  { key = "bag", label = "CAT_BAG", k = "bag" },
+  { key = "other", label = "CAT_OTHER", k = "other" },
+}
+
+function BB:FindTypeFilter(key)
+  for i = 1, getn(BB.TYPE_FILTERS) do
+    if BB.TYPE_FILTERS[i].key == key then return BB.TYPE_FILTERS[i] end
+  end
+  return nil
+end
+
+-- passt ein Bestandseintrag (e.k, e.s) zum Filter? Items ohne Kategorie (alter Stand) nur bei "Alle".
+function BB:MatchTypeFilter(spec, e)
+  if not spec or spec.key == "all" then return true end
+  local k = e.k
+  if not k then return false end
+  if spec.k == "sell" then return k == "boe" or k == "recipe" end
+  if k ~= spec.k then return false end
+  if spec.s and e.s ~= spec.s then return false end
+  return true
 end
 
 function BB:CatName(cat)

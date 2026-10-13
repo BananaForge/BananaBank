@@ -2,7 +2,7 @@
 
 **Guild bank for Vanilla WoW 1.12 (OctoWoW): share your stock, request items, track donations.**
 
-![Version](https://img.shields.io/badge/version-1.6.6-ffd100) ![Client](https://img.shields.io/badge/client-1.12.1-blue) ![License](https://img.shields.io/badge/license-MIT-lightgrey)
+![Version](https://img.shields.io/badge/version-1.7.0-ffd100) ![Client](https://img.shields.io/badge/client-1.12.1-blue) ![License](https://img.shields.io/badge/license-MIT-lightgrey)
 
 Vanilla WoW has no guild bank, so nobody knows what the bank character holds or who donated what. BananaBank fixes that: the bank character shares its stock over the guild channel, members request items with a code, the bank mails them out, and every donation and withdrawal lands in a ledger. Built for the guild **Banana Republic**. Lua 5.0, no libraries.
 
@@ -91,6 +91,7 @@ Pull requests welcome, tested in-game on a 1.12 client. Lua 5.0 rules: no `#`, `
 
 ## Changelog
 
+- **1.7.0:** every BOE item and every recipe/formula counts as sellable (prices tab lists them all, bind column shows "Recipe"). New type filter in the stock tab for everyone: all recipes or one profession (e.g. Alchemy), BOE by slot, "Sellable", materials. A completed quest has a new **Pay out** button: it sets the delivered amounts aside as a confirmed request for a recipient (e.g. your tailor) and closes the quest, so the quest reservation ends and nothing stays reserved twice; mail it from the Bank tab. Banks must scan once so older snapshots get types.
 - **1.6.6:** mail that stacks onto a partial stack is booked also when the bags are full (before, it was missed). New `/bb ledger`, `/bb credit` (credit unassigned donations to open quests, as separate "Quest credit" entries) and `/bb book` (book a donation by hand).
 - **1.6.5:** a character holding the Gildenbank rank without bank mode gets a hint at login (its stock would otherwise go stale unnoticed); `/bb setbank` scans and sends the stock right away.
 - **1.6.4:** new `/bb stock <text>` diagnostic for any character: which stored bank stocks contain an item, when they were stored and who sent them.

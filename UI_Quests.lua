@@ -265,6 +265,11 @@ function UI:BuildQuests(parent)
     if q then UI:OpenQuestEditor(q) end
   end)
   Q.editBtn:SetPoint("RIGHT", Q.closeBtn, "LEFT", -4, 0)
+  Q.payBtn = self:Button(dc, 90, 18, "QB_PAYOUT", function()
+    local q = BananaBankDB.quests[Q.sel]
+    if q then UI:OpenPayoutDialog(q) end
+  end, "ok")
+  Q.payBtn:SetPoint("RIGHT", Q.editBtn, "LEFT", -4, 0)
 
   -- Item-Zeilen
   Q.items = {}
@@ -585,10 +590,12 @@ function UI:RefreshQuestDetail()
     Q.cancelBtn:Show()
     Q.closeBtn:Show()
     Q.editBtn:Show()
+    if st == "complete" then Q.payBtn:Show() else Q.payBtn:Hide() end
   else
     Q.cancelBtn:Hide()
     Q.closeBtn:Hide()
     Q.editBtn:Hide()
+    Q.payBtn:Hide()
   end
 
   -- Items
@@ -1221,4 +1228,66 @@ function UI:ShowQuestToast(title, sub, big)
   f:SetAlpha(0)
   f:Show()
   PlaySound(big and "igQuestListComplete" or "igQuestLogOpen")
+end
+
+-- ------------------------------------------------------------
+-- Auszahlung: reservierte Mengen einer erfuellten Quest an einen Empfaenger schicken
+-- ------------------------------------------------------------
+function UI:OpenPayoutDialog(q)
+  local f = self.payDlg
+  if not f then
+    f = CreateFrame("Frame", nil, UIParent)
+    f:SetWidth(340)
+    f:SetHeight(150)
+    f:SetPoint("CENTER", UIParent, "CENTER", 0, 60)
+    f:SetFrameStrata("FULLSCREEN_DIALOG")
+    f:EnableMouse(true)
+    f:SetBackdrop({
+      bgFile = WHITE, edgeFile = "Interface\\Tooltips\\UI-Tooltip-Border",
+      tile = true, tileSize = 16, edgeSize = 14,
+      insets = { left = 3, right = 3, top = 3, bottom = 3 },
+    })
+    f:SetBackdropColor(0.015, 0.025, 0.06, 1)
+    f:SetBackdropBorderColor(C.gold[1], C.gold[2], C.gold[3], 1)
+    f.title = self:Font(f, 13, C.gold)
+    f.title:SetPoint("TOPLEFT", f, "TOPLEFT", 14, -12)
+    f.title:SetWidth(310)
+    f.title:SetHeight(16)
+    f.hint = self:Font(f, 10, C.muted)
+    f.hint:SetPoint("TOPLEFT", f, "TOPLEFT", 14, -34)
+    f.hint:SetWidth(312)
+    f.hint:SetHeight(40)
+    f.hint:SetJustifyV("TOP")
+    f.lbl = self:Font(f, 11, { 0.88, 0.90, 0.96 })
+    f.lbl:SetPoint("TOPLEFT", f, "TOPLEFT", 14, -84)
+    f.lbl:SetText(T("PAY_TO"))
+    f.edit = self:EditBox("BananaBankPayTo", f, 170)
+    f.edit:SetPoint("TOPLEFT", f, "TOPLEFT", 110, -80)
+    f.edit:SetScript("OnEnterPressed", function() this:ClearFocus() end)
+    f.ok = self:Button(f, 120, 20, "PAY_GO", function()
+      local q2 = f.q
+      if not q2 then return end
+      local r, err = BB:CreateQuestPayout(q2, f.edit:GetText())
+      if not r then
+        BB:Print("|cffff4040" .. T(err == "EMPTY" and "PAY_EMPTY" or (err == "CLOSED" and "PAY_CLOSED" or "PAY_NONAME")) .. "|r")
+        return
+      end
+      f:Hide()
+      BB:Print(string.format(T("PAY_DONE"), r.id, r.p))
+      if BB:IsBank() and UI.bank then
+        UI.bank.current = r
+        UI:ShowPage("bank")
+      end
+      UI:Refresh()
+    end, "ok")
+    f.ok:SetPoint("BOTTOMLEFT", f, "BOTTOMLEFT", 14, 12)
+    f.no = self:Button(f, 90, 20, "PAY_CANCEL", function() f:Hide() end)
+    f.no:SetPoint("BOTTOMRIGHT", f, "BOTTOMRIGHT", -14, 12)
+    self.payDlg = f
+  end
+  f.q = q
+  f.title:SetText(T("PAY_TITLE"))
+  f.hint:SetText(T("PAY_HINT"))
+  f.edit:SetText(q.c or "")
+  f:Show()
 end

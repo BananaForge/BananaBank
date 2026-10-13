@@ -80,7 +80,7 @@ end
 function BB:SerializeSnapshot(snap)
   local recs = {}
   for id, it in pairs(snap.items) do
-    table.insert(recs, id .. "~" .. it.c .. "~" .. (it.q or 1) .. "~" .. BB.Clean(it.t) .. "~" .. BB.Clean(it.n) .. "~" .. (it.k or ""))
+    table.insert(recs, id .. "~" .. it.c .. "~" .. (it.q or 1) .. "~" .. BB.Clean(it.t) .. "~" .. BB.Clean(it.n) .. "~" .. (it.k or "") .. "~" .. (it.s or ""))
   end
   return table.concat(recs, "^")
 end
@@ -93,6 +93,7 @@ function BB:ParseSnapshot(payload)
     if id and tonumber(f[2]) then
       items[id] = { c = tonumber(f[2]), q = tonumber(f[3]) or 1, t = f[4] or "", n = f[5] or ("#" .. id) }
       if f[6] and BB.CAT_SET and BB.CAT_SET[f[6]] then items[id].k = f[6] end
+      if f[7] and BB.SUB_SET and BB.SUB_SET[f[7]] then items[id].s = f[7] end
     end
   end
   return items
