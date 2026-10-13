@@ -35,7 +35,7 @@ end
 local ev = CreateFrame("Frame", "BananaBankEvents")
 local EVENTS = {
   "ADDON_LOADED", "PLAYER_ENTERING_WORLD", "CHAT_MSG_ADDON",
-  "BANKFRAME_OPENED", "BANKFRAME_CLOSED", "BAG_UPDATE", "PLAYERBANKSLOTS_CHANGED", "PLAYER_MONEY",
+  "BANKFRAME_OPENED", "BANKFRAME_CLOSED", "BAG_UPDATE", "PLAYERBANKSLOTS_CHANGED", "PLAYERBANKBAGSLOTS_CHANGED", "UNIT_INVENTORY_CHANGED", "PLAYER_MONEY",
   "MAIL_SHOW", "MAIL_CLOSED", "MAIL_SEND_SUCCESS", "MAIL_FAILED",
   "TRADE_SHOW", "TRADE_CLOSED", "TRADE_ACCEPT_UPDATE", "TRADE_TARGET_ITEM_CHANGED",
   "TRADE_PLAYER_ITEM_CHANGED", "TRADE_MONEY_CHANGED", "UI_INFO_MESSAGE",
@@ -85,7 +85,9 @@ ev:SetScript("OnEvent", function()
     if BB:IsBank() then BB:ScheduleSnapshot(1) end
     BB.UI:Refresh()
 
-  elseif event == "BAG_UPDATE" or event == "PLAYERBANKSLOTS_CHANGED" then
+  elseif event == "BAG_UPDATE" or event == "PLAYERBANKSLOTS_CHANGED" or event == "PLAYERBANKBAGSLOTS_CHANGED"
+      or (event == "UNIT_INVENTORY_CHANGED" and arg1 == "player") then
+    -- Taschen anlegen oder tauschen aendert den Bestand ebenfalls (die Tasche im Einsatz zaehlt nicht mehr)
     -- auch bei geschlossener Bank: Post verschicken, Taschen oeffnen, Items abgeben ...
     if BB:IsBank() and BB.worldReady and not BB.job then BB:ScheduleSnapshot(3) end
     if BB.UI.page == "bank" then BB:After(0.5, function() BB.UI:Refresh() end, "bagrefresh") end
@@ -177,6 +179,8 @@ SlashCmdList["BANANABANK"] = function(msg)
     BB.UI:ToggleQuestTracker()
   elseif cmd == "questlog" then
     BB:PrintQuestLog(rest)
+  elseif cmd == "find" then
+    BB:FindItems(rest)
   elseif cmd == "status" then
     BB:Status()
   elseif cmd == "unhide" then

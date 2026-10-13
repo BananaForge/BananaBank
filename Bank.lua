@@ -119,6 +119,56 @@ function BB:UpdateSnapshot(push, onlyIfChanged)
   if self.UI then self.UI:Refresh() end
 end
 
+-- /bb find <Text>: zeigt, wo dieser Char passende Items liegen hat und was als Tasche im Einsatz ist
+function BB:FindItems(text)
+  text = string.lower(text or "")
+  if text == "" then
+    self:Print(self.T("FIND_USAGE"))
+    return
+  end
+  local hits = 0
+  local function scan(list, label)
+    for _, bag in ipairs(list) do
+      for slot = 1, (GetContainerNumSlots(bag) or 0) do
+        local link = GetContainerItemLink(bag, slot)
+        if link then
+          local _, name = BB.ParseLink(link)
+          if name and string.find(string.lower(name), text, 1, true) then
+            local _, count = GetContainerItemInfo(bag, slot)
+            hits = hits + 1
+            self:Print(string.format(self.T("FIND_LINE"), label, bag, slot, count or 1, name))
+          end
+        end
+      end
+    end
+  end
+  scan(BB.BAG_LIST, self.T("FIND_BAGS"))
+  if self.bankOpen then scan(BB.BANK_LIST, self.T("FIND_BANK")) end
+  -- Taschen im Einsatz (angelegt): zaehlen nicht zum Bestand
+  if GetInventoryItemLink and ContainerIDToInventoryID then
+    for bag = 1, 4 do
+      local link = GetInventoryItemLink("player", ContainerIDToInventoryID(bag))
+      if link then
+        local _, name = BB.ParseLink(link)
+        if name and string.find(string.lower(name), text, 1, true) then
+          hits = hits + 1
+          self:Print(string.format(self.T("FIND_EQUIPPED"), bag, name))
+        end
+      end
+    end
+  end
+  if not self.bankOpen then
+    local cache = BananaBankDB.bankCache[self:Me()] or {}
+    for id, it in pairs(cache) do
+      if string.find(string.lower(it.n or ""), text, 1, true) then
+        hits = hits + 1
+        self:Print(string.format(self.T("FIND_CACHE"), it.c, it.n))
+      end
+    end
+  end
+  if hits == 0 then self:Print(self.T("FIND_NONE")) end
+end
+
 function BB:ScheduleSnapshot(delay)
   if not self:IsBank() then return end
   self:After(delay or 3, function() BB:UpdateSnapshot(true, true) end, "snapshot")

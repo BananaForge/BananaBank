@@ -2,7 +2,7 @@
 
 **Guild bank for Vanilla WoW 1.12 (OctoWoW): share your stock, request items, track donations.**
 
-![Version](https://img.shields.io/badge/version-1.6.2-ffd100) ![Client](https://img.shields.io/badge/client-1.12.1-blue) ![License](https://img.shields.io/badge/license-MIT-lightgrey)
+![Version](https://img.shields.io/badge/version-1.6.3-ffd100) ![Client](https://img.shields.io/badge/client-1.12.1-blue) ![License](https://img.shields.io/badge/license-MIT-lightgrey)
 
 Vanilla WoW has no guild bank, so nobody knows what the bank character holds or who donated what. BananaBank fixes that: the bank character shares its stock over the guild channel, members request items with a code, the bank mails them out, and every donation and withdrawal lands in a ledger. Built for the guild **Banana Republic**. Lua 5.0, no libraries.
 
@@ -53,6 +53,7 @@ When updating, delete the old folder first, otherwise an old `BananaBank.toc` ca
 | `/bb setbank` / `removebank` | Set or remove the bank role for this character |
 | `/bb scan` / `sync` | Record and send stock / sync with the guild |
 | `/bb prices` / `ahscan` | Prices tab / fetch prices at the auction house |
+| `/bb find <text>` | (bank character) show where matching items are, and which bags are in use |
 | `/bb banks` | Open the Banks tab |
 | `/bb totals` | Open the donation totals window |
 | `/bb quests` / `tracker` | Open the Guild quests tab / show or hide the quest tracker |
@@ -86,6 +87,7 @@ Pull requests welcome, tested in-game on a 1.12 client. Lua 5.0 rules: no `#`, `
 
 ## Changelog
 
+- **1.6.3:** equipping or swapping bags (bag slots and bank bag slots) refreshes the bank stock, so bags in use no longer count as available. New `/bb find <text>` shows where a bank character holds an item.
 - **1.6.2:** the bank stock updates on every change of the bags, also with the bank closed (mailing, trading, opening the bags), but is only sent when the content changed. Fixes items showing up twice after being mailed from one bank to another.
 - **1.6.1:** the bank directory (Banks tab, bank selector, belongs-to hints) is only shown on characters in bank mode.
 - **1.6.0:** bank directory with roles and categories, banks tab, stock per bank, "belongs to" hints in tooltips, remaining items of a request shown with the bank that holds them. Stock snapshots carry the item category (set by the bank character).
