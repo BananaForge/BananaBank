@@ -11,8 +11,8 @@ local WHITE, FONT, FONT_TITLE = UI.WHITE, UI.FONT, UI.FONT_TITLE
 UI.bankUIModule = true
 UI.bk = {}
 
-local ROW_H = 92
-local VISIBLE = 4
+local ROW_H = 108
+local VISIBLE = 3
 local MENU_ROW = 38
 local MENU_MAX = 9
 
@@ -203,15 +203,27 @@ function UI:BuildBanks(parent)
   self.pages.banks = p
   local K = self.bk
 
-  K.summary = self:Font(p, 11, C.muted)
-  K.summary:SetPoint("TOPLEFT", p, "TOPLEFT", 8, -6)
-  K.summary:SetWidth(520)
-  K.summary:SetHeight(14)
-  K.editBtn = self:Button(p, 180, 22, "BK_EDIT", function() UI:OpenBankEditor() end, "primary")
-  K.editBtn:SetPoint("TOPRIGHT", p, "TOPRIGHT", 0, 0)
+  -- Kopfzeile: Summe ueber alle Banken auf einen Blick
+  local sum = self:Panel(p, 0, 46)
+  sum:SetPoint("TOPLEFT", p, "TOPLEFT", 0, 0)
+  sum:SetPoint("TOPRIGHT", p, "TOPRIGHT", 0, 0)
+  K.tiles = {}
+  local tdefs = { { "BK_T_BANKS", 18 }, { "BK_T_ITEMS", 230 }, { "BK_T_GOLD", 440 } }
+  for i = 1, getn(tdefs) do
+    local lbl = self:Font(sum, 10, C.goldDim)
+    lbl:SetPoint("TOPLEFT", sum, "TOPLEFT", tdefs[i][2], -7)
+    self:Loc(lbl, tdefs[i][1])
+    local val = self:Font(sum, 17, C.gold, FONT_TITLE)
+    val:SetPoint("TOPLEFT", sum, "TOPLEFT", tdefs[i][2], -21)
+    val:SetWidth(200)
+    val:SetHeight(20)
+    K.tiles[i] = val
+  end
+  K.editBtn = self:Button(sum, 180, 22, "BK_EDIT", function() UI:OpenBankEditor() end, "primary")
+  K.editBtn:SetPoint("RIGHT", sum, "RIGHT", -12, 0)
 
   local lp = CreateFrame("Frame", nil, p)
-  lp:SetPoint("TOPLEFT", p, "TOPLEFT", 0, -30)
+  lp:SetPoint("TOPLEFT", p, "TOPLEFT", 0, -52)
   lp:SetPoint("BOTTOMRIGHT", p, "BOTTOMRIGHT", 0, 0)
   K.lp = lp
   local sf = CreateFrame("ScrollFrame", "BananaBankBanksScroll", lp, "FauxScrollFrameTemplate")
@@ -253,8 +265,8 @@ function UI:BuildBanks(parent)
     card.desc:SetHeight(26)
     card.desc:SetJustifyV("TOP")
     card.tags = self:Font(card, 10, C.goldDim)
-    card.tags:SetPoint("TOPLEFT", card, "TOPLEFT", 30, -72)
-    card.tags:SetWidth(430)
+    card.tags:SetPoint("TOPLEFT", card, "TOPLEFT", 30, -82)
+    card.tags:SetWidth(520)
     card.tags:SetHeight(12)
     card.s1 = self:Font(card, 12, C.gold)
     card.s1:SetPoint("TOPRIGHT", card, "TOPRIGHT", -14, -10)
@@ -269,7 +281,7 @@ function UI:BuildBanks(parent)
     card.s3:SetJustifyH("RIGHT")
     card.s3:SetWidth(210)
     card.warn = self:Font(card, 10, C.orange)
-    card.warn:SetPoint("TOPRIGHT", card, "TOPRIGHT", -14, -56)
+    card.warn:SetPoint("TOPRIGHT", card, "TOPRIGHT", -14, -59)
     card.warn:SetJustifyH("RIGHT")
     card.warn:SetWidth(210)
     card.show = self:Button(card, 110, 20, "BK_SHOW", function(b)
@@ -280,7 +292,7 @@ function UI:BuildBanks(parent)
       S.page = 1
       UI:ShowPage("stock")
     end)
-    card.show:SetPoint("BOTTOMRIGHT", card, "BOTTOMRIGHT", -12, 8)
+    card.show:SetPoint("BOTTOMRIGHT", card, "BOTTOMRIGHT", -12, 9)
     table.insert(K.rows, card)
   end
   K.empty = self:Font(lp, 12, C.muted)
@@ -309,7 +321,11 @@ function UI:RefreshBanks()
       totalGold = totalGold + st.gold
     end
   end
-  K.summary:SetText(string.format(T("BK_SUMMARY"), getn(names), totalItems, BB.Money(totalGold)))
+  local online = 0
+  for i = 1, getn(names) do if BB:IsOnline(names[i]) then online = online + 1 end end
+  K.tiles[1]:SetText(getn(names) .. "  |cff9a9cb3(" .. string.format(T("BK_T_ONLINE"), online) .. ")|r")
+  K.tiles[2]:SetText(totalItems)
+  K.tiles[3]:SetText(BB.Money(totalGold))
   if BB:IsBank() and BB:MayBeBank(me) then K.editBtn:Show() else K.editBtn:Hide() end
 
   local n = getn(names)

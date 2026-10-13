@@ -7,7 +7,8 @@ local T = function(k) return BB.T(k) end
 local getn = table.getn
 local floor = math.floor
 
-local PRICE_ROWS = 12
+local PRICE_ROWS = 10
+local PRICE_ROW_H = 25
 UI.priceModule = true
 
 function UI:BuildPrices(parent)
@@ -43,7 +44,8 @@ function UI:BuildPrices(parent)
     local key = defs[i][2]
     local chip = self:Chip(p, 92, defs[i][1], function()
       P.filter = key
-      P.page = 1
+      local sb = getglobal("BananaBankPriceScrollScrollBar")
+      if sb then sb:SetValue(0) end
       UI:RefreshPrices()
     end)
     chip.key = key
@@ -54,7 +56,20 @@ function UI:BuildPrices(parent)
 
   local list = self:Panel(p)
   list:SetPoint("TOPLEFT", p, "TOPLEFT", 0, -56)
-  list:SetPoint("BOTTOMRIGHT", p, "BOTTOMRIGHT", 0, 28)
+  list:SetPoint("BOTTOMRIGHT", p, "BOTTOMRIGHT", 0, 30)
+  P.list = list
+  local sf = CreateFrame("ScrollFrame", "BananaBankPriceScroll", list, "FauxScrollFrameTemplate")
+  sf:SetPoint("TOPLEFT", list, "TOPLEFT", 0, -28)
+  sf:SetPoint("BOTTOMRIGHT", list, "BOTTOMRIGHT", -4, 4)
+  sf:SetScript("OnVerticalScroll", function() FauxScrollFrame_OnVerticalScroll(PRICE_ROW_H, function() UI:RefreshPrices() end) end)
+  sf.offset = 0
+  P.sf = sf
+  local function wheel()
+    local sb = getglobal("BananaBankPriceScrollScrollBar")
+    if sb then sb:SetValue(sb:GetValue() - arg1 * PRICE_ROW_H * 2) end
+  end
+  sf:EnableMouseWheel(true)
+  sf:SetScript("OnMouseWheel", wheel)
   local cols = { { "COL_ITEM", 14 }, { "COL_BIND", 300 }, { "COL_PRICE", 400 }, { "COL_SOURCE", 512 }, { "COL_DATE", 608 } }
   for i = 1, getn(cols) do
     local h = self:Font(list, 10, C.goldDim)
@@ -68,7 +83,9 @@ function UI:BuildPrices(parent)
     local row = CreateFrame("Frame", nil, list)
     row:SetHeight(24)
     row:SetPoint("TOPLEFT", list, "TOPLEFT", 8, -28 - (i - 1) * 25)
-    row:SetPoint("TOPRIGHT", list, "TOPRIGHT", -8, -28 - (i - 1) * 25)
+    row:SetPoint("TOPRIGHT", list, "TOPRIGHT", -26, -28 - (i - 1) * 25)
+    row:EnableMouseWheel(true)
+    row:SetScript("OnMouseWheel", wheel)
     local zebra = row:CreateTexture(nil, "BACKGROUND")
     zebra:SetAllPoints(row)
     zebra:SetTexture(1, 1, 1, (math.mod(i, 2) == 0) and 0.03 or 0)
@@ -102,23 +119,11 @@ function UI:BuildPrices(parent)
   P.empty:SetJustifyH("CENTER")
   P.empty:SetWidth(420)
 
-  local prevBtn = self:Button(p, 26, 20, "<", function()
-    P.page = P.page - 1
-    UI:RefreshPrices()
-  end, "flat")
-  prevBtn:SetPoint("BOTTOMLEFT", p, "BOTTOMLEFT", 8, 2)
-  local nextBtn = self:Button(p, 26, 20, ">", function()
-    P.page = P.page + 1
-    UI:RefreshPrices()
-  end, "flat")
-  nextBtn:SetPoint("LEFT", prevBtn, "RIGHT", 60, 0)
-  P.pageFs = self:Font(p, 11, C.text)
-  P.pageFs:SetPoint("LEFT", prevBtn, "RIGHT", 4, 0)
-  P.pageFs:SetWidth(52)
-  P.pageFs:SetJustifyH("CENTER")
   local legend = self:Font(p, 10, C.muted)
-  legend:SetPoint("LEFT", nextBtn, "RIGHT", 12, 0)
-  legend:SetWidth(520)
+  legend:SetPoint("BOTTOMLEFT", p, "BOTTOMLEFT", 8, 6)
+  legend:SetWidth(790)
+  legend:SetHeight(22)
+  legend:SetJustifyV("TOP")
   self:Loc(legend, "PRICE_LEGEND")
 
   self:BuildPriceDialog()
@@ -172,13 +177,14 @@ function UI:RefreshPrices()
   end
 
   local list = self:PriceList()
-  local pages = floor((getn(list) - 1) / PRICE_ROWS) + 1
-  if pages < 1 then pages = 1 end
-  if P.page > pages then P.page = pages end
-  if P.page < 1 then P.page = 1 end
+  local offset = 0
+  P.busy = true
+  if FauxScrollFrame_Update then FauxScrollFrame_Update(P.sf, getn(list), PRICE_ROWS, PRICE_ROW_H) end
+  offset = (FauxScrollFrame_GetOffset and FauxScrollFrame_GetOffset(P.sf)) or P.sf.offset or 0
+  P.busy = false
   for i = 1, PRICE_ROWS do
     local row = P.rows[i]
-    local entry = list[(P.page - 1) * PRICE_ROWS + i]
+    local entry = list[offset + i]
     if entry then
       local id = entry.id
       row.id = id
@@ -224,7 +230,6 @@ function UI:RefreshPrices()
   else
     P.empty:Hide()
   end
-  P.pageFs:SetText(P.page .. " / " .. pages)
 end
 
 -- ------------------------------------------------------------
