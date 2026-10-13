@@ -2,7 +2,7 @@
 
 **Guild bank for Vanilla WoW 1.12 (OctoWoW): share your stock, request items, track donations.**
 
-![Version](https://img.shields.io/badge/version-1.6.4-ffd100) ![Client](https://img.shields.io/badge/client-1.12.1-blue) ![License](https://img.shields.io/badge/license-MIT-lightgrey)
+![Version](https://img.shields.io/badge/version-1.6.5-ffd100) ![Client](https://img.shields.io/badge/client-1.12.1-blue) ![License](https://img.shields.io/badge/license-MIT-lightgrey)
 
 Vanilla WoW has no guild bank, so nobody knows what the bank character holds or who donated what. BananaBank fixes that: the bank character shares its stock over the guild channel, members request items with a code, the bank mails them out, and every donation and withdrawal lands in a ledger. Built for the guild **Banana Republic**. Lua 5.0, no libraries.
 
@@ -88,6 +88,7 @@ Pull requests welcome, tested in-game on a 1.12 client. Lua 5.0 rules: no `#`, `
 
 ## Changelog
 
+- **1.6.5:** a character holding the Gildenbank rank without bank mode gets a hint at login (its stock would otherwise go stale unnoticed); `/bb setbank` scans and sends the stock right away.
 - **1.6.4:** new `/bb stock <text>` diagnostic for any character: which stored bank stocks contain an item, when they were stored and who sent them.
 - **1.6.3:** equipping or swapping bags (bag slots and bank bag slots) refreshes the bank stock, so bags in use no longer count as available. New `/bb find <text>` shows where a bank character holds an item.
 - **1.6.2:** the bank stock updates on every change of the bags, also with the bank closed (mailing, trading, opening the bags), but is only sent when the content changed. Fixes items showing up twice after being mailed from one bank to another.

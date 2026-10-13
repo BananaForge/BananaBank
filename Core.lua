@@ -10,7 +10,7 @@
 BananaBank = {}
 local BB = BananaBank
 
-BB.VERSION = "1.6.4"
+BB.VERSION = "1.6.5"
 BB.PREFIX = "BBNK"
 BB.DONATE_NAME = "Lumihunt"
 -- Einziger erlaubter Bank-Rang, deutsch und englisch. Fest eingebaut, es gibt
@@ -256,6 +256,19 @@ function BB:ReadRoster()
   end
   self.rankExists = exists
   self.rosterReady = true
+  self:BankModeNudge()
+end
+
+-- Char mit dem Bank-Rang, aber ohne Bank-Modus: einmal pro Sitzung darauf hinweisen. Sonst
+-- bleibt ein Bank-Char stumm, sein Bestand veraltet, und niemand merkt es (z.B. wenn die
+-- gespeicherten Einstellungen nach einem Absturz fehlen).
+function BB:BankModeNudge()
+  if self.bankNudged or not BananaBankDB then return end
+  local me = self:Me()
+  if self:Ready() and self:MayBeBank(me) and not self:IsBank() then
+    self.bankNudged = true
+    self:Print("|cffff8000" .. string.format(self.T("MSG_BANK_NUDGE"), BB.BANK_RANK_LABEL) .. "|r")
+  end
 end
 
 function BB:RequestRoster()
@@ -332,6 +345,8 @@ function BB:SetBank(on)
     end
     BananaBankDB.banks[me] = true
     self:Print(string.format(self.T("MSG_BANK_SET"), me))
+    -- gleich erfassen und senden, damit ein veralteter Bestand dieses Chars korrigiert wird
+    self:ScheduleSnapshot(1)
   else
     BananaBankDB.banks[me] = nil
     self:Print(string.format(self.T("MSG_BANK_REMOVED"), me))

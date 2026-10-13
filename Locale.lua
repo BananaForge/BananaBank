@@ -350,6 +350,7 @@ BB.L.deDE = {
   FIND_NONE = "Nichts gefunden.",
   STOCKDBG_USAGE = "/bb stock <Text> zeigt, welche gespeicherten Bestände das Item enthalten.",
   STOCKDBG_LINE = "%s: %dx %s  (Stand %s, von %s, Bank-Rang: %s)",
+  MSG_BANK_NUDGE = "Dieser Char hat den Rang %s, ist aber nicht im Bank-Modus. Mit /bb setbank wird er wieder Bank, sonst veraltet sein Bestand.",
   YES = "ja",
   NO = "nein",
 
@@ -775,6 +776,7 @@ BB.L.enUS = {
   FIND_NONE = "Nothing found.",
   STOCKDBG_USAGE = "/bb stock <text> shows which stored stocks contain the item.",
   STOCKDBG_LINE = "%s: %dx %s  (as of %s, from %s, bank rank: %s)",
+  MSG_BANK_NUDGE = "This character holds the rank %s but is not in bank mode. Use /bb setbank to make it a bank again, otherwise its stock goes stale.",
   YES = "yes",
   NO = "no",
 
