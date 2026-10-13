@@ -348,6 +348,8 @@ BB.L.deDE = {
   FIND_EQUIPPED = "Tasche im Einsatz (Taschenplatz %d): %s - zählt nicht zum Bestand",
   FIND_CACHE = "Bankfächer (Zwischenspeicher): %dx %s",
   FIND_NONE = "Nichts gefunden.",
+  STOCKDBG_USAGE = "/bb stock <Text> zeigt, welche gespeicherten Bestände das Item enthalten.",
+  STOCKDBG_LINE = "%s: %dx %s  (Stand %s, von %s, Bank-Rang: %s)",
   YES = "ja",
   NO = "nein",
 
@@ -771,6 +773,8 @@ BB.L.enUS = {
   FIND_EQUIPPED = "Bag in use (bag slot %d): %s - not part of the stock",
   FIND_CACHE = "Bank slots (cache): %dx %s",
   FIND_NONE = "Nothing found.",
+  STOCKDBG_USAGE = "/bb stock <text> shows which stored stocks contain the item.",
+  STOCKDBG_LINE = "%s: %dx %s  (as of %s, from %s, bank rank: %s)",
   YES = "yes",
   NO = "no",
 

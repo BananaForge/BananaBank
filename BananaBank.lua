@@ -179,6 +179,8 @@ SlashCmdList["BANANABANK"] = function(msg)
     BB.UI:ToggleQuestTracker()
   elseif cmd == "questlog" then
     BB:PrintQuestLog(rest)
+  elseif cmd == "stock" then
+    BB:StockDebug(rest)
   elseif cmd == "find" then
     BB:FindItems(rest)
   elseif cmd == "status" then

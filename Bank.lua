@@ -119,6 +119,33 @@ function BB:UpdateSnapshot(push, onlyIfChanged)
   if self.UI then self.UI:Refresh() end
 end
 
+-- /bb stock <Text>: zeigt, welche gespeicherten Bestaende (aller Banken) das Item enthalten und wie alt sie sind.
+-- Laeuft auf jedem Client und zeigt, was dieser Client ueber den Bestand glaubt.
+function BB:StockDebug(text)
+  text = string.lower(text or "")
+  if text == "" then
+    self:Print(self.T("STOCKDBG_USAGE"))
+    return
+  end
+  local hits = 0
+  local names = {}
+  for bank in pairs(BananaBankDB.snaps) do table.insert(names, bank) end
+  table.sort(names)
+  for i = 1, getn(names) do
+    local bank = names[i]
+    local snap = BananaBankDB.snaps[bank]
+    for id, it in pairs(snap.items) do
+      if string.find(string.lower(it.n or ""), text, 1, true) then
+        hits = hits + 1
+        local ok = self:MayBeBank(bank) and self.T("YES") or self.T("NO")
+        self:Print(string.format(self.T("STOCKDBG_LINE"), bank, it.c, it.n, date("%d.%m. %H:%M:%S", snap.ts),
+          snap.from or "?", ok))
+      end
+    end
+  end
+  if hits == 0 then self:Print(self.T("FIND_NONE")) end
+end
+
 -- /bb find <Text>: zeigt, wo dieser Char passende Items liegen hat und was als Tasche im Einsatz ist
 function BB:FindItems(text)
   text = string.lower(text or "")
