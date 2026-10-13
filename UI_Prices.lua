@@ -60,7 +60,7 @@ function UI:BuildPrices(parent)
   P.list = list
   local sf = CreateFrame("ScrollFrame", "BananaBankPriceScroll", list, "FauxScrollFrameTemplate")
   sf:SetPoint("TOPLEFT", list, "TOPLEFT", 0, -28)
-  sf:SetPoint("BOTTOMRIGHT", list, "BOTTOMRIGHT", -4, 4)
+  sf:SetPoint("BOTTOMRIGHT", list, "BOTTOMRIGHT", -28, 4)
   sf:SetScript("OnVerticalScroll", function() FauxScrollFrame_OnVerticalScroll(PRICE_ROW_H, function() UI:RefreshPrices() end) end)
   sf.offset = 0
   P.sf = sf
@@ -70,7 +70,7 @@ function UI:BuildPrices(parent)
   end
   sf:EnableMouseWheel(true)
   sf:SetScript("OnMouseWheel", wheel)
-  local cols = { { "COL_ITEM", 14 }, { "COL_BIND", 300 }, { "COL_PRICE", 400 }, { "COL_SOURCE", 512 }, { "COL_DATE", 608 } }
+  local cols = { { "COL_ITEM", 14 }, { "COL_BIND", 300 }, { "COL_PRICE", 400 }, { "COL_SOURCE", 504 }, { "COL_DATE", 596 } }
   for i = 1, getn(cols) do
     local h = self:Font(list, 10, C.goldDim)
     h:SetPoint("TOPLEFT", list, "TOPLEFT", cols[i][2], -9)
@@ -102,14 +102,14 @@ function UI:BuildPrices(parent)
     row.bind:SetWidth(100)
     row.price = self:Font(row, 11, C.gold)
     row.price:SetPoint("LEFT", row, "LEFT", 392, 0)
-    row.price:SetWidth(112)
+    row.price:SetWidth(98)
     row.src = self:Font(row, 10, C.muted)
-    row.src:SetPoint("LEFT", row, "LEFT", 504, 0)
-    row.src:SetWidth(94)
+    row.src:SetPoint("LEFT", row, "LEFT", 496, 0)
+    row.src:SetWidth(90)
     row.date = self:Font(row, 10, C.muted)
-    row.date:SetPoint("LEFT", row, "LEFT", 600, 0)
-    row.date:SetWidth(72)
-    row.edit = self:Button(row, 62, 20, "BTN_PRICE_SET", function(b) UI:ShowPriceDialog(b.row.id) end, "flat")
+    row.date:SetPoint("LEFT", row, "LEFT", 588, 0)
+    row.date:SetWidth(76)
+    row.edit = self:Button(row, 52, 20, "BTN_PRICE_SET", function(b) UI:ShowPriceDialog(b.row.id) end, "flat")
     row.edit:SetPoint("RIGHT", row, "RIGHT", 0, 0)
     row.edit.row = row
     table.insert(P.rows, row)
