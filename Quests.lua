@@ -93,7 +93,7 @@ function BB:QuestStats()
   local out = {}
   for id in pairs(db.quests) do out[id] = { got = {}, eff = {}, by = {}, done = 0, need = 0 } end
   for _, e in pairs(db.ledger) do
-    if e.k == "in" and e.code ~= "" then
+    if (e.k == "in" or e.k == "qfix") and e.code ~= "" then
       local s = out[e.code]
       local q = s and db.quests[e.code]
       if q and q.items[e.i] then
@@ -157,7 +157,7 @@ function BB:QuestRanking(since)
   for id, q in pairs(db.quests) do need[id] = self:QuestNeed(q) end
   local per = {}
   for _, e in pairs(db.ledger) do
-    if e.k == "in" and e.code ~= "" and (not since or e.t >= since) then
+    if (e.k == "in" or e.k == "qfix") and e.code ~= "" and (not since or e.t >= since) then
       local q = db.quests[e.code]
       if q and q.s ~= "cancelled" and q.items[e.i] and need[q.id] > 0 then
         local r = per[e.p]
@@ -304,7 +304,8 @@ function BB:PrintQuestLog(n)
   for i = from, getn(log) do
     local e = log[i]
     local line = date("%d.%m. %H:%M", e.t) .. "  |cffffd100" .. e.a .. "|r  " ..
-      self.T("QLOG_" .. string.upper(e.act)) .. "  \"" .. e.title .. "\""
+      self.T("QLOG_" .. string.upper(e.act))
+    if e.title and e.title ~= "" then line = line .. "  \"" .. e.title .. "\"" end
     if e.x and e.x ~= "" then line = line .. "  |cff9a9cb3" .. e.x .. "|r" end
     DEFAULT_CHAT_FRAME:AddMessage(line)
   end
@@ -546,3 +547,111 @@ tickFrame:SetScript("OnUpdate", function()
   tickAcc = 0
   if BananaBankDB and BB.qSeen then BB:QuestTick() end
 end)
+
+
+-- ------------------------------------------------------------
+-- Nachtraege (nur Bank-Chars, deren Buchungen die anderen akzeptieren)
+-- ------------------------------------------------------------
+local function bankOnly(self)
+  if self:IsBank() and self:MayBeBank(self:Me()) then return true end
+  self:Print("|cffff4040" .. self.T("ERR_NOT_BANK") .. "|r")
+  return false
+end
+
+-- Spenden, die nach dem Anlegen einer Quest gebucht wurden, aber keiner Quest zugeordnet sind,
+-- nachtraeglich der Quest gutschreiben. Die alten Eintraege bleiben unveraendert, der Nachtrag
+-- ist ein eigener Eintrag (k = qfix, g = ID der Spende), so sehen es alle Clients gleich.
+function BB:CreditQuestDeliveries()
+  if not bankOnly(self) then return end
+  local db = BananaBankDB
+  local credited = {}
+  for _, e in pairs(db.ledger) do
+    if e.k == "qfix" and e.g ~= "" then credited[e.g] = (credited[e.g] or 0) + (e.c or 0) end
+  end
+  local entries = {}
+  for _, e in pairs(db.ledger) do
+    if e.k == "in" and e.code == "" then table.insert(entries, e) end
+  end
+  table.sort(entries, function(a, b)
+    if a.t ~= b.t then return a.t < b.t end
+    return a.id < b.id
+  end)
+  local quests = {}
+  for _, qu in pairs(db.quests) do
+    if qu.s == "open" then table.insert(quests, qu) end
+  end
+  table.sort(quests, function(a, b)
+    if a.ts ~= b.ts then return a.ts < b.ts end
+    return a.id < b.id
+  end)
+  local made, units = 0, 0
+  for qi = 1, getn(quests) do
+    local qu = quests[qi]
+    for ei = 1, getn(entries) do
+      local e = entries[ei]
+      local left = e.c - (credited[e.id] or 0)
+      if left > 0 and e.t >= qu.ts then
+        -- passendes Quest-Item: ID oder Name
+        local iid
+        for id in pairs(qu.items) do
+          local m = qu.meta and qu.meta[id]
+          local lname = GetItemInfo(id)
+          if id == e.i or (lname and lname == e.n) or (m and m.n == e.n) then iid = id end
+        end
+        if iid then
+          local s = self:QuestStats()[qu.id]
+          local need = qu.items[iid] - ((s and s.got[iid]) or 0)
+          if need > 0 then
+            local take = left
+            if take > need then take = need end
+            self:AddLedger({ k = "qfix", p = e.p, n = e.n, c = take, q = e.q, i = iid, code = qu.id, g = e.id, t = e.t })
+            credited[e.id] = (credited[e.id] or 0) + take
+            made = made + 1
+            units = units + take
+          end
+        end
+      end
+    end
+  end
+  if made > 0 then
+    self:QLog("credit", nil, self:Me(), string.format("%d Eintraege, %d Items", made, units))
+    self:QuestTick()
+  end
+  self:Print(string.format(self.T("QCREDIT_DONE"), made, units))
+end
+
+-- Eine Spende von Hand buchen (z.B. wenn Post angenommen wurde, ohne dass sie erfasst wurde)
+function BB:ManualBook(player, count, itemText)
+  if not bankOnly(self) then return end
+  count = tonumber(count)
+  itemText = string.lower(itemText or "")
+  if not player or player == "" or not count or count < 1 or itemText == "" then
+    self:Print(self.T("QBOOK_USAGE"))
+    return
+  end
+  count = floor(count)
+  local matches = {}
+  local exact
+  for id, e in pairs(self:GetStock()) do
+    local nm = string.lower(e.n or "")
+    if nm == itemText then exact = { id = id, e = e } end
+    if string.find(nm, itemText, 1, true) then table.insert(matches, { id = id, e = e }) end
+  end
+  local pick = exact
+  if not pick then
+    if getn(matches) == 0 then
+      self:Print(string.format(self.T("QBOOK_NOITEM"), itemText))
+      return
+    elseif getn(matches) > 1 then
+      local names = {}
+      for i = 1, getn(matches) do
+        if getn(names) < 5 then table.insert(names, matches[i].e.n) end
+      end
+      self:Print(string.format(self.T("QBOOK_MANY"), table.concat(names, ", ")))
+      return
+    end
+    pick = matches[1]
+  end
+  self:BookDonation(BB.Clean(player), pick.e.n, count, pick.e.q or 1, pick.id, "")
+  self:Print(string.format(self.T("QBOOK_DONE"), count, pick.e.n, player))
+end

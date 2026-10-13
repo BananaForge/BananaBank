@@ -6,6 +6,7 @@
 
 local BB = BananaBank
 local getn = table.getn
+local floor = math.floor
 
 BB.summaryModule = true
 
@@ -189,4 +190,50 @@ function BB:ItemDonors(it)
     return a.p < b.p
   end)
   return list
+end
+
+
+-- /bb ledger [N | Text | today]: letzte Buchungen im Chat, zum Gegenpruefen
+local KIND_NAME = { ["in"] = "KIND_IN", out = "KIND_OUT", gold = "KIND_GOLD", gout = "KIND_GOUT", back = "KIND_BACK", cod = "KIND_COD", qfix = "KIND_QFIX" }
+
+function BB:PrintLedger(arg)
+  arg = string.lower(arg or "")
+  local list = self:LedgerSorted()   -- neueste zuerst
+  local out = {}
+  local limit = 15
+  local since
+  local text
+  if arg == "today" or arg == "heute" then
+    local d = date("*t")
+    since = time({ year = d.year, month = d.month, day = d.day, hour = 0, min = 0, sec = 0 })
+    limit = 60
+  elseif tonumber(arg) then
+    limit = math.min(60, math.max(1, floor(tonumber(arg))))
+  elseif arg ~= "" then
+    text = arg
+    limit = 30
+  end
+  for i = 1, getn(list) do
+    local e = list[i]
+    local ok = true
+    if since and e.t < since then ok = false end
+    if text and not (string.find(string.lower(e.p or ""), text, 1, true) or string.find(string.lower(e.n or ""), text, 1, true)) then ok = false end
+    if ok then table.insert(out, e) end
+    if getn(out) >= limit then break end
+  end
+  self:Print(string.format(self.T("LEDGER_PRINT_HEAD"), getn(out), getn(list)))
+  for i = getn(out), 1, -1 do
+    local e = out[i]
+    local what
+    if e.k == "gold" or e.k == "gout" or e.k == "cod" then
+      what = BB.Money(e.m)
+    else
+      what = (e.c or 0) .. "x " .. (e.n or "?")
+    end
+    local line = date("%d.%m. %H:%M", e.t) .. "  " .. self.T(KIND_NAME[e.k] or "KIND_IN") .. "  " .. (e.p or "?") .. "  " .. what
+    local qq = e.code ~= "" and BananaBankDB.quests and BananaBankDB.quests[e.code]
+    if qq then line = line .. "  |cffffd100[" .. qq.title .. "]|r"
+    elseif e.code ~= "" then line = line .. "  |cff9a9cb3" .. e.code .. "|r" end
+    DEFAULT_CHAT_FRAME:AddMessage(line)
+  end
 end

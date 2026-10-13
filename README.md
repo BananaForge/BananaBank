@@ -2,7 +2,7 @@
 
 **Guild bank for Vanilla WoW 1.12 (OctoWoW): share your stock, request items, track donations.**
 
-![Version](https://img.shields.io/badge/version-1.6.5-ffd100) ![Client](https://img.shields.io/badge/client-1.12.1-blue) ![License](https://img.shields.io/badge/license-MIT-lightgrey)
+![Version](https://img.shields.io/badge/version-1.6.6-ffd100) ![Client](https://img.shields.io/badge/client-1.12.1-blue) ![License](https://img.shields.io/badge/license-MIT-lightgrey)
 
 Vanilla WoW has no guild bank, so nobody knows what the bank character holds or who donated what. BananaBank fixes that: the bank character shares its stock over the guild channel, members request items with a code, the bank mails them out, and every donation and withdrawal lands in a ledger. Built for the guild **Banana Republic**. Lua 5.0, no libraries.
 
@@ -53,6 +53,9 @@ When updating, delete the old folder first, otherwise an old `BananaBank.toc` ca
 | `/bb setbank` / `removebank` | Set or remove the bank role for this character |
 | `/bb scan` / `sync` | Record and send stock / sync with the guild |
 | `/bb prices` / `ahscan` | Prices tab / fetch prices at the auction house |
+| `/bb ledger [n\|text\|today]` | Print the latest ledger entries in chat (to check what was booked) |
+| `/bb credit` | (bank character) credit donations that were booked without a quest to the open quests |
+| `/bb book <player> <count> <item>` | (bank character) book a donation by hand |
 | `/bb stock <text>` | (any character) show which stored bank stocks contain an item, with age and sender |
 | `/bb find <text>` | (bank character) show where matching items are, and which bags are in use |
 | `/bb banks` | Open the Banks tab |
@@ -88,6 +91,7 @@ Pull requests welcome, tested in-game on a 1.12 client. Lua 5.0 rules: no `#`, `
 
 ## Changelog
 
+- **1.6.6:** mail that stacks onto a partial stack is booked also when the bags are full (before, it was missed). New `/bb ledger`, `/bb credit` (credit unassigned donations to open quests, as separate "Quest credit" entries) and `/bb book` (book a donation by hand).
 - **1.6.5:** a character holding the Gildenbank rank without bank mode gets a hint at login (its stock would otherwise go stale unnoticed); `/bb setbank` scans and sends the stock right away.
 - **1.6.4:** new `/bb stock <text>` diagnostic for any character: which stored bank stocks contain an item, when they were stored and who sent them.
 - **1.6.3:** equipping or swapping bags (bag slots and bank bag slots) refreshes the bank stock, so bags in use no longer count as available. New `/bb find <text>` shows where a bank character holds an item.

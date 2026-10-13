@@ -401,7 +401,7 @@ local function fillTop(pnl, list)
   if list[1] then pnl.empty:Hide() else pnl.empty:Show() end
 end
 
-local KIND_TAG = { out = "-", gout = "-", ["in"] = "+", gold = "+", back = "<", cod = "$" }
+local KIND_TAG = { out = "-", gout = "-", ["in"] = "+", gold = "+", back = "<", cod = "$", qfix = "*" }
 
 function UI:RefreshLedger()
   if not self.led then return end

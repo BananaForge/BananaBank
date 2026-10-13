@@ -634,6 +634,27 @@ BB.SYSTEM_SENDERS = {
   ["The Postmaster"] = true, ["Der Postmeister"] = true, ["Postmaster"] = true,
 }
 
+-- Passt die Lieferung in die Taschen? Ein freies Fach oder genug Platz in Teilstapeln desselben Items.
+-- (Voller Rucksack heisst nicht, dass der Brief nicht ankommt: das Item kann auf einen Stapel gehen.)
+function BB:CanReceive(name, count)
+  if self:HasFreeBagSlot() then return true end
+  local room = 0
+  for _, bag in ipairs(BB.BAG_LIST) do
+    for slot = 1, (GetContainerNumSlots(bag) or 0) do
+      local link = GetContainerItemLink(bag, slot)
+      if link then
+        local id, nm = BB.ParseLink(link)
+        if nm == name then
+          local _, c = GetContainerItemInfo(bag, slot)
+          local _, _, _, _, _, _, stack = GetItemInfo(id)
+          if stack and c and c < stack then room = room + (stack - c) end
+        end
+      end
+    end
+  end
+  return room >= (count or 1)
+end
+
 function BB:HasFreeBagSlot()
   return findEmptyBagSlot({}) ~= nil
 end
@@ -659,7 +680,7 @@ function BB:OnTakeInbox(i, isItem, j)
   if isItem then
     if not hasItem then return end
     name, tex, count, q = GetInboxItem(i, j)
-    if not name or not self:HasFreeBagSlot() then return end
+    if not name or not self:CanReceive(name, count or 1) then return end
   else
     if not money or money <= 0 then return end
   end

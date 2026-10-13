@@ -179,6 +179,13 @@ SlashCmdList["BANANABANK"] = function(msg)
     BB.UI:ToggleQuestTracker()
   elseif cmd == "questlog" then
     BB:PrintQuestLog(rest)
+  elseif cmd == "ledger" or cmd == "buch" then
+    BB:PrintLedger(rest)
+  elseif cmd == "credit" then
+    BB:CreditQuestDeliveries()
+  elseif cmd == "book" then
+    local _, _, player, cnt, item = string.find(rest, "^(%S+)%s+(%d+)%s+(.+)$")
+    BB:ManualBook(player, cnt, item)
   elseif cmd == "stock" then
     BB:StockDebug(rest)
   elseif cmd == "find" then
