@@ -309,12 +309,25 @@ end
 -- Item-Tooltip nur ueber Cache (SetHyperlink auf unbekannte Items kann in 1.12 trennen)
 function UI:ItemTooltip(owner, id, extra)
   GameTooltip:SetOwner(owner, "ANCHOR_RIGHT")
-  if GetItemInfo(id) then
+  -- Items, die dieser Client noch nie gesehen hat, kennt er nicht. Den Server danach zu fragen
+  -- (SetHyperlink) ist in 1.12 nur mit Umschalt gedrueckt erlaubt, weil ein falsches Item den Client trennen kann.
+  local known = GetItemInfo(id)
+  if not known and IsShiftKeyDown() and type(id) == "number" and id > 0 and id < 100000 then
+    GameTooltip:SetHyperlink("item:" .. id .. ":0:0:0")
+    known = true
+  elseif known then
     GameTooltip:SetHyperlink("item:" .. id .. ":0:0:0")
   else
     local n, q = BB:ItemInfo(id)
     local c = BB.QUALITY_COLOR[q or 1] or BB.QUALITY_COLOR[1]
     GameTooltip:AddLine(n, c[1], c[2], c[3])
+    local e = BB.stockCache and BB.stockCache[id]
+    if e and e.k and e.k ~= "other" then
+      local cat = BB:CatName(e.k)
+      if e.s and BB.T("SUB_" .. string.upper(e.s)) then cat = cat .. ": " .. BB.T("SUB_" .. string.upper(e.s)) end
+      GameTooltip:AddLine(cat, 0.8, 0.8, 0.8)
+    end
+    GameTooltip:AddLine(BB.T("TT_UNKNOWN"), 1, 0.65, 0.2)
   end
   if extra then
     GameTooltip:AddLine(" ")
