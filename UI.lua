@@ -551,10 +551,7 @@ end
 
 function UI:Toggle()
   self:Init()
-  if self.frame:IsVisible() then self.frame:Hide() else
-    self.frame:Show()
-    if self.MaybeShowHelp then self:MaybeShowHelp() end
-  end
+  if self.frame:IsVisible() then self.frame:Hide() else self.frame:Show() end
 end
 
 function UI:SetLanguage(lang)

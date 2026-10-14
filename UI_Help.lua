@@ -18,14 +18,14 @@ local SECTIONS = {
 }
 BB.HELP_IMG = BB.HELP_IMG or {}
 
-local BOX_W, BOX_H = 118, 56
+local BOX_W, BOX_H = 120, 84
 
 function UI:BuildHelp()
   if self.helpWin then return end
   local f = CreateFrame("Frame", "BananaBankHelp", UIParent)
   self.helpWin = f
   f:SetWidth(640)
-  f:SetHeight(430)
+  f:SetHeight(450)
   f:SetPoint("CENTER", UIParent, "CENTER", 0, 20)
   f:SetFrameStrata("FULLSCREEN_DIALOG")
   f:SetMovable(true)
@@ -51,30 +51,32 @@ function UI:BuildHelp()
   self:Loc(f.title, "HLP_TITLE")
   f.chips = {}
   for i = 1, getn(SECTIONS) do
-    local chip = self:Chip(f, 150, "HLP_SEC_" .. SECTIONS[i].key, function()
-      f.sec = i
+    local idx = i
+    local chip = self:Chip(f, 170, "HLP_SEC_" .. SECTIONS[i].key, function()
+      f.sec = idx
       f.n = 1
       UI:RefreshHelp()
     end)
-    chip:SetPoint("TOPLEFT", f, "TOPLEFT", 26 + (i - 1) * 156, -52)
+    chip:SetHeight(22)
+    chip:SetPoint("TOPLEFT", f, "TOPLEFT", 26 + (i - 1) * 176, -50)
     f.chips[i] = chip
   end
-  self:GlowLine(f, -78, 20, -20)
+  self:GlowLine(f, -80, 20, -20)
 
   f.step = self:Font(f, 10, C.muted)
-  f.step:SetPoint("TOPLEFT", f, "TOPLEFT", 28, -88)
+  f.step:SetPoint("TOPLEFT", f, "TOPLEFT", 28, -92)
   f.step:SetWidth(580)
   f.step:SetHeight(12)
-  f.head = self:Font(f, 18, C.gold)
-  f.head:SetPoint("TOPLEFT", f, "TOPLEFT", 28, -104)
+  f.head = self:Font(f, 20, C.gold, UI.FONT_TITLE)
+  f.head:SetPoint("TOPLEFT", f, "TOPLEFT", 28, -108)
   f.head:SetWidth(580)
   f.head:SetHeight(22)
 
   -- Bildflaeche: Ablauf-Kaesten oder ein Screenshot
   local art = CreateFrame("Frame", nil, f)
-  art:SetPoint("TOPLEFT", f, "TOPLEFT", 28, -134)
+  art:SetPoint("TOPLEFT", f, "TOPLEFT", 28, -138)
   art:SetWidth(584)
-  art:SetHeight(130)
+  art:SetHeight(140)
   art:SetBackdrop({
     bgFile = WHITE, edgeFile = "Interface\\Tooltips\\UI-Tooltip-Border",
     tile = true, tileSize = 16, edgeSize = 12,
@@ -100,30 +102,43 @@ function UI:BuildHelp()
     })
     b:SetBackdropColor(0.10, 0.14, 0.30, 1)
     b:SetBackdropBorderColor(C.gold[1], C.gold[2], C.gold[3], 0.9)
-    b.num = self:Font(b, 10, C.goldDim)
-    b.num:SetPoint("TOPLEFT", b, "TOPLEFT", 6, -5)
+    local badge = b:CreateTexture(nil, "ARTWORK")
+    badge:SetTexture(WHITE)
+    badge:SetVertexColor(C.gold[1], C.gold[2], C.gold[3], 1)
+    badge:SetWidth(20)
+    badge:SetHeight(20)
+    badge:SetPoint("TOP", b, "TOP", 0, -8)
+    b.num = self:Font(b, 13, { 0.08, 0.06, 0.02 })
+    b.num:SetPoint("CENTER", badge, "CENTER", 0, 0)
+    b.num:SetJustifyH("CENTER")
     b.num:SetText(i)
-    b.fs = self:Font(b, 11, { 1, 1, 1 })
-    b.fs:SetPoint("TOPLEFT", b, "TOPLEFT", 8, -17)
+    b.fs = self:Font(b, 12, { 1, 1, 1 })
+    b.fs:SetPoint("TOPLEFT", b, "TOPLEFT", 8, -34)
     b.fs:SetWidth(BOX_W - 16)
-    b.fs:SetHeight(34)
+    b.fs:SetHeight(44)
+    b.fs:SetJustifyH("CENTER")
     b.fs:SetJustifyV("TOP")
     f.boxes[i] = b
-    local a = self:Font(art, 22, C.gold)
+    local a = self:Font(art, 24, C.gold, UI.FONT_TITLE)
     a:SetText(">")
     f.arrows[i] = a
   end
 
-  f.body = self:Font(f, 12, { 0.88, 0.90, 0.96 })
-  f.body:SetPoint("TOPLEFT", f, "TOPLEFT", 28, -276)
-  f.body:SetWidth(584)
-  f.body:SetHeight(62)
+  f.body = self:Font(f, 13, { 0.88, 0.90, 0.96 })
+  f.body:SetPoint("TOPLEFT", f, "TOPLEFT", 30, -290)
+  f.body:SetWidth(580)
+  f.body:SetHeight(66)
   f.body:SetJustifyV("TOP")
-  f.foot = self:Font(f, 11, C.goldDim)
-  f.foot:SetPoint("TOPLEFT", f, "TOPLEFT", 28, -344)
-  f.foot:SetWidth(584)
+  local strip = f:CreateTexture(nil, "BORDER")
+  strip:SetTexture(WHITE)
+  strip:SetPoint("TOPLEFT", f, "TOPLEFT", 28, -362)
+  strip:SetWidth(584)
+  strip:SetHeight(32)
+  strip:SetGradientAlpha("HORIZONTAL", 1, 0.82, 0.26, 0.30, 1, 0.82, 0.26, 0.04)
+  f.foot = self:Font(f, 11, { 1, 0.9, 0.55 })
+  f.foot:SetPoint("LEFT", strip, "LEFT", 10, 0)
+  f.foot:SetWidth(566)
   f.foot:SetHeight(28)
-  f.foot:SetJustifyV("TOP")
 
   f.prev = self:Button(f, 110, 24, "HLP_PREV", function() UI:HelpGo(-1) end)
   f.prev:SetPoint("BOTTOMLEFT", f, "BOTTOMLEFT", 26, 22)
@@ -149,14 +164,21 @@ function UI:BuildHelp()
   f:SetScript("OnMouseWheel", function() UI:HelpGo(-arg1) end)
 end
 
+-- der Bank-Teil erscheint nur auf Chars mit Rang Gildenbank (oder Quest-Verwaltern)
+function UI:HelpHasBankPart()
+  local me = BB:Me()
+  return (BB.MayBeBank and BB:MayBeBank(me)) or BB:CanManageQuests() or false
+end
+
 function UI:HelpGo(delta)
   local f = self.helpWin
   local sec = SECTIONS[f.sec]
   local n = f.n + delta
+  local last = self:HelpHasBankPart() and getn(SECTIONS) or 1
   if n < 1 then
     if f.sec > 1 then f.sec = f.sec - 1 n = SECTIONS[f.sec].count else n = 1 end
   elseif n > sec.count then
-    if f.sec < getn(SECTIONS) then f.sec = f.sec + 1 n = 1 else n = sec.count end
+    if f.sec < last then f.sec = f.sec + 1 n = 1 else n = sec.count end
   end
   f.n = n
   self:RefreshHelp()
@@ -167,8 +189,13 @@ function UI:RefreshHelp()
   if not f then return end
   local sec = SECTIONS[f.sec]
   local n = f.n
+  local hasB = self:HelpHasBankPart()
+  if not hasB and f.sec > 1 then f.sec = 1 f.n = 1 sec = SECTIONS[1] n = 1 end
   local pre = "HLP_" .. sec.key .. n
-  for i = 1, getn(f.chips) do f.chips[i]:SetActive(i == f.sec) end
+  for i = 1, getn(f.chips) do
+    f.chips[i]:SetActive(i == f.sec)
+    if hasB then f.chips[i]:Show() else f.chips[i]:Hide() end
+  end
   f.step:SetText(string.format(T("HLP_STEP"), n, sec.count) .. "  -  " .. T(pre .. "_T"))
   f.head:SetText(T(pre .. "_H"))
   f.body:SetText(T(pre .. "_B"))
@@ -188,7 +215,7 @@ function UI:RefreshHelp()
       local b = f.boxes[i]
       if i <= cnt then
         b:ClearAllPoints()
-        b:SetPoint("TOPLEFT", f.art, "TOPLEFT", x0 + (i - 1) * (BOX_W + gap), -37)
+        b:SetPoint("TOPLEFT", f.art, "TOPLEFT", x0 + (i - 1) * (BOX_W + gap), -28)
         b.fs:SetText(T(pre .. "_A" .. i))
         b:Show()
       else
@@ -197,7 +224,7 @@ function UI:RefreshHelp()
       local a = f.arrows[i]
       if i < cnt then
         a:ClearAllPoints()
-        a:SetPoint("TOPLEFT", f.art, "TOPLEFT", x0 + i * BOX_W + (i - 1) * gap + 5, -52)
+        a:SetPoint("TOPLEFT", f.art, "TOPLEFT", x0 + i * BOX_W + (i - 1) * gap + 3, -55)
         a:Show()
       else
         a:Hide()
@@ -218,7 +245,7 @@ function UI:RefreshHelp()
     end
   end
   if f.sec == 1 and n == 1 then f.prev:Hide() else f.prev:Show() end
-  if f.sec == getn(SECTIONS) and n == sec.count then f.next:Hide() else f.next:Show() end
+  if f.sec == (hasB and getn(SECTIONS) or 1) and n == sec.count then f.next:Hide() else f.next:Show() end
 end
 
 function UI:ToggleHelp()
@@ -239,12 +266,4 @@ function UI:BuildHelpButton(parent)
   end)
   b:SetScript("OnLeave", function() GameTooltip:Hide() end)
   return b
-end
-
--- beim allerersten Oeffnen des Fensters einmal von selbst zeigen
-function UI:MaybeShowHelp()
-  local db = BananaBankDB
-  if not db or db.helpSeen then return end
-  db.helpSeen = true
-  self:ToggleHelp()
 end
