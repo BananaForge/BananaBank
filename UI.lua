@@ -402,6 +402,10 @@ function UI:Init()
   self.deBtn:SetPoint("RIGHT", self.enBtn, "LEFT", -4, 0)
   self.supportBtn = self:Button(f, 96, 18, "BTN_SUPPORT", function() UI:ShowThanks() end, "flat")
   self.supportBtn:SetPoint("RIGHT", self.deBtn, "LEFT", -8, 0)
+  if self.BuildHelpButton then
+    self.helpBtn = self:BuildHelpButton(f)
+    self.helpBtn:SetPoint("RIGHT", self.supportBtn, "LEFT", -6, 0)
+  end
 
   self:GlowLine(f, -76, 80, -16)
 
@@ -547,7 +551,10 @@ end
 
 function UI:Toggle()
   self:Init()
-  if self.frame:IsVisible() then self.frame:Hide() else self.frame:Show() end
+  if self.frame:IsVisible() then self.frame:Hide() else
+    self.frame:Show()
+    if self.MaybeShowHelp then self:MaybeShowHelp() end
+  end
 end
 
 function UI:SetLanguage(lang)
@@ -559,6 +566,7 @@ function UI:SetLanguage(lang)
   end
   self:UpdateLangButtons()
   self:Refresh()
+  if self.RefreshHelp then self:RefreshHelp() end
   BB:Print(T("MSG_LANGUAGE"))
 end
 

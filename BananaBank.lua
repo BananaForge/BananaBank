@@ -158,6 +158,9 @@ SlashCmdList["BANANABANK"] = function(msg)
   local restLower = string.lower(rest)
   if cmd == "" or cmd == "show" then
     BB.UI:Toggle()
+  elseif cmd == "anleitung" or cmd == "guide" or cmd == "tutorial" then
+    BB.UI:Init()
+    BB.UI:ToggleHelp()
   elseif cmd == "setbank" then
     BB:SetBank(true)
   elseif cmd == "removebank" then
