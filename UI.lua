@@ -390,7 +390,7 @@ function UI:Init()
   forge:SetText("by BananaForge  v" .. BB.VERSION)
   self.subtitle = self:Font(f, 11, C.muted)
   self.subtitle:SetPoint("TOPLEFT", f, "TOPLEFT", 86, -50)
-  self.subtitle:SetWidth(520)
+  self.subtitle:SetWidth(440)
   self.subtitle:SetHeight(14)
 
   -- rechts oben: Unterstuetzen, DE/EN, Schliessen
@@ -405,6 +405,12 @@ function UI:Init()
   if self.BuildHelpButton then
     self.helpBtn = self:BuildHelpButton(f)
     self.helpBtn:SetPoint("RIGHT", self.supportBtn, "LEFT", -6, 0)
+  end
+  if self.BuildSettingsButton then
+    self.setBtn = self:BuildSettingsButton(f)
+    self.setBtn:SetPoint("RIGHT", self.helpBtn or self.supportBtn, "LEFT", -6, 0)
+    self:BuildMainBankLabel(f)
+    self:RefreshMainBank()
   end
 
   self:GlowLine(f, -76, 80, -16)
@@ -564,6 +570,7 @@ function UI:SetLanguage(lang)
   self:UpdateLangButtons()
   self:Refresh()
   if self.RefreshHelp then self:RefreshHelp() end
+  if self.setWin and self.setWin:IsVisible() then self:RefreshSettings() end
   BB:Print(T("MSG_LANGUAGE"))
 end
 
@@ -582,6 +589,8 @@ function UI:Refresh()
   self:RefreshMailHelper()
   if self.RefreshQuestTracker then self:RefreshQuestTracker() end
   if self.RefreshSummaryWindows then self:RefreshSummaryWindows() end
+  if self.RefreshMainBank then self:RefreshMainBank() end
+  if self.setWin and self.setWin:IsVisible() then self:RefreshSettings() end
   if not self.frame:IsVisible() then return end
   if self:UpdateGate() then return end
   local snap = BB:NewestSnapshot()

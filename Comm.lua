@@ -274,7 +274,7 @@ function BB:SendHello()
   local qn2, qs2 = self:QuestDigest()
   local bn2, bs2 = self:BankInfoDigest()
   self:Send("H~" .. self.VERSION .. "~" .. qn .. "~" .. qs .. "~" .. table.concat(snaps, ";") ..
-    "~" .. table.concat(seqs, ";") .. "~" .. (BananaBankDB.priceTs or 0) .. "~" .. qn2 .. "~" .. qs2 .. "~" .. bn2 .. "~" .. bs2)
+    "~" .. table.concat(seqs, ";") .. "~" .. (BananaBankDB.priceTs or 0) .. "~" .. qn2 .. "~" .. qs2 .. "~" .. bn2 .. "~" .. bs2 .. "~" .. (BananaBankDB.mainTs or 0))
 end
 
 local function parseList(s)
@@ -291,7 +291,7 @@ local function versionNum(v)
   return (tonumber(f[1]) or 0) * 10000 + (tonumber(f[2]) or 0) * 100 + (tonumber(f[3]) or 0)
 end
 
-function BB:OnHello(sender, ver, qn, qs, snapStr, seqStr, priceTs, gn, gs, bn, bs)
+function BB:OnHello(sender, ver, qn, qs, snapStr, seqStr, priceTs, gn, gs, bn, bs, mt)
   if not versionWarned and versionNum(ver) > versionNum(self.VERSION) then
     versionWarned = true
     self:Print(string.format(self.T("MSG_NEW_VERSION"), ver))
@@ -347,6 +347,11 @@ function BB:OnHello(sender, ver, qn, qs, snapStr, seqStr, priceTs, gn, gs, bn, b
       if myBN > 0 then schedulePush("I", function() BB:PushBankInfo() end) end
       behind = true
     end
+  end
+
+  -- Hauptbank-Name: der neuere Stand gewinnt
+  if mt and (BananaBankDB.mainTs or 0) > (tonumber(mt) or 0) then
+    schedulePush("N", function() BB:PushMainBank() end)
   end
 
   local myN, mySum = self:RequestDigest()
@@ -417,6 +422,8 @@ function BB:OnTransfer(sender, kind, meta, payload)
       if self:MergeBankInfo(r) then n = n + 1 end
     end
     self:Debug(n .. " Bank-Rollen von " .. sender)
+  elseif kind == "N" then
+    if self:MergeMainBank(payload) then self:Debug("Hauptbank von " .. sender) end
   elseif kind == "G" then
     local n = 0
     for _, r in ipairs(self:ParseQuests(payload)) do
@@ -489,10 +496,12 @@ function BB:OnAddonMessage(prefix, msg, channel, sender)
       pushes["G"] = nil
     elseif kind == "I" and meta == "full" then
       pushes["I"] = nil
+    elseif kind == "N" then
+      pushes["N"] = nil
     end
   elseif t == "H~" then
     local f = BB.Split(msg, "~")
-    self:OnHello(sender, f[2], f[3], f[4], f[5], f[6], f[7], f[8], f[9], f[10], f[11])
+    self:OnHello(sender, f[2], f[3], f[4], f[5], f[6], f[7], f[8], f[9], f[10], f[11], f[12])
   end
 end
 

@@ -199,7 +199,9 @@ function UI:RefreshHelp()
   f.step:SetText(string.format(T("HLP_STEP"), n, sec.count) .. "  -  " .. T(pre .. "_T"))
   f.head:SetText(T(pre .. "_H"))
   f.body:SetText(T(pre .. "_B"))
-  f.foot:SetText(T(pre .. "_F"))
+  local foot = T(pre .. "_F")
+  if string.find(foot, "%s", 1, true) then foot = string.format(foot, BB:MainBank()) end
+  f.foot:SetText(foot)
   local img = BB.HELP_IMG[sec.key .. n]
   local cnt = sec.steps[n]
   if img then

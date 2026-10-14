@@ -794,14 +794,7 @@ function UI:RefreshQuestDetail()
     Q.mine:SetText(T("QC_NONE"))
     Q.mineRank:SetText("")
   end
-  local holders = BB:RankHolders()
-  local names = {}
-  for i = 1, math.min(getn(holders), 3) do table.insert(names, holders[i]) end
-  if getn(names) > 0 then
-    Q.how:SetText(string.format(T("QC_HOW"), table.concat(names, ", ")))
-  else
-    Q.how:SetText(T("QC_HOW_NONE"))
-  end
+  Q.how:SetText(string.format(T("QC_HOW"), BB:MainBank()))
   if BB:QuestIsActive(q) then
     Q.trackBtn:Show()
     local tracked = BananaBankDB.qtrack[q.id]

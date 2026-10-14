@@ -357,3 +357,65 @@ function BB:MergeBankInfo(r)
   BananaBankDB.binfo[r.name] = r
   return true
 end
+
+-- ------------------------------------------------------------
+-- Hauptbank: der Name, an den Mitglieder Spenden und Post schicken (von Verwaltern gesetzt, synchronisiert)
+-- ------------------------------------------------------------
+BB.MAIN_BANK_DEFAULT = "Bananenbank"
+
+function BB:MainBank()
+  local n = BananaBankDB and BananaBankDB.mainBank
+  if n and n ~= "" then return n end
+  return BB.MAIN_BANK_DEFAULT
+end
+
+-- WoW-Charaktername: nur Buchstaben, 2 bis 12 Zeichen, erster gross
+local function cleanCharName(s)
+  s = BB.Clean(s or "")
+  local out = ""
+  for i = 1, string.len(s) do
+    local c = string.sub(s, i, i)
+    if string.find(c, "[%a\128-\255]") then out = out .. c end
+  end
+  if string.len(out) < 2 or string.len(out) > 24 then return nil end
+  return string.upper(string.sub(out, 1, 1)) .. string.lower(string.sub(out, 2))
+end
+BB.CleanCharName = cleanCharName
+
+function BB:SetMainBank(name)
+  if not self:CanManageQuests() then
+    self:Print("|cffff4040" .. self.T("ERR_QUEST_NOPERM") .. "|r")
+    return false
+  end
+  local n = cleanCharName(name)
+  if not n then
+    self:Print("|cffff4040" .. self.T("SET_MAIN_BAD") .. "|r")
+    return false
+  end
+  local db = BananaBankDB
+  db.mainBank = n
+  db.mainTs = math.max(time(), (db.mainTs or 0) + 1)
+  db.mainBy = self:Me()
+  self:PushMainBank()
+  self:Print(string.format(self.T("SET_MAIN_OK"), n))
+  if self.UI then self.UI:Refresh() end
+  return true
+end
+
+function BB:PushMainBank()
+  local db = BananaBankDB
+  if (db.mainTs or 0) == 0 or not db.mainBank then return end
+  self:SendTransfer("N", "one", table.concat({ BB.Clean(db.mainBank), db.mainTs, BB.Clean(db.mainBy or "") }, "~"))
+end
+
+function BB:MergeMainBank(payload)
+  local f = BB.Split(payload or "", "~")
+  local name, ts, by = cleanCharName(f[1]), tonumber(f[2]), f[3]
+  if not name or not ts or not by or by == "" then return false end
+  if ts > time() + 86400 or ts <= (BananaBankDB.mainTs or 0) then return false end
+  -- nur von Verwaltern (Gildenmeister, Gildenbank, Offiziere) laut eigener Gildenliste
+  if not self:CanManageQuests(by) then return false end
+  BananaBankDB.mainBank, BananaBankDB.mainTs, BananaBankDB.mainBy = name, ts, by
+  if self.UI then self.UI:Refresh() end
+  return true
+end

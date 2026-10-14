@@ -10,7 +10,7 @@
 BananaBank = {}
 local BB = BananaBank
 
-BB.VERSION = "1.9.0"
+BB.VERSION = "2.0.0"
 BB.PREFIX = "BBNK"
 BB.DONATE_NAME = "Lumihunt"
 -- Einziger erlaubter Bank-Rang, deutsch und englisch. Fest eingebaut, es gibt
@@ -787,6 +787,7 @@ function BB:CheckModules()
   if not (self.UI and self.UI.bankUIModule) then table.insert(missing, "UI_Banks.lua") end
   if not (self.UI and self.UI.filterModule) then table.insert(missing, "UI_Filter.lua") end
   if not (self.UI and self.UI.helpModule) then table.insert(missing, "UI_Help.lua") end
+  if not (self.UI and self.UI.settingsModule) then table.insert(missing, "UI_Settings.lua") end
   if not self.summaryModule then table.insert(missing, "Summary.lua") end
   if not (self.UI and self.UI.summaryModule) then table.insert(missing, "UI_Summary.lua") end
   if not (self.UI and self.UI.questModule) then table.insert(missing, "UI_Quests.lua") end
