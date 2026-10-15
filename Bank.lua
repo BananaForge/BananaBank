@@ -632,10 +632,19 @@ function BB:SendMailFinish()
   end
   p.cod = cod
   p.subject = "BananaBank " .. p.r.id .. " (" .. p.idx .. "/" .. table.getn(p.slots) .. ")"
+  local body = string.format(self.T("MAIL_BODY"), p.r.id)
   if SendMailNameEditBox then SendMailNameEditBox:SetText(p.r.p) end
   if SendMailSubjectEditBox then SendMailSubjectEditBox:SetText(p.subject) end
+  if SendMailBodyEditBox then SendMailBodyEditBox:SetText(body) end
+  -- Wie von Hand: Nachnahme ins Betragsfeld, Modus waehlen, dann die Senden-Funktion des Fensters benutzen.
+  -- Ersetzt ein anderes Post-Addon das Fenster, haengt es sich dort ein; der direkte Aufruf umgeht es.
+  if SendMailFrame_SendMail and SendMailMoney and MoneyInputFrame_SetCopper then
+    pcall(MoneyInputFrame_SetCopper, SendMailMoney, cod)
+    if SendMailRadioButton_OnClick then pcall(SendMailRadioButton_OnClick, cod > 0 and 2 or 1) end
+    if pcall(SendMailFrame_SendMail) then return end
+  end
   if SetSendMailCOD then pcall(SetSendMailCOD, cod) end
-  SendMail(p.r.p, p.subject, string.format(self.T("MAIL_BODY"), p.r.id))
+  SendMail(p.r.p, p.subject, body)
 end
 
 function BB:OnMailSent()
