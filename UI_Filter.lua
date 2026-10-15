@@ -202,14 +202,14 @@ local GROUP_ORDER, GROUP_INDEX
 local function groupOrder()
   if GROUP_ORDER then return GROUP_ORDER end
   GROUP_ORDER = {}
-  for i = 1, getn(BB.RECIPE_SUBS) do table.insert(GROUP_ORDER, "recipe:" .. BB.RECIPE_SUBS[i]) end
-  table.insert(GROUP_ORDER, "recipe:other")
-  for i = 1, getn(BB.BOE_SUBS) do table.insert(GROUP_ORDER, "boe:" .. BB.BOE_SUBS[i]) end
-  table.insert(GROUP_ORDER, "boe:other")
   local mats = { "cloth", "leather", "herb", "ore" }
   for i = 1, getn(mats) do table.insert(GROUP_ORDER, mats[i]) end
   for i = 1, getn(BB.TRADE_SUBS) do table.insert(GROUP_ORDER, "trade:" .. BB.TRADE_SUBS[i]) end
   table.insert(GROUP_ORDER, "trade:other")
+  for i = 1, getn(BB.BOE_SUBS) do table.insert(GROUP_ORDER, "boe:" .. BB.BOE_SUBS[i]) end
+  table.insert(GROUP_ORDER, "boe:other")
+  for i = 1, getn(BB.RECIPE_SUBS) do table.insert(GROUP_ORDER, "recipe:" .. BB.RECIPE_SUBS[i]) end
+  table.insert(GROUP_ORDER, "recipe:other")
   local rest = { "potion", "bag", "other" }
   for i = 1, getn(rest) do table.insert(GROUP_ORDER, rest[i]) end
   GROUP_INDEX = {}
