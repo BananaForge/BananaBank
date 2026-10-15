@@ -93,6 +93,7 @@ Pull requests welcome, tested in-game on a 1.12 client. Lua 5.0 rules: no `#`, `
 
 ## Changelog
 
+- **2.4.4:** mail sending: one single click per attachment (the second click attached items twice in the multi-attachment mail window), the result is checked after half a second, then the right-click way is tried once. A letter is never sent without a confirmed attachment.
 - **2.4.3:** mail sending now goes through the mail window's own Send function like a manual send (cash on delivery in the amount field, COD mode selected), so a replacement mail window / mail addon handles it. The direct `SendMail` call remains as fallback.
 - **2.4.2:** mail sending: when the client reports the attachment a moment late (multi-attachment mail window), the addon waits half a second and checks again instead of aborting with "The client did not take the attachment".
 - **2.4.1:** mail sending: if the client does not take an attachment by the cursor, a second way (right-click attach, only while the Send tab is open) is tried and checked with `GetSendMailItem`. On failure the window state is printed, also `/bb maildebug`. The attachment slot count is no longer cached before the mail window exists.

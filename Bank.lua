@@ -491,32 +491,34 @@ end
 
 -- haengt einen Stapel an. Gibt false zurueck, wenn der Client ihn nicht nimmt;
 -- das Item liegt dann wieder in seinem Fach.
-function BB:AttachItem(e, index)
+function BB:AttachItem(e, index, stage)
   if CursorHasItem() then ClearCursor() end
-  PickupContainerItem(e.bag, e.slot)
-  if not CursorHasItem() then return false end
-  if self:MailSlots() > 1 then tryClick(index) end
-  if CursorHasItem() then tryClick(nil) end
-  if not CursorHasItem() then return true end
-  PickupContainerItem(e.bag, e.slot)
-  if CursorHasItem() then ClearCursor() end
+  if stage ~= 2 and ClickSendMailItemButton then
+    PickupContainerItem(e.bag, e.slot)
+    if not CursorHasItem() then return false end
+    -- genau ein Klick: manche Fenster uebernehmen den Anhang erst einen Moment spaeter
+    -- (der Cursor bleibt kurz belegt), ein zweiter Klick haengt ihn doppelt an
+    if self:MailSlots() > 1 then pcall(ClickSendMailItemButton, index) else pcall(ClickSendMailItemButton) end
+    if not CursorHasItem() and mailHasAttachment(index) ~= false then return true end
+    return "wait"
+  end
   -- zweiter Weg: Rechtsklick auf das Item haengt es an, wenn der Reiter Senden offen ist
-  -- (so macht es der Client selbst, auch wenn ein anderes Post-Addon das Fenster ersetzt hat)
-  -- nur wenn das Sendefenster wirklich offen ist, sonst wuerde das Item benutzt
+  -- (nur dann, sonst wuerde das Item benutzt)
   local sf = getglobal("SendMailFrame")
   if UseContainerItem and sf and sf:IsVisible() then
     pcall(UseContainerItem, e.bag, e.slot)
     if CursorHasItem() then ClearCursor() end
     if self:AttachedNow(e, index) then return true end
-    -- der Client meldet den Anhang oft erst einen Moment spaeter: dann kurz warten und nochmal pruefen
     return "wait"
   end
   return false
 end
 
--- Liegt dieser Stapel im Brief? Antwort des Clients, Sperre des Fachs oder leeres Fach
+-- Liegt dieser Stapel im Brief? Antwort des Clients; Sperre oder leeres Fach zaehlen nur,
+-- wenn das Item nicht auf dem Cursor haengt
 function BB:AttachedNow(e, index)
   if mailHasAttachment(index) then return true end
+  if CursorHasItem() then return false end
   local link = GetContainerItemLink(e.bag, e.slot)
   if not link then return true end
   local _, _, locked = GetContainerItemInfo(e.bag, e.slot)
@@ -572,6 +574,7 @@ function BB:SendMailStep2()
     return self:MailDone()
   end
 
+  p.stage2 = nil
   -- so viele Stapel wie der Client erlaubt in einen Brief
   local slots = self:MailSlots()
   local batch = {}
@@ -611,18 +614,39 @@ end
 function BB:SendMailVerify()
   local p = self.prep
   if not p or not p.sending or not p.batch then return end
+  local missing = {}
   for i = 1, table.getn(p.batch) do
-    if not self:AttachedNow(p.slots[p.batch[i]], i) then
-      p.batch = nil
-      return self:AttachFailed()
-    end
+    if not self:AttachedNow(p.slots[p.batch[i]], i) then table.insert(missing, i) end
   end
-  self:SendMailFinish()
+  if table.getn(missing) == 0 then return self:SendMailFinish() end
+  -- erster Weg hat nicht gegriffen: Cursor frei machen und einmal den Rechtsklick-Weg versuchen
+  if not p.stage2 then
+    p.stage2 = true
+    if CursorHasItem() then ClearCursor() end
+    for j = 1, table.getn(missing) do
+      local i = missing[j]
+      if not self:AttachItem(p.slots[p.batch[i]], i, 2) then
+        p.batch = nil
+        return self:AttachFailed()
+      end
+    end
+    self:After(0.5, function() BB:SendMailVerify() end, "mailverify")
+    return
+  end
+  p.batch = nil
+  if CursorHasItem() then ClearCursor() end
+  self:AttachFailed()
 end
 
 function BB:SendMailFinish()
   local p = self.prep
   if not p or not p.sending or not p.batch then return end
+  p.stage2 = nil
+  -- nie einen leeren Brief schicken: der Server lehnt ihn bei kleinen Chars ab und die Nachnahme waere sinnlos
+  if mailHasAttachment(1) == false then
+    p.batch = nil
+    return self:AttachFailed()
+  end
   local batch = p.batch
   local cod = 0
   for i = 1, table.getn(batch) do
