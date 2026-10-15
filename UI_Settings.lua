@@ -10,7 +10,7 @@ local WHITE = UI.WHITE
 UI.settingsModule = true
 UI.set = {}
 
-local GEN_H, GUILD_H, BANK_H = 168, 108, 134
+local GEN_H, GUILD_H, BANK_H = 168, 108, 160
 
 -- ------------------------------------------------------------
 -- Kopf: Zahnrad und "Spenden an: <Hauptbank>"
@@ -194,6 +194,7 @@ function UI:BuildSettings()
   end)
   btn(g, "SET_AHSCAN", 212, -98, 100, function() BB:StartAHScan() end)
   btn(g, "SET_BOOK", 316, -98, 108, function() UI:OpenBookDialog() end)
+  btn(g, "SET_MAILLOG", 4, -124, 200, function() BB:PrintMailLog() end)
 
   f:SetScript("OnShow", function() UI:RefreshSettings() end)
 end

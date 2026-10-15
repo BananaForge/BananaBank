@@ -671,28 +671,88 @@ end
 
 local lastTake = { key = "", t = 0 }
 
+-- Protokoll der Post-Entnahmen: jede Entnahme mit Ergebnis, damit nachvollziehbar ist, warum etwas nicht gebucht wurde
+function BB:MailLog(sender, isItem, name, count, money, result, note)
+  local db = BananaBankDB
+  db.maillog = db.maillog or {}
+  table.insert(db.maillog, {
+    t = time(), p = sender or "?", it = isItem and 1 or 0, n = name or "", c = count or 0, m = money or 0,
+    r = result, x = note or "",
+  })
+  while getn(db.maillog) > 80 do table.remove(db.maillog, 1) end
+end
+
+function BB:PrintMailLog(arg)
+  local log = BananaBankDB.maillog or {}
+  local n = tonumber(arg) or 25
+  local from = math.max(1, getn(log) - n + 1)
+  if getn(log) == 0 then
+    self:Print(self.T(self:IsBank() and "ML_EMPTY" or "ML_NOTBANK"))
+    return
+  end
+  self:Print(string.format(self.T("ML_HEAD"), getn(log) - from + 1, getn(log)))
+  for i = from, getn(log) do
+    local e = log[i]
+    local what
+    if e.r == "open" then what = ""
+    elseif e.it == 1 then what = e.c .. "x " .. e.n else what = BB.Money(e.m) end
+    local line = date("%d.%m. %H:%M:%S", e.t) .. "  " .. e.p .. "  " .. what .. "  -  "
+    local col = (e.r == "booked" or e.r == "open") and "|cff80ff80" or "|cffff9a2e"
+    line = line .. col .. self.T("ML_" .. string.upper(e.r)) .. "|r"
+    if e.x ~= "" then line = line .. " (" .. e.x .. ")" end
+    DEFAULT_CHAT_FRAME:AddMessage(line)
+  end
+end
+
 function BB:OnTakeInbox(i, isItem, j)
   if not self:IsBank() then return end
   local _, _, sender, subject, money, cod, daysLeft, hasItem, _, wasReturned = GetInboxHeaderInfo(i)
-  if not sender or (cod and cod > 0) then return end
+  if not sender then
+    self:MailLog("?", isItem, nil, 0, 0, "nosender", "Brief " .. tostring(i))
+    return
+  end
+  if cod and cod > 0 then
+    self:MailLog(sender, isItem, nil, 0, money, "cod", BB.Money(cod))
+    return
+  end
   -- Uebergaben zwischen Bank-Chars sind keine Spenden
-  if BananaBankDB.banks[sender] or self:MayBeBank(sender) or BB.SYSTEM_SENDERS[sender] then return end
+  if BananaBankDB.banks[sender] or self:MayBeBank(sender) or BB.SYSTEM_SENDERS[sender] then
+    self:MailLog(sender, isItem, nil, 0, money, "bank")
+    return
+  end
 
   local name, tex, count, q
   if isItem then
-    if not hasItem then return end
+    if not hasItem then
+      self:MailLog(sender, true, nil, 0, 0, "noitem", "Brief " .. tostring(i))
+      return
+    end
     name, tex, count, q = GetInboxItem(i, j)
-    if not name or not self:CanReceive(name, count or 1) then return end
+    if not name then
+      self:MailLog(sender, true, nil, 0, 0, "noname", "Brief " .. tostring(i))
+      return
+    end
+    if not self:CanReceive(name, count or 1) then
+      self:MailLog(sender, true, name, count or 1, 0, "noroom")
+      return
+    end
   else
-    if not money or money <= 0 then return end
+    if not money or money <= 0 then
+      self:MailLog(sender, false, nil, 0, 0, "nomoney")
+      return
+    end
   end
 
   -- doppelte Aufrufe fuer dieselbe Entnahme ignorieren; Inhalt gehoert zum Schluessel,
   -- damit mehrere gleiche Briefe hintereinander nicht verschluckt werden
   local key = sender .. "|" .. tostring(subject) .. "|" .. tostring(daysLeft) .. "|" .. tostring(isItem)
     .. "|" .. tostring(j) .. "|" .. tostring(name) .. "|" .. tostring(count) .. "|" .. tostring(money)
-  if key == lastTake.key and GetTime() - lastTake.t < 0.5 then return end
-  lastTake.key, lastTake.t = key, GetTime()
+  -- doppelt nur, wenn sich der Briefkasten dazwischen nicht veraendert hat (sonst ist es ein weiterer gleicher Brief)
+  if key == lastTake.key and lastTake.serial == (self.inboxSerial or 0) and GetTime() - lastTake.t < 3 then
+    self:MailLog(sender, isItem, name, count or 1, money, "dup")
+    return
+  end
+  lastTake.key, lastTake.t, lastTake.serial = key, GetTime(), (self.inboxSerial or 0)
 
   if isItem then
     local kind = "in"
@@ -702,12 +762,14 @@ function BB:OnTakeInbox(i, isItem, j)
     else
       self:AddLedger({ k = kind, p = sender, n = name, c = count or 1, q = q or 1, i = self:IdByName(name) })
     end
+    self:MailLog(sender, true, name, count or 1, 0, kind == "in" and "booked" or "back")
     self:ScheduleSnapshot(4)
   else
     -- Gold aus einer Nachnahme ist ein Verkaufserloes, keine Spende
     local kind = "gold"
     if subject and string.find(subject, "BananaBank", 1, true) then kind = "cod" end
     self:AddLedger({ k = kind, p = sender, m = money })
+    self:MailLog(sender, false, nil, 0, money, kind == "gold" and "gold" or "codin")
     self:ScheduleSnapshot(4)
   end
   if self.UI then self.UI:Refresh() end

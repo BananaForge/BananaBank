@@ -58,6 +58,7 @@ When updating, delete the old folder first, otherwise an old `BananaBank.toc` ca
 | `/bb book <player> <count> <item>` | (bank character) book a donation by hand |
 | `/bb stock <text>` | (any character) show which stored bank stocks contain an item, with age and sender |
 | `/bb find <text>` | (bank character) show where matching items are, and which bags are in use |
+| `/bb maillog [N]` | (bank character) the last mail takes and why something was not booked |
 | `/bb banks` | Open the Banks tab |
 | `/bb totals` | Open the donation totals window |
 | `/bb quests` / `tracker` | Open the Guild quests tab / show or hide the quest tracker |
@@ -91,6 +92,7 @@ Pull requests welcome, tested in-game on a 1.12 client. Lua 5.0 rules: no `#`, `
 
 ## Changelog
 
+- **2.3.1:** **mail log** for bank characters (`/bb maillog [N]` or Settings > Mail log): every mail take is logged with the reason when it was not booked (cash on delivery, sender is a bank, no room in the bags, no attachment, duplicate call). Duplicate detection is now based on the mailbox update event instead of a timer, so a pile of identical mails taken quickly is booked completely.
 - **2.3.0:** category tree by profession: Entire bank, **Professions** (every profession selectable: alchemy, blacksmithing, enchanting, engineering, leatherworking, tailoring, jewelcrafting, cooking, first aid, other), each with its trade materials and its recipes (herbs under alchemy, ore under blacksmithing, leather under leatherworking, cloth under tailoring), then BOE (by slot), Potions, Bags, Other. Results are grouped the same way, e.g. "Alchemy - Recipes". Jewelcrafting recipes are recognised.
 - **2.2.2:** category tree reordered: Entire bank, Trade materials, BOE, Recipes, Potions, Bags, Other (the results follow the same order). "Sellable" removed from the filter.
 - **2.2.1:** cloth, leather and ore are recognised by the item name ending even when the server reports the same sub type for all trade goods (they were listed under trade goods / other). Category renamed to **Trade goods** (German: Handwerkswaren).

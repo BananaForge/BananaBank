@@ -36,7 +36,7 @@ local ev = CreateFrame("Frame", "BananaBankEvents")
 local EVENTS = {
   "ADDON_LOADED", "PLAYER_ENTERING_WORLD", "CHAT_MSG_ADDON",
   "BANKFRAME_OPENED", "BANKFRAME_CLOSED", "BAG_UPDATE", "PLAYERBANKSLOTS_CHANGED", "PLAYERBANKBAGSLOTS_CHANGED", "UNIT_INVENTORY_CHANGED", "PLAYER_MONEY",
-  "MAIL_SHOW", "MAIL_CLOSED", "MAIL_SEND_SUCCESS", "MAIL_FAILED",
+  "MAIL_SHOW", "MAIL_INBOX_UPDATE", "MAIL_CLOSED", "MAIL_SEND_SUCCESS", "MAIL_FAILED",
   "TRADE_SHOW", "TRADE_CLOSED", "TRADE_ACCEPT_UPDATE", "TRADE_TARGET_ITEM_CHANGED",
   "TRADE_PLAYER_ITEM_CHANGED", "TRADE_MONEY_CHANGED", "UI_INFO_MESSAGE",
   "AUCTION_ITEM_LIST_UPDATE", "AUCTION_HOUSE_CLOSED", "AUCTION_HOUSE_SHOW",
@@ -100,7 +100,15 @@ ev:SetScript("OnEvent", function()
 
   elseif event == "MAIL_SHOW" then
     BB.mailOpen = true
+    if BB:IsBank() and GetInboxNumItems then
+      local cnt = GetInboxNumItems()
+      BB:MailLog("-", true, "", 0, 0, "open", tostring(cnt or 0))
+    end
     BB.UI:Refresh()
+
+  elseif event == "MAIL_INBOX_UPDATE" then
+    -- der Briefkasten hat sich geaendert: die naechste gleiche Entnahme ist ein neuer Brief, kein doppelter Aufruf
+    BB.inboxSerial = (BB.inboxSerial or 0) + 1
 
   elseif event == "MAIL_CLOSED" then
     BB.mailOpen = false
@@ -182,6 +190,8 @@ SlashCmdList["BANANABANK"] = function(msg)
     BB.UI:ToggleQuestTracker()
   elseif cmd == "questlog" then
     BB:PrintQuestLog(rest)
+  elseif cmd == "maillog" or cmd == "postlog" then
+    BB:PrintMailLog(rest)
   elseif cmd == "ledger" or cmd == "buch" then
     BB:PrintLedger(rest)
   elseif cmd == "credit" then
