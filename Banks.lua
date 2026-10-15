@@ -63,6 +63,15 @@ local function has(s, list)
   return false
 end
 
+-- Stoff, Leder und Erz erkennt man an der Namensendung (manche Server melden bei allen Handwerkswaren denselben Untertyp)
+function BB:NameCategory(name)
+  local n = string.lower(name or "")
+  if string.find(n, "cloth$") or string.find(n, "stoff$") then return "cloth" end
+  if string.find(n, "leather$") or string.find(n, "leder$") or string.find(n, " hide$") then return "leather" end
+  if string.find(n, " ore$") or string.find(n, " bar$") or string.find(n, "erz$") or string.find(n, "barren$") then return "ore" end
+  return nil
+end
+
 -- Handwerksmaterial nach Beruf: erst Untertyp des Items, dann Namensstichwoerter
 local TRADE_SUB_TYPE = {
   { "parts", "eng" }, { "teile", "eng" }, { "explosives", "eng" }, { "sprengstoff", "eng" }, { "devices", "eng" },
@@ -70,7 +79,7 @@ local TRADE_SUB_TYPE = {
   { "jewelcrafting", "jc" }, { "juwelenschleifen", "jc" }, { "gem", "jc" }, { "edelstein", "jc" },
 }
 local TRADE_NAME = {
-  { "jc", { "moonstone", "ruby", "citrine", "jade", "agate", "aquamarine", "opal", "sapphire", "emerald", "diamond", "pearl", "tigerseye", "malachite", "shadowgem", "mondstein", "rubin", "citrin", "achat", "saphir", "smaragd", "diamant", "perle", "tigerauge" } },
+  { "jc", { "moonstone", "ruby", "citrine", "jade", "agate", "aquamarine", "opal", "sapphire", "emerald", "diamond", "pearl", "tigerseye", "malachite", "shadowgem", "quartz", "quarz", "mondstein", "rubin", "citrin", "achat", "saphir", "smaragd", "diamant", "perle", "tigerauge" } },
   { "ench", { "dust", "essence", "shard", "vellum", "staub", "essenz", "splitter", "pergament" } },
   { "eng", { "tube", "bolts", "powder", "fuse", "trigger", "casing", "gear", "rohr", "bolzen", "pulver", "zünder" } },
   { "tail", { "thread", "dye", "faden", "farbstoff" } },
@@ -112,6 +121,8 @@ function BB:ItemCategory(id, bind)
     if has(s, S_LEATHER) then return "leather", nil end
     if has(s, S_HERB) then return "herb", nil end
     if has(s, S_ORE) then return "ore", nil end
+    local nk = self:NameCategory(name)
+    if nk then return nk, nil end
     return "trade", BB:TradeSub(subtype, name)
   end
   if has(t, T_CONSUMABLE) then
@@ -195,6 +206,10 @@ end
 -- Kategorie fuer die Anzeige: gespeicherte aus dem Snapshot, sonst lokal bestimmt, sonst nach dem Namen.
 -- So landen auch Eintraege alter Snapshots (ohne Kategorie) in der richtigen Gruppe.
 function BB:ResolveCategory(id, e)
+  if not e.k or e.k == "other" or e.k == "trade" then
+    local nk = self:NameCategory(e.n)
+    if nk then return nk, nil end
+  end
   if e.k == "trade" and not e.s then
     local _, _, _, _, _, st = GetItemInfo(id)
     return "trade", self:TradeSub(st, e.n)
