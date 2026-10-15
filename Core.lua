@@ -10,7 +10,7 @@
 BananaBank = {}
 local BB = BananaBank
 
-BB.VERSION = "2.3.1"
+BB.VERSION = "2.3.2"
 BB.PREFIX = "BBNK"
 BB.DONATE_NAME = "Lumihunt"
 -- Einziger erlaubter Bank-Rang, deutsch und englisch. Fest eingebaut, es gibt
@@ -269,6 +269,12 @@ function BB:BankModeNudge()
     self.bankNudged = true
     self:Print("|cffff8000" .. string.format(self.T("MSG_BANK_NUDGE"), BB.BANK_RANK_LABEL) .. "|r")
   end
+end
+
+-- true/false laut Gildenliste, nil solange die Liste noch nicht geladen ist
+function BB:IsGuildMember(name)
+  if not self.rosterReady then return nil end
+  return BananaBankDB.ranks[name] ~= nil
 end
 
 function BB:RequestRoster()

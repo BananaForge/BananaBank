@@ -100,6 +100,8 @@ ev:SetScript("OnEvent", function()
 
   elseif event == "MAIL_SHOW" then
     BB.mailOpen = true
+    -- neue Mitglieder kennen: Gildenliste beim Oeffnen des Postfachs auffrischen
+    if BB:IsBank() then BB:RequestRoster() end
     if BB:IsBank() and GetInboxNumItems then
       local cnt = GetInboxNumItems()
       BB:MailLog("-", true, "", 0, 0, "open", tostring(cnt or 0))

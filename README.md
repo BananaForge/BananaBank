@@ -92,6 +92,7 @@ Pull requests welcome, tested in-game on a 1.12 client. Lua 5.0 rules: no `#`, `
 
 ## Changelog
 
+- **2.3.2:** opening the mailbox on a bank character refreshes the guild roster first, so new members are known. Mail from senders who are not in the guild roster is still booked, but marked: "(not in guild)" in the ledger and a note in the mail log.
 - **2.3.1:** **mail log** for bank characters (`/bb maillog [N]` or Settings > Mail log): every mail take is logged with the reason when it was not booked (cash on delivery, sender is a bank, no room in the bags, no attachment, duplicate call). Duplicate detection is now based on the mailbox update event instead of a timer, so a pile of identical mails taken quickly is booked completely.
 - **2.3.0:** category tree by profession: Entire bank, **Professions** (every profession selectable: alchemy, blacksmithing, enchanting, engineering, leatherworking, tailoring, jewelcrafting, cooking, first aid, other), each with its trade materials and its recipes (herbs under alchemy, ore under blacksmithing, leather under leatherworking, cloth under tailoring), then BOE (by slot), Potions, Bags, Other. Results are grouped the same way, e.g. "Alchemy - Recipes". Jewelcrafting recipes are recognised.
 - **2.2.2:** category tree reordered: Entire bank, Trade materials, BOE, Recipes, Potions, Bags, Other (the results follow the same order). "Sellable" removed from the filter.

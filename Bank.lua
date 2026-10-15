@@ -762,14 +762,18 @@ function BB:OnTakeInbox(i, isItem, j)
     else
       self:AddLedger({ k = kind, p = sender, n = name, c = count or 1, q = q or 1, i = self:IdByName(name) })
     end
-    self:MailLog(sender, true, name, count or 1, 0, kind == "in" and "booked" or "back")
+    local note
+    if self:IsGuildMember(sender) == false then note = self.T("ML_EXTERN") end
+    self:MailLog(sender, true, name, count or 1, 0, kind == "in" and "booked" or "back", note)
     self:ScheduleSnapshot(4)
   else
     -- Gold aus einer Nachnahme ist ein Verkaufserloes, keine Spende
     local kind = "gold"
     if subject and string.find(subject, "BananaBank", 1, true) then kind = "cod" end
     self:AddLedger({ k = kind, p = sender, m = money })
-    self:MailLog(sender, false, nil, 0, money, kind == "gold" and "gold" or "codin")
+    local note
+    if self:IsGuildMember(sender) == false then note = self.T("ML_EXTERN") end
+    self:MailLog(sender, false, nil, 0, money, kind == "gold" and "gold" or "codin", note)
     self:ScheduleSnapshot(4)
   end
   if self.UI then self.UI:Refresh() end

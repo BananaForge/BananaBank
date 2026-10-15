@@ -446,7 +446,11 @@ function UI:RefreshLedger()
         local qc = BB.QUALITY_COLOR[e.q or 1] or BB.QUALITY_COLOR[1]
         what = e.c .. "x |cff" .. qc[4] .. e.n .. "|r"
       end
-      row.txt:SetText(e.p .. ": " .. what)
+      local who = e.p
+      if (e.k == "in" or e.k == "gold" or e.k == "back") and BB:IsGuildMember(e.p) == false then
+        who = who .. " |cffff9a2e" .. T("LEDGER_EXTERN") .. "|r"
+      end
+      row.txt:SetText(who .. ": " .. what)
       local sub = BB.Date(e.t) .. "  " .. T("KIND_" .. string.upper(e.k))
       local qq = e.code ~= "" and BananaBankDB.quests[e.code]
       if qq then
