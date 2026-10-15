@@ -93,6 +93,7 @@ Pull requests welcome, tested in-game on a 1.12 client. Lua 5.0 rules: no `#`, `
 
 ## Changelog
 
+- **2.5.0:** **TurtleMail support**: with TurtleMail installed the attachments live in its own list (invisible to `GetSendMailItem`) and its Send button sends them. The addon now checks attachments with `TurtleMail.sendmail_attached` and sends through `TurtleMail.send_mail_button_onclick` (recipient set past its `SetText` override), instead of the standard send function, which sent letters without attachment and was rejected by the server for small characters.
 - **2.4.5:** mail sending: when the mail window takes the item from the cursor but does not answer `GetSendMailItem`, an empty cursor after the click now counts as attached (the letter is sent). The failure message also prints the raw answers of `GetSendMailItem`. If the server still rejects the letter nothing is lost.
 - **2.4.4:** mail sending: one single click per attachment (the second click attached items twice in the multi-attachment mail window), the result is checked after half a second, then the right-click way is tried once. A letter is never sent without a confirmed attachment.
 - **2.4.3:** mail sending now goes through the mail window's own Send function like a manual send (cash on delivery in the amount field, COD mode selected), so a replacement mail window / mail addon handles it. The direct `SendMail` call remains as fallback.

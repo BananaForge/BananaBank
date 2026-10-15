@@ -473,6 +473,12 @@ local function mailHasAttachment(index)
   return false
 end
 
+-- Ersetzt TurtleMail das Sendefenster? Dann gehen Anhaenge und Senden ueber dessen eigene Funktionen.
+function BB:TurtleMailActive()
+  return type(TurtleMail) == "table" and type(TurtleMail.send_mail_button_onclick) == "function"
+    and type(TurtleMail.sendmail_attached) == "function"
+end
+
 -- Zustand des Postfensters fuer die Fehlersuche
 function BB:MailDebugInfo()
   local function vis(f) local fr = getglobal(f) if not fr then return "-" end return fr:IsVisible() and "ja" or "nein" end
@@ -485,6 +491,7 @@ function BB:MailDebugInfo()
     "GetSendMailItem: " .. (GetSendMailItem and "ja" or "nein"),
     "TurtleMail geladen: " .. ((TurtleMail or getglobal("TurtleMailFrame")) and "ja" or "nein"),
     "Cursor haelt Item: " .. (CursorHasItem() and "ja" or "nein"),
+    "TurtleMail-Sendefunktion: " .. (self:TurtleMailActive() and "ja" or "nein"),
   }
   if GetSendMailItem then
     local ok, a1, a2, a3 = pcall(GetSendMailItem, 1)
@@ -523,6 +530,11 @@ end
 -- Liegt dieser Stapel im Brief? Antwort des Clients; Sperre oder leeres Fach zaehlen nur,
 -- wenn das Item nicht auf dem Cursor haengt
 function BB:AttachedNow(e, index)
+  -- TurtleMail haelt die Anhaenge in einer eigenen Liste; GetSendMailItem sieht sie nicht
+  if self:TurtleMailActive() then
+    local ok, r = pcall(TurtleMail.sendmail_attached, e.bag, e.slot)
+    return ok and r and true or false
+  end
   if mailHasAttachment(index) then return true end
   if CursorHasItem() then return false end
   local link = GetContainerItemLink(e.bag, e.slot)
@@ -625,7 +637,7 @@ function BB:SendMailVerify()
     local ok = self:AttachedNow(p.slots[p.batch[i]], i)
     -- erster Weg: ist der Cursor nach dem Klick leer, hat das Fenster das Item genommen, auch wenn es
     -- sich per Abfrage nicht meldet (manche Fenster beantworten GetSendMailItem nicht)
-    if not ok and not p.stage2 and not CursorHasItem() then ok = true end
+    if not ok and not p.stage2 and not CursorHasItem() and not self:TurtleMailActive() then ok = true end
     if not ok then table.insert(missing, i) end
   end
   if table.getn(missing) == 0 then return self:SendMailFinish() end
@@ -662,9 +674,19 @@ function BB:SendMailFinish()
   p.cod = cod
   p.subject = "BananaBank " .. p.r.id .. " (" .. p.idx .. "/" .. table.getn(p.slots) .. ")"
   local body = string.format(self.T("MAIL_BODY"), p.r.id)
-  if SendMailNameEditBox then SendMailNameEditBox:SetText(p.r.p) end
+  if SendMailNameEditBox then
+    -- TurtleMail ueberschreibt SetText und ignoriert es, solange es sich einen Empfaenger gemerkt hat
+    if SendMailNameEditBox._SetText then SendMailNameEditBox:_SetText(p.r.p) else SendMailNameEditBox:SetText(p.r.p) end
+  end
   if SendMailSubjectEditBox then SendMailSubjectEditBox:SetText(p.subject) end
   if SendMailBodyEditBox then SendMailBodyEditBox:SetText(body) end
+  -- TurtleMail: seine Senden-Funktion verschickt die Anhaenge aus der eigenen Liste. Die Funktion des
+  -- Standardfensters wuerde einen Brief ohne Anhang schicken.
+  if self:TurtleMailActive() and SendMailMoney and MoneyInputFrame_SetCopper then
+    pcall(MoneyInputFrame_SetCopper, SendMailMoney, cod)
+    if SendMailRadioButton_OnClick then pcall(SendMailRadioButton_OnClick, cod > 0 and 2 or 1) end
+    if pcall(TurtleMail.send_mail_button_onclick) then return end
+  end
   -- Wie von Hand: Nachnahme ins Betragsfeld, Modus waehlen, dann die Senden-Funktion des Fensters benutzen.
   -- Ersetzt ein anderes Post-Addon das Fenster, haengt es sich dort ein; der direkte Aufruf umgeht es.
   if SendMailFrame_SendMail and SendMailMoney and MoneyInputFrame_SetCopper then
