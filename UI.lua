@@ -630,10 +630,10 @@ function UI:BuildStock(parent)
   local p = CreateFrame("Frame", nil, parent)
   p:SetAllPoints(parent)
   self.pages.stock = p
-  self.stock = { page = 1, filter = 0, onlyAvail = false, search = "" }
+  self.stock = { page = 1, filter = 0, onlyAvail = false, search = "", type = "all", view = "icons" }
   local S = self.stock
 
-  local search = self:EditBox("BananaBankSearch", p, 170)
+  local search = self:EditBox("BananaBankSearch", p, 150)
   search:SetPoint("TOPLEFT", p, "TOPLEFT", 8, -2)
   local ph = self:Font(search, 11, C.muted)
   ph:SetPoint("LEFT", search, "LEFT", 2, 0)
@@ -652,7 +652,7 @@ function UI:BuildStock(parent)
   local prev = search
   for i = 1, getn(chipDefs) do
     local q = chipDefs[i][2]
-    local chip = self:Chip(p, 58, chipDefs[i][1], function()
+    local chip = self:Chip(p, 52, chipDefs[i][1], function()
       S.filter = q
       S.page = 1
       UI:RefreshStock()
@@ -678,55 +678,15 @@ function UI:BuildStock(parent)
   S.role:SetWidth(180)
   S.role:SetHeight(12)
   S.role:Hide()
-  if self.BuildTypeButton then self:BuildTypeButton(p) end
 
-  -- Raster
-  local grid = CreateFrame("Frame", nil, p)
-  grid:SetWidth(COLS * (SIZE + GAP) - GAP)
-  grid:SetHeight(ROWS * (SIZE + GAP) - GAP)
-  grid:SetPoint("TOPLEFT", p, "TOPLEFT", 8, -52)
-  grid:EnableMouseWheel(true)
-  grid:SetScript("OnMouseWheel", function()
-    S.page = S.page - arg1
-    UI:RefreshStock()
-  end)
-  S.slots = {}
-  for r = 0, ROWS - 1 do
-    for c = 0, COLS - 1 do
-      local s = self:Slot(grid, SIZE)
-      s:SetPoint("TOPLEFT", grid, "TOPLEFT", c * (SIZE + GAP), -r * (SIZE + GAP))
-      s:RegisterForClicks("LeftButtonUp", "RightButtonUp")
-      s:SetScript("OnClick", function() UI:OnSlotClick(this, arg1) end)
-      s:SetScript("OnEnter", function() UI:OnSlotEnter(this) end)
-      s:SetScript("OnLeave", function() GameTooltip:Hide() end)
-      table.insert(S.slots, s)
-    end
-  end
-  S.empty = self:Font(grid, 13, C.muted)
-  S.empty:SetPoint("CENTER", grid, "CENTER", 0, 0)
-  S.empty:SetJustifyH("CENTER")
-  S.empty:SetWidth(380)
-
-  local prevBtn = self:Button(p, 26, 20, "<", function()
-    S.page = S.page - 1
-    UI:RefreshStock()
-  end, "flat")
-  prevBtn:SetPoint("BOTTOMLEFT", p, "BOTTOMLEFT", 8, 2)
-  local nextBtn = self:Button(p, 26, 20, ">", function()
-    S.page = S.page + 1
-    UI:RefreshStock()
-  end, "flat")
-  nextBtn:SetPoint("LEFT", prevBtn, "RIGHT", 60, 0)
-  S.pageFs = self:Font(p, 11, C.text)
-  S.pageFs:SetPoint("LEFT", prevBtn, "RIGHT", 4, 0)
-  S.pageFs:SetWidth(52)
-  S.pageFs:SetJustifyH("CENTER")
+  -- Ansicht (Symbole/Liste), Kategorienbaum und Ergebnisliste im AH-Stil: UI_Filter.lua
+  self:BuildStockView(p)
   S.info = self:Font(p, 11, C.muted)
-  S.info:SetPoint("LEFT", nextBtn, "RIGHT", 12, 0)
-  S.info:SetWidth(300)
+  S.info:SetPoint("BOTTOMLEFT", p, "BOTTOMLEFT", 8, 6)
+  S.info:SetWidth(500)
 
   -- Warenkorb rechts
-  local cart = self:Panel(p, 268, 0)
+  local cart = self:Panel(p, 232, 0)
   cart:SetPoint("TOPRIGHT", p, "TOPRIGHT", 0, 0)
   cart:SetPoint("BOTTOMRIGHT", p, "BOTTOMRIGHT", 0, 0)
   local ct = self:Font(cart, 15, C.gold, FONT_TITLE)
@@ -736,7 +696,7 @@ function UI:BuildStock(parent)
   S.cartRows = {}
   for i = 1, 9 do
     local row = CreateFrame("Frame", nil, cart)
-    row:SetWidth(248)
+    row:SetWidth(212)
     row:SetHeight(28)
     row:SetPoint("TOPLEFT", cart, "TOPLEFT", 10, -38 - (i - 1) * 30)
     local ic = self:Slot(row, 26)
@@ -746,7 +706,7 @@ function UI:BuildStock(parent)
     row.ic = ic
     row.name = self:Font(row, 11, C.text)
     row.name:SetPoint("LEFT", ic, "RIGHT", 6, 0)
-    row.name:SetWidth(128)
+    row.name:SetWidth(94)
     row.name:SetHeight(13)
     row.cnt = self:Font(row, 12, C.gold)
     row.cnt:SetPoint("RIGHT", row, "RIGHT", -46, 0)
@@ -759,26 +719,26 @@ function UI:BuildStock(parent)
   end
   S.cartEmpty = self:Font(cart, 11, C.muted)
   S.cartEmpty:SetPoint("TOPLEFT", cart, "TOPLEFT", 14, -46)
-  S.cartEmpty:SetWidth(240)
+  S.cartEmpty:SetWidth(208)
   self:Loc(S.cartEmpty, "CART_EMPTY")
   S.cartSum = self:Font(cart, 11, C.muted)
   S.cartSum:SetPoint("BOTTOMLEFT", cart, "BOTTOMLEFT", 12, 76)
-  S.cartSum:SetWidth(244)
+  S.cartSum:SetWidth(208)
   S.cartPrice = self:Font(cart, 11, C.gold)
   S.cartPrice:SetPoint("BOTTOMLEFT", cart, "BOTTOMLEFT", 12, 90)
-  S.cartPrice:SetWidth(244)
+  S.cartPrice:SetWidth(208)
   local hint = self:Font(cart, 9, C.muted)
   hint:SetPoint("BOTTOMLEFT", cart, "BOTTOMLEFT", 12, 62)
-  hint:SetWidth(244)
+  hint:SetWidth(208)
   self:Loc(hint, "CART_HINT")
-  local clear = self:Button(cart, 76, 22, "BTN_CLEAR", function()
+  local clear = self:Button(cart, 66, 22, "BTN_CLEAR", function()
     BananaBankDB.basket = {}
     UI:RefreshStock()
   end, "flat")
   clear:SetPoint("BOTTOMLEFT", cart, "BOTTOMLEFT", 10, 32)
-  S.makeBtn = self:Button(cart, 166, 22, "BTN_MAKE_CODE", function() UI:MakeCode() end, "primary")
+  S.makeBtn = self:Button(cart, 134, 22, "BTN_MAKE_CODE", function() UI:MakeCode() end, "primary")
   S.makeBtn:SetPoint("LEFT", clear, "RIGHT", 6, 0)
-  S.lastCodeBtn = self:Button(cart, 248, 20, "BTN_LAST_CODE", function()
+  S.lastCodeBtn = self:Button(cart, 212, 20, "BTN_LAST_CODE", function()
     if UI.lastReq then UI:ShowExport(UI.lastReq) end
   end, "flat")
   S.lastCodeBtn:SetPoint("BOTTOMLEFT", cart, "BOTTOMLEFT", 10, 8)
@@ -829,29 +789,7 @@ function UI:RefreshStock()
   if self.RefreshTypeButton then self:RefreshTypeButton() end
   for i = 1, getn(S.chips) do S.chips[i]:SetActive(S.chips[i].q == S.filter) end
   local list, stock, res = self:StockList()
-  local per = COLS * ROWS
-  local pages = floor((getn(list) - 1) / per) + 1
-  if pages < 1 then pages = 1 end
-  if S.page > pages then S.page = pages end
-  if S.page < 1 then S.page = 1 end
-  local basket = BananaBankDB.basket
-  for i = 1, per do
-    local s = S.slots[i]
-    local entry = list[(S.page - 1) * per + i]
-    if entry then
-      s.id = entry.id
-      s.icon:SetTexture(BB.FullTex(entry.e.t))
-      s:SetQuality(entry.e.q)
-      if entry.avail > 0 then s.icon:SetVertexColor(1, 1, 1) else s.icon:SetVertexColor(0.35, 0.35, 0.35) end
-      s.count:SetText(entry.avail > 1 and entry.avail or (entry.avail == 1 and "" or "0"))
-      if entry.res > 0 then s.res:SetText(entry.res) else s.res:SetText("") end
-      if basket[entry.id] then s.badge:SetText("x" .. basket[entry.id]) else s.badge:SetText("") end
-      s:Show()
-    else
-      s.id = nil
-      s:Hide()
-    end
-  end
+  self:RefreshStockView(list)
   if getn(list) == 0 then
     if S.bank and not BananaBankDB.snaps[S.bank] then
       S.empty:SetText(string.format(T("STOCK_BANK_NOSCAN"), S.bank))
@@ -868,7 +806,6 @@ function UI:RefreshStock()
   else
     S.empty:Hide()
   end
-  S.pageFs:SetText(S.page .. " / " .. pages)
   local total, reserved = 0, 0
   for id, e in pairs(stock) do total = total + 1 end
   for id, n in pairs(res) do reserved = reserved + n end
