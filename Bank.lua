@@ -486,6 +486,12 @@ function BB:MailDebugInfo()
     "TurtleMail geladen: " .. ((TurtleMail or getglobal("TurtleMailFrame")) and "ja" or "nein"),
     "Cursor haelt Item: " .. (CursorHasItem() and "ja" or "nein"),
   }
+  if GetSendMailItem then
+    local ok, a1, a2, a3 = pcall(GetSendMailItem, 1)
+    table.insert(lines, "GetSendMailItem(1): " .. tostring(ok) .. ", " .. tostring(a1) .. ", " .. tostring(a2) .. ", " .. tostring(a3))
+    local ok2, b1 = pcall(GetSendMailItem)
+    table.insert(lines, "GetSendMailItem(): " .. tostring(ok2) .. ", " .. tostring(b1))
+  end
   return lines
 end
 
@@ -616,7 +622,11 @@ function BB:SendMailVerify()
   if not p or not p.sending or not p.batch then return end
   local missing = {}
   for i = 1, table.getn(p.batch) do
-    if not self:AttachedNow(p.slots[p.batch[i]], i) then table.insert(missing, i) end
+    local ok = self:AttachedNow(p.slots[p.batch[i]], i)
+    -- erster Weg: ist der Cursor nach dem Klick leer, hat das Fenster das Item genommen, auch wenn es
+    -- sich per Abfrage nicht meldet (manche Fenster beantworten GetSendMailItem nicht)
+    if not ok and not p.stage2 and not CursorHasItem() then ok = true end
+    if not ok then table.insert(missing, i) end
   end
   if table.getn(missing) == 0 then return self:SendMailFinish() end
   -- erster Weg hat nicht gegriffen: Cursor frei machen und einmal den Rechtsklick-Weg versuchen
@@ -642,11 +652,6 @@ function BB:SendMailFinish()
   local p = self.prep
   if not p or not p.sending or not p.batch then return end
   p.stage2 = nil
-  -- nie einen leeren Brief schicken: der Server lehnt ihn bei kleinen Chars ab und die Nachnahme waere sinnlos
-  if mailHasAttachment(1) == false then
-    p.batch = nil
-    return self:AttachFailed()
-  end
   local batch = p.batch
   local cod = 0
   for i = 1, table.getn(batch) do
