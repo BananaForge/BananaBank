@@ -28,6 +28,8 @@ BB.BOE_SUBS = { "head", "neck", "shoulder", "chest", "waist", "legs", "feet", "w
 BB.SUB_SET = { other = true }
 for i = 1, getn(BB.RECIPE_SUBS) do BB.SUB_SET[BB.RECIPE_SUBS[i]] = true end
 for i = 1, getn(BB.BOE_SUBS) do BB.SUB_SET[BB.BOE_SUBS[i]] = true end
+BB.TRADE_SUBS = { "alch", "ench", "eng", "bs", "jc", "cook", "tail" }
+for i = 1, getn(BB.TRADE_SUBS) do BB.SUB_SET[BB.TRADE_SUBS[i]] = true end
 
 local T_CONTAINER = { "container", "behälter" }
 local T_RECIPE = { "recipe", "rezept" }
@@ -61,6 +63,33 @@ local function has(s, list)
   return false
 end
 
+-- Handwerksmaterial nach Beruf: erst Untertyp des Items, dann Namensstichwoerter
+local TRADE_SUB_TYPE = {
+  { "parts", "eng" }, { "teile", "eng" }, { "explosives", "eng" }, { "sprengstoff", "eng" }, { "devices", "eng" },
+  { "enchanting", "ench" }, { "verzauberkunst", "ench" }, { "meat", "cook" }, { "fleisch", "cook" },
+  { "jewelcrafting", "jc" }, { "juwelenschleifen", "jc" }, { "gem", "jc" }, { "edelstein", "jc" },
+}
+local TRADE_NAME = {
+  { "jc", { "moonstone", "ruby", "citrine", "jade", "agate", "aquamarine", "opal", "sapphire", "emerald", "diamond", "pearl", "tigerseye", "malachite", "shadowgem", "mondstein", "rubin", "citrin", "achat", "saphir", "smaragd", "diamant", "perle", "tigerauge" } },
+  { "ench", { "dust", "essence", "shard", "vellum", "staub", "essenz", "splitter", "pergament" } },
+  { "eng", { "tube", "bolts", "powder", "fuse", "trigger", "casing", "gear", "rohr", "bolzen", "pulver", "zünder" } },
+  { "tail", { "thread", "dye", "faden", "farbstoff" } },
+  { "bs", { "coal", "flux", "kohle", "flussmittel" } },
+  { "alch", { "vial", "oil", "phiole", "öl" } },
+  { "cook", { "meat", "egg", "fleisch", "ei " } },
+}
+function BB:TradeSub(subtype, name)
+  local st = string.lower(subtype or "")
+  for i = 1, getn(TRADE_SUB_TYPE) do
+    if string.find(st, TRADE_SUB_TYPE[i][1], 1, true) then return TRADE_SUB_TYPE[i][2] end
+  end
+  local n = string.lower(name or "")
+  for i = 1, getn(TRADE_NAME) do
+    if has(n, TRADE_NAME[i][2]) then return TRADE_NAME[i][1] end
+  end
+  return "other"
+end
+
 -- bind: "boe" | "bop" | "none" (vom Tooltip-Scan, siehe Prices.lua). Gibt Kategorie und Unterart zurueck.
 function BB:ItemCategory(id, bind)
   local name, _, _, _, itype, subtype, _, equip = GetItemInfo(id)
@@ -83,7 +112,7 @@ function BB:ItemCategory(id, bind)
     if has(s, S_LEATHER) then return "leather", nil end
     if has(s, S_HERB) then return "herb", nil end
     if has(s, S_ORE) then return "ore", nil end
-    return "trade", nil
+    return "trade", BB:TradeSub(subtype, name)
   end
   if has(t, T_CONSUMABLE) then
     if has(string.lower(name), N_POTION) then return "potion", nil end
@@ -126,11 +155,19 @@ BB.TYPE_FILTERS = {
   { key = "boe:weapon", label = "SUB_WEAPON", k = "boe", s = "weapon", grp = "TF_G_BOE" },
   { key = "boe:other", label = "SUB_OTHER", k = "boe", s = "other", grp = "TF_G_BOE" },
   { header = "TF_H_MATS" },
-  { key = "cloth", label = "CAT_CLOTH", k = "cloth" },
-  { key = "leather", label = "CAT_LEATHER", k = "leather" },
-  { key = "herb", label = "CAT_HERB", k = "herb" },
-  { key = "ore", label = "CAT_ORE", k = "ore" },
-  { key = "trade", label = "CAT_TRADE", k = "trade" },
+  { key = "mat", label = "TF_MAT_ALL", k = "mat" },
+  { key = "mat:cloth", label = "CAT_CLOTH", k = "cloth", grp = "TF_G_MAT" },
+  { key = "mat:leather", label = "CAT_LEATHER", k = "leather", grp = "TF_G_MAT" },
+  { key = "mat:herb", label = "CAT_HERB", k = "herb", grp = "TF_G_MAT" },
+  { key = "mat:ore", label = "CAT_ORE", k = "ore", grp = "TF_G_MAT" },
+  { key = "mat:alch", label = "SUB_ALCH", k = "trade", s = "alch", grp = "TF_G_MAT" },
+  { key = "mat:ench", label = "SUB_ENCH", k = "trade", s = "ench", grp = "TF_G_MAT" },
+  { key = "mat:eng", label = "SUB_ENG", k = "trade", s = "eng", grp = "TF_G_MAT" },
+  { key = "mat:bs", label = "SUB_BS", k = "trade", s = "bs", grp = "TF_G_MAT" },
+  { key = "mat:jc", label = "SUB_JC", k = "trade", s = "jc", grp = "TF_G_MAT" },
+  { key = "mat:tail", label = "SUB_TAIL", k = "trade", s = "tail", grp = "TF_G_MAT" },
+  { key = "mat:cook", label = "SUB_COOK", k = "trade", s = "cook", grp = "TF_G_MAT" },
+  { key = "mat:other", label = "SUB_OTHER", k = "trade", s = "other", grp = "TF_G_MAT" },
   { key = "potion", label = "CAT_POTION", k = "potion" },
   { key = "bag", label = "CAT_BAG", k = "bag" },
   { key = "other", label = "CAT_OTHER", k = "other" },
@@ -149,6 +186,7 @@ function BB:MatchTypeFilter(spec, e)
   local k = e.k
   if not k then return false end
   if spec.k == "sell" then return k == "boe" or k == "recipe" end
+  if spec.k == "mat" then return k == "cloth" or k == "leather" or k == "herb" or k == "ore" or k == "trade" end
   if k ~= spec.k then return false end
   if spec.s and e.s ~= spec.s then return false end
   return true
@@ -157,15 +195,23 @@ end
 -- Kategorie fuer die Anzeige: gespeicherte aus dem Snapshot, sonst lokal bestimmt, sonst nach dem Namen.
 -- So landen auch Eintraege alter Snapshots (ohne Kategorie) in der richtigen Gruppe.
 function BB:ResolveCategory(id, e)
+  if e.k == "trade" and not e.s then
+    local _, _, _, _, _, st = GetItemInfo(id)
+    return "trade", self:TradeSub(st, e.n)
+  end
   if e.k and e.k ~= "other" then return e.k, e.s end
   local bind = BananaBankDB.bind and BananaBankDB.bind[id]
   local k, sub = self:ItemCategory(id, bind)
   if k and k ~= "other" then return k, sub end
   local n = string.lower(e.n or "")
   if string.find(n, "cloth$") or string.find(n, "stoff$") then return "cloth", nil end
-  if string.find(n, "leather$") or string.find(n, "leder$") then return "leather", nil end
+  if string.find(n, "leather$") or string.find(n, "leder$") or string.find(n, " hide$") then return "leather", nil end
   if string.find(n, " ore$") or string.find(n, " bar$") or string.find(n, "erz$") or string.find(n, "barren$") then return "ore", nil end
   if string.find(n, "potion") or string.find(n, "elixir") or string.find(n, "flask") or string.find(n, "trank") then return "potion", nil end
+  if not GetItemInfo(id) then
+    local sub = self:TradeSub(nil, n)
+    if sub ~= "other" then return "trade", sub end
+  end
   return "other", nil
 end
 

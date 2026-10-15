@@ -193,7 +193,7 @@ local TREE_ROWS = 17
 
 local function groupKey(entry)
   local k = entry.k or "other"
-  if k == "recipe" or k == "boe" then return k .. ":" .. (entry.s or "other") end
+  if k == "recipe" or k == "boe" or k == "trade" then return k .. ":" .. (entry.s or "other") end
   return k
 end
 
@@ -206,7 +206,11 @@ local function groupOrder()
   table.insert(GROUP_ORDER, "recipe:other")
   for i = 1, getn(BB.BOE_SUBS) do table.insert(GROUP_ORDER, "boe:" .. BB.BOE_SUBS[i]) end
   table.insert(GROUP_ORDER, "boe:other")
-  local rest = { "cloth", "leather", "herb", "ore", "trade", "potion", "bag", "other" }
+  local mats = { "cloth", "leather", "herb", "ore" }
+  for i = 1, getn(mats) do table.insert(GROUP_ORDER, mats[i]) end
+  for i = 1, getn(BB.TRADE_SUBS) do table.insert(GROUP_ORDER, "trade:" .. BB.TRADE_SUBS[i]) end
+  table.insert(GROUP_ORDER, "trade:other")
+  local rest = { "potion", "bag", "other" }
   for i = 1, getn(rest) do table.insert(GROUP_ORDER, rest[i]) end
   GROUP_INDEX = {}
   for i = 1, getn(GROUP_ORDER) do GROUP_INDEX[GROUP_ORDER[i]] = i end
@@ -217,6 +221,7 @@ local function groupLabel(key)
   local _, _, k, sub = string.find(key, "^(%a+):(%a+)$")
   if k == "recipe" then return T("TF_H_RECIPES") .. "  -  " .. T("SUB_" .. string.upper(sub)) end
   if k == "boe" then return T("TF_H_BOE") .. "  -  " .. T("SUB_" .. string.upper(sub)) end
+  if k == "trade" then return T("CAT_TRADE") .. "  -  " .. T("SUB_" .. string.upper(sub)) end
   return BB:CatName(key)
 end
 
@@ -227,8 +232,9 @@ local function treeNodes(cur)
   for i = 1, getn(list) do
     local e = list[i]
     if e.key and not e.grp then
-      table.insert(out, { key = e.key, label = e.label, depth = 0, parent = (e.key == "rec" or e.key == "boe") })
-      if e.key == "rec" or e.key == "boe" then
+      local isParent = (e.key == "rec" or e.key == "boe" or e.key == "mat")
+      table.insert(out, { key = e.key, label = e.label, depth = 0, parent = isParent })
+      if isParent then
         local open = (cur == e.key) or (string.sub(cur or "", 1, string.len(e.key) + 1) == e.key .. ":")
         if open then
           for j = 1, getn(list) do
@@ -484,6 +490,7 @@ function UI:RefreshStockView(list)
     S.viewChips[i]:ClearAllPoints()
     S.viewChips[i]:SetPoint("TOPLEFT", S.viewChips[i]:GetParent(), "TOPLEFT", (BB:IsBank() and 280 or 126) + (i - 1) * 78, -27)
   end
+  if S.type ~= "all" and not BB:FindTypeFilter(S.type) then S.type = "all" end
   self:RefreshTree()
   -- bei geaenderten Suchkriterien wieder nach oben
   local sig = table.concat({ tostring(S.bank), tostring(S.type), S.filter, S.search, tostring(S.onlyAvail), S.view }, "|")
