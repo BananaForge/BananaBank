@@ -442,7 +442,8 @@ function BB:MailSlots()
   for i = 1, 12 do
     if getglobal("SendMailItemButton" .. i) then n = i else break end
   end
-  if n < 1 then n = 1 end
+  -- Frame noch nicht da: vorerst einen Anhang annehmen, aber nicht merken
+  if n < 1 then return 1 end
   self.mailSlots = n
   return n
 end
@@ -460,6 +461,34 @@ local function tryClick(index)
   end
 end
 
+-- Ist am Brief schon etwas angehaengt? (Antwort des Clients, nicht nur der Cursor)
+local function mailHasAttachment(index)
+  if not GetSendMailItem then return nil end
+  local ok, name = pcall(GetSendMailItem, index)
+  if ok and name and name ~= "" then return true end
+  if index then
+    ok, name = pcall(GetSendMailItem)
+    if ok and name and name ~= "" then return true end
+  end
+  return false
+end
+
+-- Zustand des Postfensters fuer die Fehlersuche
+function BB:MailDebugInfo()
+  local function vis(f) local fr = getglobal(f) if not fr then return "-" end return fr:IsVisible() and "ja" or "nein" end
+  local slots = 0
+  for i = 1, 12 do if getglobal("SendMailItemButton" .. i) then slots = i else break end end
+  local lines = {
+    "SendMailFrame sichtbar: " .. vis("SendMailFrame"),
+    "SendMailItemButton-Felder: " .. slots,
+    "ClickSendMailItemButton: " .. (ClickSendMailItemButton and "ja" or "nein"),
+    "GetSendMailItem: " .. (GetSendMailItem and "ja" or "nein"),
+    "TurtleMail geladen: " .. ((TurtleMail or getglobal("TurtleMailFrame")) and "ja" or "nein"),
+    "Cursor haelt Item: " .. (CursorHasItem() and "ja" or "nein"),
+  }
+  return lines
+end
+
 -- haengt einen Stapel an. Gibt false zurueck, wenn der Client ihn nicht nimmt;
 -- das Item liegt dann wieder in seinem Fach.
 function BB:AttachItem(e, index)
@@ -468,12 +497,21 @@ function BB:AttachItem(e, index)
   if not CursorHasItem() then return false end
   if self:MailSlots() > 1 then tryClick(index) end
   if CursorHasItem() then tryClick(nil) end
-  if CursorHasItem() then
-    PickupContainerItem(e.bag, e.slot)
+  if not CursorHasItem() then return true end
+  PickupContainerItem(e.bag, e.slot)
+  if CursorHasItem() then ClearCursor() end
+  -- zweiter Weg: Rechtsklick auf das Item haengt es an, wenn der Reiter Senden offen ist
+  -- (so macht es der Client selbst, auch wenn ein anderes Post-Addon das Fenster ersetzt hat)
+  -- nur wenn das Sendefenster wirklich offen ist, sonst wuerde das Item benutzt
+  local sf = getglobal("SendMailFrame")
+  if UseContainerItem and sf and sf:IsVisible() then
+    pcall(UseContainerItem, e.bag, e.slot)
+    local has = mailHasAttachment(index)
+    local _, _, locked = GetContainerItemInfo(e.bag, e.slot)
+    if has or (has == nil and locked) then return true end
     if CursorHasItem() then ClearCursor() end
-    return false
   end
-  return true
+  return false
 end
 
 function BB:ClearAttachments()
@@ -541,6 +579,8 @@ function BB:SendMailStep2()
     p.sending = false
     self:Cancel("automail")
     self:Print("|cffff4040" .. self.T("ERR_ATTACH_FAILED") .. "|r")
+    local info = self:MailDebugInfo()
+    for i = 1, table.getn(info) do self:Print("|cff9a9cb3" .. info[i] .. "|r") end
     if self.UI then self.UI:Refresh() end
     return
   end
