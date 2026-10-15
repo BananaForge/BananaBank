@@ -10,7 +10,7 @@
 BananaBank = {}
 local BB = BananaBank
 
-BB.VERSION = "2.3.2"
+BB.VERSION = "2.4.0"
 BB.PREFIX = "BBNK"
 BB.DONATE_NAME = "Lumihunt"
 -- Einziger erlaubter Bank-Rang, deutsch und englisch. Fest eingebaut, es gibt
@@ -264,10 +264,19 @@ end
 -- gespeicherten Einstellungen nach einem Absturz fehlen).
 function BB:BankModeNudge()
   if self.bankNudged or not BananaBankDB then return end
+  local db = BananaBankDB
   local me = self:Me()
   if self:Ready() and self:MayBeBank(me) and not self:IsBank() then
     self.bankNudged = true
-    self:Print("|cffff8000" .. string.format(self.T("MSG_BANK_NUDGE"), BB.BANK_RANK_LABEL) .. "|r")
+    -- Rang Gildenbank = Bank-Modus automatisch (abschaltbar, und wer ihn von Hand beendet hat, bleibt aus)
+    if db.autoBank ~= false and not (db.bankOptOut and db.bankOptOut[me]) then
+      db.banks[me] = true
+      self:Print(string.format(self.T("MSG_BANK_AUTO"), me))
+      self:ScheduleSnapshot(2)
+      if self.UI and self.UI.OnBankModeChanged then self.UI:OnBankModeChanged() end
+    else
+      self:Print("|cffff8000" .. string.format(self.T("MSG_BANK_NUDGE"), BB.BANK_RANK_LABEL) .. "|r")
+    end
   end
 end
 
@@ -350,11 +359,14 @@ function BB:SetBank(on)
       return
     end
     BananaBankDB.banks[me] = true
+    if BananaBankDB.bankOptOut then BananaBankDB.bankOptOut[me] = nil end
     self:Print(string.format(self.T("MSG_BANK_SET"), me))
     -- gleich erfassen und senden, damit ein veralteter Bestand dieses Chars korrigiert wird
     self:ScheduleSnapshot(1)
   else
     BananaBankDB.banks[me] = nil
+    BananaBankDB.bankOptOut = BananaBankDB.bankOptOut or {}
+    BananaBankDB.bankOptOut[me] = true
     self:Print(string.format(self.T("MSG_BANK_REMOVED"), me))
   end
   if self.UI and self.UI.OnBankModeChanged then self.UI:OnBankModeChanged() end

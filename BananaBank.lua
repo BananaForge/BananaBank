@@ -192,6 +192,13 @@ SlashCmdList["BANANABANK"] = function(msg)
     BB.UI:ToggleQuestTracker()
   elseif cmd == "questlog" then
     BB:PrintQuestLog(rest)
+  elseif cmd == "abgleich" or cmd == "reconcile" then
+    local _, _, sub, who, nums = string.find(rest, "^(%S+)%s+(%S+)%s+(.+)$")
+    if sub and (string.lower(sub) == "buchen" or string.lower(sub) == "book") then
+      BB:ReconcileBook(who, nums)
+    else
+      BB:PrintReconcile(rest)
+    end
   elseif cmd == "maillog" or cmd == "postlog" then
     BB:PrintMailLog(rest)
   elseif cmd == "ledger" or cmd == "buch" then

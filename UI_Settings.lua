@@ -10,7 +10,7 @@ local WHITE = UI.WHITE
 UI.settingsModule = true
 UI.set = {}
 
-local GEN_H, GUILD_H, BANK_H = 168, 108, 160
+local GEN_H, GUILD_H, BANK_H = 168, 108, 208
 
 -- ------------------------------------------------------------
 -- Kopf: Zahnrad und "Spenden an: <Hauptbank>"
@@ -195,6 +195,16 @@ function UI:BuildSettings()
   btn(g, "SET_AHSCAN", 212, -98, 100, function() BB:StartAHScan() end)
   btn(g, "SET_BOOK", 316, -98, 108, function() UI:OpenBookDialog() end)
   btn(g, "SET_MAILLOG", 4, -124, 200, function() BB:PrintMailLog() end)
+  btn(g, "SET_RECON", 210, -124, 214, function() BB:PrintReconcile("") end)
+  S.cAuto = check(g, "SET_AUTOBANK", 4, -152, function() return BananaBankDB.autoBank ~= false end, function(v)
+    BananaBankDB.autoBank = v
+  end, 420)
+  local ah = self:Font(g, 10, C.muted)
+  ah:SetPoint("TOPLEFT", g, "TOPLEFT", 4, -174)
+  ah:SetWidth(420)
+  ah:SetHeight(24)
+  ah:SetJustifyV("TOP")
+  self:Loc(ah, "SET_AUTOBANK_HINT")
 
   f:SetScript("OnShow", function() UI:RefreshSettings() end)
 end
@@ -231,7 +241,7 @@ function UI:RefreshSettings()
   S.cMini.Update()
   S.cTrack.Update()
   S.cDebug.Update()
-  if S.cBank then S.cBank.Update() S.cCod.Update() S.cWhisper.Update() end
+  if S.cBank then S.cBank.Update() S.cCod.Update() S.cWhisper.Update() S.cAuto.Update() end
   if not S.mainFocus then S.main:SetText(BB:MainBank()) end
 end
 

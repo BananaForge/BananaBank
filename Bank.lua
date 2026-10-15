@@ -880,3 +880,94 @@ function BB:TradeClosed()
     if BB.trade == tok then BB.trade = nil end
   end, "tradeclear")
 end
+
+-- ------------------------------------------------------------
+-- Abgleich Bestand gegen Buch: was liegt in der Bank, ohne dass das Buch es als Eingang kennt?
+-- ------------------------------------------------------------
+function BB:ReconcileList(onlyRecipes)
+  local net = {}
+  for _, e in pairs(BananaBankDB.ledger) do
+    local n = e.n or ""
+    if e.k == "in" or e.k == "back" then net[n] = (net[n] or 0) + (e.c or 0)
+    elseif e.k == "out" then net[n] = (net[n] or 0) - (e.c or 0) end
+  end
+  local out = {}
+  for id, e in pairs(self:GetStock()) do
+    local k = self:ResolveCategory(id, e)
+    if not onlyRecipes or k == "recipe" then
+      local diff = e.c - (net[e.n] or 0)
+      if diff > 0 then
+        table.insert(out, { id = id, n = e.n, q = e.q or 1, t = e.t, stock = e.c, booked = net[e.n] or 0, diff = diff, k = k })
+      end
+    end
+  end
+  table.sort(out, function(a, b)
+    if a.diff ~= b.diff then return a.diff > b.diff end
+    return a.n < b.n
+  end)
+  return out
+end
+
+function BB:PrintReconcile(arg)
+  arg = string.lower(arg or "")
+  local only = (arg == "rezepte" or arg == "recipes")
+  local list = self:ReconcileList(only)
+  self.recon = list
+  self:Print(string.format(self.T("RC_HEAD"), getn(list)))
+  for i = 1, getn(list) do
+    local e = list[i]
+    DEFAULT_CHAT_FRAME:AddMessage(string.format("%d. %s  -  %s %d, %s %d, |cffffd100+%d|r", i, e.n,
+      self.T("RC_STOCK"), e.stock, self.T("RC_BOOKED"), e.booked, e.diff))
+  end
+  if getn(list) > 0 then self:Print(self.T("RC_HOWTO")) end
+end
+
+-- Nummern wie "1,3,5-9" oder "alle" in eine Menge umwandeln
+local function parseNumbers(text, max)
+  local set = {}
+  text = string.lower(text or "")
+  if text == "alle" or text == "all" then
+    for i = 1, max do set[i] = true end
+    return set
+  end
+  for _, part in ipairs(BB.Split(text, ",")) do
+    local _, _, a, b = string.find(part, "^%s*(%d+)%s*-%s*(%d+)%s*$")
+    if a then
+      for i = tonumber(a), math.min(tonumber(b), max) do set[i] = true end
+    else
+      local n = tonumber(part)
+      if n and n >= 1 and n <= max then set[n] = true end
+    end
+  end
+  return set
+end
+
+-- /bb abgleich buchen <Spieler> <Nummern|alle>
+function BB:ReconcileBook(player, numbers)
+  if not (self:IsBank() and self:MayBeBank(self:Me())) then
+    self:Print("|cffff4040" .. self.T("ERR_NOT_BANK") .. "|r")
+    return
+  end
+  local list = self.recon
+  if not list or getn(list) == 0 then
+    self:Print(self.T("RC_NOLIST"))
+    return
+  end
+  if not player or player == "" or not numbers or numbers == "" then
+    self:Print(self.T("RC_HOWTO"))
+    return
+  end
+  local set = parseNumbers(numbers, getn(list))
+  local n, items = 0, 0
+  for i = 1, getn(list) do
+    if set[i] then
+      local e = list[i]
+      self:BookDonation(player, e.n, e.diff, e.q, e.id, e.t)
+      n = n + 1
+      items = items + e.diff
+    end
+  end
+  self.recon = nil
+  self:Print(string.format(self.T("RC_DONE"), n, items, player))
+  if self.UI then self.UI:Refresh() end
+end
