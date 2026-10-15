@@ -506,11 +506,21 @@ function BB:AttachItem(e, index)
   local sf = getglobal("SendMailFrame")
   if UseContainerItem and sf and sf:IsVisible() then
     pcall(UseContainerItem, e.bag, e.slot)
-    local has = mailHasAttachment(index)
-    local _, _, locked = GetContainerItemInfo(e.bag, e.slot)
-    if has or (has == nil and locked) then return true end
     if CursorHasItem() then ClearCursor() end
+    if self:AttachedNow(e, index) then return true end
+    -- der Client meldet den Anhang oft erst einen Moment spaeter: dann kurz warten und nochmal pruefen
+    return "wait"
   end
+  return false
+end
+
+-- Liegt dieser Stapel im Brief? Antwort des Clients, Sperre des Fachs oder leeres Fach
+function BB:AttachedNow(e, index)
+  if mailHasAttachment(index) then return true end
+  local link = GetContainerItemLink(e.bag, e.slot)
+  if not link then return true end
+  local _, _, locked = GetContainerItemInfo(e.bag, e.slot)
+  if locked then return true end
   return false
 end
 
@@ -565,27 +575,55 @@ function BB:SendMailStep2()
   -- so viele Stapel wie der Client erlaubt in einen Brief
   local slots = self:MailSlots()
   local batch = {}
+  local wait = false
   local last = p.idx + slots - 1
   if last > table.getn(p.slots) then last = table.getn(p.slots) end
   for k = p.idx, last do
-    if self:AttachItem(p.slots[k], table.getn(batch) + 1) then
+    local r = self:AttachItem(p.slots[k], table.getn(batch) + 1)
+    if r then
       table.insert(batch, k)
+      if r == "wait" then wait = true break end
     else
       break
     end
   end
 
-  if table.getn(batch) == 0 then
-    p.sending = false
-    self:Cancel("automail")
-    self:Print("|cffff4040" .. self.T("ERR_ATTACH_FAILED") .. "|r")
-    local info = self:MailDebugInfo()
-    for i = 1, table.getn(info) do self:Print("|cff9a9cb3" .. info[i] .. "|r") end
-    if self.UI then self.UI:Refresh() end
+  if table.getn(batch) == 0 then return self:AttachFailed() end
+  p.batch = batch
+  if wait then
+    -- zweiter Weg (Rechtsklick): Anhang kurz spaeter pruefen, dann senden
+    self:After(0.5, function() BB:SendMailVerify() end, "mailverify")
     return
   end
+  self:SendMailFinish()
+end
 
-  p.batch = batch
+function BB:AttachFailed()
+  local p = self.prep
+  if p then p.sending = false end
+  self:Cancel("automail")
+  self:Print("|cffff4040" .. self.T("ERR_ATTACH_FAILED") .. "|r")
+  local info = self:MailDebugInfo()
+  for i = 1, table.getn(info) do self:Print("|cff9a9cb3" .. info[i] .. "|r") end
+  if self.UI then self.UI:Refresh() end
+end
+
+function BB:SendMailVerify()
+  local p = self.prep
+  if not p or not p.sending or not p.batch then return end
+  for i = 1, table.getn(p.batch) do
+    if not self:AttachedNow(p.slots[p.batch[i]], i) then
+      p.batch = nil
+      return self:AttachFailed()
+    end
+  end
+  self:SendMailFinish()
+end
+
+function BB:SendMailFinish()
+  local p = self.prep
+  if not p or not p.sending or not p.batch then return end
+  local batch = p.batch
   local cod = 0
   for i = 1, table.getn(batch) do
     local e = p.slots[batch[i]]

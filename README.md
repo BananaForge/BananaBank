@@ -93,6 +93,7 @@ Pull requests welcome, tested in-game on a 1.12 client. Lua 5.0 rules: no `#`, `
 
 ## Changelog
 
+- **2.4.2:** mail sending: when the client reports the attachment a moment late (multi-attachment mail window), the addon waits half a second and checks again instead of aborting with "The client did not take the attachment".
 - **2.4.1:** mail sending: if the client does not take an attachment by the cursor, a second way (right-click attach, only while the Send tab is open) is tried and checked with `GetSendMailItem`. On failure the window state is printed, also `/bb maildebug`. The attachment slot count is no longer cached before the mail window exists.
 - **2.4.0:** **bank mode is automatic** for every character with the Gildenbank rank (set at login; switch in the settings; whoever ran `/bb removebank` stays off). New **stock / ledger check**: `/bb abgleich [rezepte]` lists items that are in the bank without the ledger knowing them as received, `/bb abgleich buchen <player> <1,3,5-9|alle>` books them afterwards as a donation of that player (quests are credited as usual).
 - **2.3.2:** opening the mailbox on a bank character refreshes the guild roster first, so new members are known. Mail from senders who are not in the guild roster is still booked, but marked: "(not in guild)" in the ledger and a note in the mail log.
