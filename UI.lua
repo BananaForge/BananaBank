@@ -772,8 +772,10 @@ function UI:StockList()
     local ok = (e.q or 1) >= S.filter
     if ok and S.search ~= "" and not string.find(string.lower(e.n or ""), S.search, 1, true) then ok = false end
     if ok and S.onlyAvail and avail <= 0 then ok = false end
-    if ok and typeSpec and not BB:MatchTypeFilter(typeSpec, e) then ok = false end
-    if ok then table.insert(list, { id = id, e = e, res = res[id] or 0, avail = avail }) end
+    local rk, rs
+    if ok then rk, rs = BB:ResolveCategory(id, e) end
+    if ok and typeSpec and not BB:MatchTypeFilter(typeSpec, { k = rk, s = rs }) then ok = false end
+    if ok then table.insert(list, { id = id, e = e, k = rk, s = rs, res = res[id] or 0, avail = avail }) end
   end
   table.sort(list, function(a, b)
     if (a.e.q or 1) ~= (b.e.q or 1) then return (a.e.q or 1) > (b.e.q or 1) end

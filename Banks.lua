@@ -12,7 +12,7 @@ BB.BANK_ROLE_LEN = 40
 BB.BANK_DESC_LEN = 160
 
 -- Reihenfolge wie im Editor
-BB.CATS = { "cloth", "leather", "herb", "ore", "potion", "bag", "recipe", "boe", "other" }
+BB.CATS = { "cloth", "leather", "herb", "ore", "trade", "potion", "bag", "recipe", "boe", "other" }
 BB.CAT_SET = {}
 for i = 1, getn(BB.CATS) do BB.CAT_SET[BB.CATS[i]] = true end
 
@@ -83,7 +83,7 @@ function BB:ItemCategory(id, bind)
     if has(s, S_LEATHER) then return "leather", nil end
     if has(s, S_HERB) then return "herb", nil end
     if has(s, S_ORE) then return "ore", nil end
-    return "other", nil
+    return "trade", nil
   end
   if has(t, T_CONSUMABLE) then
     if has(string.lower(name), N_POTION) then return "potion", nil end
@@ -130,6 +130,7 @@ BB.TYPE_FILTERS = {
   { key = "leather", label = "CAT_LEATHER", k = "leather" },
   { key = "herb", label = "CAT_HERB", k = "herb" },
   { key = "ore", label = "CAT_ORE", k = "ore" },
+  { key = "trade", label = "CAT_TRADE", k = "trade" },
   { key = "potion", label = "CAT_POTION", k = "potion" },
   { key = "bag", label = "CAT_BAG", k = "bag" },
   { key = "other", label = "CAT_OTHER", k = "other" },
@@ -151,6 +152,21 @@ function BB:MatchTypeFilter(spec, e)
   if k ~= spec.k then return false end
   if spec.s and e.s ~= spec.s then return false end
   return true
+end
+
+-- Kategorie fuer die Anzeige: gespeicherte aus dem Snapshot, sonst lokal bestimmt, sonst nach dem Namen.
+-- So landen auch Eintraege alter Snapshots (ohne Kategorie) in der richtigen Gruppe.
+function BB:ResolveCategory(id, e)
+  if e.k and e.k ~= "other" then return e.k, e.s end
+  local bind = BananaBankDB.bind and BananaBankDB.bind[id]
+  local k, sub = self:ItemCategory(id, bind)
+  if k and k ~= "other" then return k, sub end
+  local n = string.lower(e.n or "")
+  if string.find(n, "cloth$") or string.find(n, "stoff$") then return "cloth", nil end
+  if string.find(n, "leather$") or string.find(n, "leder$") then return "leather", nil end
+  if string.find(n, " ore$") or string.find(n, " bar$") or string.find(n, "erz$") or string.find(n, "barren$") then return "ore", nil end
+  if string.find(n, "potion") or string.find(n, "elixir") or string.find(n, "flask") or string.find(n, "trank") then return "potion", nil end
+  return "other", nil
 end
 
 function BB:CatName(cat)

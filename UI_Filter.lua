@@ -191,9 +191,9 @@ local V_ROWS = 12
 local TREE_H = 18
 local TREE_ROWS = 17
 
-local function groupKey(e)
-  local k = e.k or "other"
-  if k == "recipe" or k == "boe" then return k .. ":" .. (e.s or "other") end
+local function groupKey(entry)
+  local k = entry.k or "other"
+  if k == "recipe" or k == "boe" then return k .. ":" .. (entry.s or "other") end
   return k
 end
 
@@ -206,7 +206,7 @@ local function groupOrder()
   table.insert(GROUP_ORDER, "recipe:other")
   for i = 1, getn(BB.BOE_SUBS) do table.insert(GROUP_ORDER, "boe:" .. BB.BOE_SUBS[i]) end
   table.insert(GROUP_ORDER, "boe:other")
-  local rest = { "cloth", "leather", "herb", "ore", "potion", "bag", "other" }
+  local rest = { "cloth", "leather", "herb", "ore", "trade", "potion", "bag", "other" }
   for i = 1, getn(rest) do table.insert(GROUP_ORDER, rest[i]) end
   GROUP_INDEX = {}
   for i = 1, getn(GROUP_ORDER) do GROUP_INDEX[GROUP_ORDER[i]] = i end
@@ -445,7 +445,7 @@ local function buildRows(list, view)
   groupOrder()
   local groups, keys = {}, {}
   for i = 1, getn(list) do
-    local key = groupKey(list[i].e)
+    local key = groupKey(list[i])
     if not GROUP_INDEX[key] then key = "other" end
     if not groups[key] then groups[key] = {} table.insert(keys, key) end
     table.insert(groups[key], list[i])

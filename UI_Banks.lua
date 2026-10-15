@@ -395,7 +395,7 @@ function UI:BuildBankEditor()
   local f = CreateFrame("Frame", "BananaBankInfoEditor", UIParent)
   self.bke = f
   f:SetWidth(540)
-  f:SetHeight(420)
+  f:SetHeight(444)
   f:SetPoint("CENTER", UIParent, "CENTER", 0, 10)
   f:SetFrameStrata("DIALOG")
   f:SetMovable(true)
@@ -466,7 +466,7 @@ function UI:BuildBankEditor()
     f.chips[cat] = chip
   end
   local hint = self:Font(f, 10, { 0.62, 0.64, 0.74 })
-  hint:SetPoint("TOPLEFT", f, "TOPLEFT", 28, -322)
+  hint:SetPoint("TOPLEFT", f, "TOPLEFT", 28, -346)
   hint:SetWidth(484)
   hint:SetHeight(26)
   hint:SetJustifyV("TOP")
