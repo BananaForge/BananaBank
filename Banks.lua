@@ -45,6 +45,7 @@ local PROF = {
   { "ench", { "enchant", "verzauber" } }, { "eng", { "engineer", "ingenieur" } },
   { "lw", { "leatherwork", "lederverarb" } }, { "tail", { "tailor", "schneider" } },
   { "cook", { "cook", "koch" } }, { "fa", { "first aid", "erste hilfe" } },
+  { "jc", { "jewelcraft", "juwelen" } },
 }
 local SLOT = {
   INVTYPE_HEAD = "head", INVTYPE_NECK = "neck", INVTYPE_SHOULDER = "shoulder", INVTYPE_CHEST = "chest",
@@ -134,51 +135,50 @@ end
 
 -- Filter im Bestand (fuer alle sichtbar): Typ auswaehlen, zum Beispiel alle Alchemie-Rezepte
 -- header = Ueberschrift im Menue; k = Kategorie ("sell" = BOE und Rezepte), s = Unterart
-BB.TYPE_FILTERS = {
-  { key = "all", label = "TF_ALL" },
-  { key = "mat", label = "TF_MAT_ALL", k = "mat" },
-  { key = "mat:cloth", label = "CAT_CLOTH", k = "cloth", grp = "TF_G_MAT" },
-  { key = "mat:leather", label = "CAT_LEATHER", k = "leather", grp = "TF_G_MAT" },
-  { key = "mat:herb", label = "CAT_HERB", k = "herb", grp = "TF_G_MAT" },
-  { key = "mat:ore", label = "CAT_ORE", k = "ore", grp = "TF_G_MAT" },
-  { key = "mat:alch", label = "SUB_ALCH", k = "trade", s = "alch", grp = "TF_G_MAT" },
-  { key = "mat:ench", label = "SUB_ENCH", k = "trade", s = "ench", grp = "TF_G_MAT" },
-  { key = "mat:eng", label = "SUB_ENG", k = "trade", s = "eng", grp = "TF_G_MAT" },
-  { key = "mat:bs", label = "SUB_BS", k = "trade", s = "bs", grp = "TF_G_MAT" },
-  { key = "mat:jc", label = "SUB_JC", k = "trade", s = "jc", grp = "TF_G_MAT" },
-  { key = "mat:tail", label = "SUB_TAIL", k = "trade", s = "tail", grp = "TF_G_MAT" },
-  { key = "mat:cook", label = "SUB_COOK", k = "trade", s = "cook", grp = "TF_G_MAT" },
-  { key = "mat:other", label = "SUB_OTHER", k = "trade", s = "other", grp = "TF_G_MAT" },
-  { key = "boe", label = "TF_BOE_ALL", k = "boe" },
-  { key = "boe:head", label = "SUB_HEAD", k = "boe", s = "head", grp = "TF_G_BOE" },
-  { key = "boe:neck", label = "SUB_NECK", k = "boe", s = "neck", grp = "TF_G_BOE" },
-  { key = "boe:shoulder", label = "SUB_SHOULDER", k = "boe", s = "shoulder", grp = "TF_G_BOE" },
-  { key = "boe:chest", label = "SUB_CHEST", k = "boe", s = "chest", grp = "TF_G_BOE" },
-  { key = "boe:waist", label = "SUB_WAIST", k = "boe", s = "waist", grp = "TF_G_BOE" },
-  { key = "boe:legs", label = "SUB_LEGS", k = "boe", s = "legs", grp = "TF_G_BOE" },
-  { key = "boe:feet", label = "SUB_FEET", k = "boe", s = "feet", grp = "TF_G_BOE" },
-  { key = "boe:wrist", label = "SUB_WRIST", k = "boe", s = "wrist", grp = "TF_G_BOE" },
-  { key = "boe:hands", label = "SUB_HANDS", k = "boe", s = "hands", grp = "TF_G_BOE" },
-  { key = "boe:back", label = "SUB_BACK", k = "boe", s = "back", grp = "TF_G_BOE" },
-  { key = "boe:finger", label = "SUB_FINGER", k = "boe", s = "finger", grp = "TF_G_BOE" },
-  { key = "boe:trinket", label = "SUB_TRINKET", k = "boe", s = "trinket", grp = "TF_G_BOE" },
-  { key = "boe:shield", label = "SUB_SHIELD", k = "boe", s = "shield", grp = "TF_G_BOE" },
-  { key = "boe:weapon", label = "SUB_WEAPON", k = "boe", s = "weapon", grp = "TF_G_BOE" },
-  { key = "boe:other", label = "SUB_OTHER", k = "boe", s = "other", grp = "TF_G_BOE" },
-  { key = "rec", label = "TF_REC_ALL", k = "recipe" },
-  { key = "rec:alch", label = "SUB_ALCH", k = "recipe", s = "alch", grp = "TF_G_RECIPE" },
-  { key = "rec:bs", label = "SUB_BS", k = "recipe", s = "bs", grp = "TF_G_RECIPE" },
-  { key = "rec:ench", label = "SUB_ENCH", k = "recipe", s = "ench", grp = "TF_G_RECIPE" },
-  { key = "rec:eng", label = "SUB_ENG", k = "recipe", s = "eng", grp = "TF_G_RECIPE" },
-  { key = "rec:lw", label = "SUB_LW", k = "recipe", s = "lw", grp = "TF_G_RECIPE" },
-  { key = "rec:tail", label = "SUB_TAIL", k = "recipe", s = "tail", grp = "TF_G_RECIPE" },
-  { key = "rec:cook", label = "SUB_COOK", k = "recipe", s = "cook", grp = "TF_G_RECIPE" },
-  { key = "rec:fa", label = "SUB_FA", k = "recipe", s = "fa", grp = "TF_G_RECIPE" },
-  { key = "rec:other", label = "SUB_OTHER", k = "recipe", s = "other", grp = "TF_G_RECIPE" },
-  { key = "potion", label = "CAT_POTION", k = "potion" },
-  { key = "bag", label = "CAT_BAG", k = "bag" },
-  { key = "other", label = "CAT_OTHER", k = "other" },
+-- Baum im Bestand: oberste Ebene Komplette Bank, Berufe, BOE, Traenke, Taschen, Sonstiges.
+-- Unter Berufe steht jeder Beruf mit Handwerksmaterialien und Rezepten. rules = Liste von {k=Kategorie, s=Unterart}.
+BB.PROFS = { "alch", "bs", "ench", "eng", "lw", "tail", "jc", "cook", "fa", "other" }
+BB.PROF_MATS = {
+  alch = { { k = "herb" }, { k = "trade", s = "alch" } },
+  bs = { { k = "ore" }, { k = "trade", s = "bs" } },
+  ench = { { k = "trade", s = "ench" } },
+  eng = { { k = "trade", s = "eng" } },
+  lw = { { k = "leather" } },
+  tail = { { k = "cloth" }, { k = "trade", s = "tail" } },
+  jc = { { k = "trade", s = "jc" } },
+  cook = { { k = "trade", s = "cook" } },
+  fa = {},
+  other = { { k = "trade", s = "other" } },
 }
+
+BB.TYPE_FILTERS = {}
+do
+  local F = BB.TYPE_FILTERS
+  local allProf = { { k = "recipe" }, { k = "herb" }, { k = "ore" }, { k = "leather" }, { k = "cloth" }, { k = "trade" } }
+  table.insert(F, { key = "all", label = "TF_ALL", depth = 0 })
+  table.insert(F, { key = "prof", label = "TF_PROF", depth = 0, rules = allProf })
+  for i = 1, getn(BB.PROFS) do
+    local p = BB.PROFS[i]
+    local mats = BB.PROF_MATS[p]
+    local rules = {}
+    for j = 1, getn(mats) do table.insert(rules, mats[j]) end
+    table.insert(rules, { k = "recipe", s = p })
+    table.insert(F, { key = "prof:" .. p, label = "SUB_" .. string.upper(p), depth = 1, rules = rules })
+    if getn(mats) > 0 then
+      table.insert(F, { key = "prof:" .. p .. ":mat", label = "TF_MAT_ALL", depth = 2, rules = mats })
+    end
+    table.insert(F, { key = "prof:" .. p .. ":rec", label = "TF_REC_ALL", depth = 2, rules = { { k = "recipe", s = p } } })
+  end
+  table.insert(F, { key = "boe", label = "TF_BOE_ALL", depth = 0, rules = { { k = "boe" } } })
+  for i = 1, getn(BB.BOE_SUBS) do
+    local sub = BB.BOE_SUBS[i]
+    table.insert(F, { key = "boe:" .. sub, label = "SUB_" .. string.upper(sub), depth = 1, rules = { { k = "boe", s = sub } } })
+  end
+  table.insert(F, { key = "boe:other", label = "SUB_OTHER", depth = 1, rules = { { k = "boe", s = "other" } } })
+  table.insert(F, { key = "potion", label = "CAT_POTION", depth = 0, rules = { { k = "potion" } } })
+  table.insert(F, { key = "bag", label = "CAT_BAG", depth = 0, rules = { { k = "bag" } } })
+  table.insert(F, { key = "other", label = "CAT_OTHER", depth = 0, rules = { { k = "other" } } })
+end
 
 function BB:FindTypeFilter(key)
   for i = 1, getn(BB.TYPE_FILTERS) do
@@ -187,16 +187,16 @@ function BB:FindTypeFilter(key)
   return nil
 end
 
--- passt ein Bestandseintrag (e.k, e.s) zum Filter? Items ohne Kategorie (alter Stand) nur bei "Alle".
+-- passt ein Bestandseintrag (e.k, e.s) zum Filter? Items ohne Kategorie nur bei "Komplette Bank".
 function BB:MatchTypeFilter(spec, e)
   if not spec or spec.key == "all" then return true end
   local k = e.k
-  if not k then return false end
-  if spec.k == "sell" then return k == "boe" or k == "recipe" end
-  if spec.k == "mat" then return k == "cloth" or k == "leather" or k == "herb" or k == "ore" or k == "trade" end
-  if k ~= spec.k then return false end
-  if spec.s and e.s ~= spec.s then return false end
-  return true
+  if not k or not spec.rules then return false end
+  for i = 1, getn(spec.rules) do
+    local r = spec.rules[i]
+    if r.k == k and (not r.s or r.s == e.s) then return true end
+  end
+  return false
 end
 
 -- Kategorie fuer die Anzeige: gespeicherte aus dem Snapshot, sonst lokal bestimmt, sonst nach dem Namen.

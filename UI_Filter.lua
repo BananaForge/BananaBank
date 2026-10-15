@@ -1,4 +1,4 @@
--- BananaBank UI Teil 7: Typ-Filter im Bestand (Rezepte nach Beruf, BOE nach Slot, Materialien)
+-- BananaBank UI Teil 7: Bestand im Auktionshaus-Stil (Kategorienbaum, Ergebnisse nach Kategorien, Symbol- und Listenansicht)
 
 local BB = BananaBank
 local UI = BB.UI
@@ -9,241 +9,80 @@ local WHITE = UI.WHITE
 
 UI.filterModule = true
 
-local ROW_H = 18
-local VISIBLE = 14
-
-local function specOf(S)
-  return S.type and BB:FindTypeFilter(S.type) or nil
-end
-
--- sichtbare Eintraege (Ueberschriften + Filter) in Menue-Reihenfolge
-local function entries()
-  return BB.TYPE_FILTERS
-end
-
-function UI:RefreshTypeButton()
-  local S = self.stock
-  if not S or not S.typeBtn then return end
-  S.typeBtn:ClearAllPoints()
-  if BB:IsBank() then
-    S.typeBtn:SetPoint("TOPLEFT", S.typeBtn:GetParent(), "TOPLEFT", 272, -27)
-  else
-    S.typeBtn:SetPoint("TOPLEFT", S.typeBtn:GetParent(), "TOPLEFT", 126, -27)
-  end
-  local spec = specOf(S)
-  if spec and spec.key ~= "all" then
-    local name = T(spec.label)
-    if spec.grp then name = T(spec.grp) .. ": " .. name end
-    S.typeBtn.fs:SetText(string.format(T("TF_BTN"), name))
-    S.typeBtn.fs:SetTextColor(1, 0.95, 0.7)
-    S.typeBtn:SetBackdropColor(0.42, 0.30, 0.05, 0.98)
-  else
-    S.typeBtn.fs:SetText(string.format(T("TF_BTN"), T("TF_ALL")))
-    S.typeBtn.fs:SetTextColor(C.gold[1], C.gold[2], C.gold[3])
-    S.typeBtn:SetBackdropColor(0.05, 0.07, 0.14, 0.95)
-  end
-end
-
-function UI:BuildTypeButton(p)
-  local S = self.stock
-  S.type = "all"
-  S.typeBtn = self:Button(p, 170, 18, "", function() UI:ToggleTypeMenu() end, "flat")
-  S.typeBtn:SetPoint("TOPLEFT", p, "TOPLEFT", 126, -27)
-end
-
-function UI:CloseTypeMenu()
-  if not self.tmenu then return end
-  self.tmenu:Hide()
-  self.tmenu.catch:Hide()
-end
-
-function UI:RefreshTypeMenu()
-  local m = self.tmenu
-  if not m then return end
-  local list = entries()
-  local max = getn(list) - VISIBLE
-  if max < 0 then max = 0 end
-  if m.offset > max then m.offset = max end
-  if m.offset < 0 then m.offset = 0 end
-  local S = self.stock
-  for i = 1, VISIBLE do
-    local row = m.rows[i]
-    local e = list[m.offset + i]
-    row.entry = e
-    if not e then
-      row:Hide()
-    else
-      row:Show()
-      if e.header then
-        row.fs:SetText(T(e.header))
-        row.fs:SetTextColor(C.gold[1], C.gold[2], C.gold[3])
-        row.fs:SetPoint("LEFT", row, "LEFT", 4, 0)
-        row.sel:Hide()
-        row.hl:Hide()
-      else
-        row.fs:SetText(T(e.label))
-        row.fs:SetPoint("LEFT", row, "LEFT", e.grp and 18 or 10, 0)
-        row.hl:Show()
-        if S.type == e.key then
-          row.fs:SetTextColor(1, 0.95, 0.7)
-          row.sel:Show()
-        else
-          row.fs:SetTextColor(0.88, 0.90, 0.96)
-          row.sel:Hide()
-        end
-      end
-    end
-  end
-end
-
-function UI:BuildTypeMenu()
-  if self.tmenu then return end
-  local catch = CreateFrame("Button", nil, UIParent)
-  catch:SetAllPoints(UIParent)
-  catch:SetFrameStrata("DIALOG")
-  catch:Hide()
-  catch:SetScript("OnClick", function() UI:CloseTypeMenu() end)
-  local m = CreateFrame("Frame", nil, UIParent)
-  m:SetWidth(200)
-  m:SetHeight(VISIBLE * ROW_H + 12)
-  m:SetBackdrop({
-    bgFile = WHITE, edgeFile = "Interface\\Tooltips\\UI-Tooltip-Border",
-    tile = true, tileSize = 16, edgeSize = 14,
-    insets = { left = 3, right = 3, top = 3, bottom = 3 },
-  })
-  m:SetBackdropColor(0.015, 0.025, 0.06, 1)
-  m:SetBackdropBorderColor(C.gold[1], C.gold[2], C.gold[3], 1)
-  m:SetFrameStrata("FULLSCREEN_DIALOG")
-  m:EnableMouse(true)
-  m:EnableMouseWheel(true)
-  m:SetScript("OnMouseWheel", function()
-    m.offset = m.offset - arg1 * 3
-    UI:RefreshTypeMenu()
-  end)
-  m:Hide()
-  m.catch = catch
-  m.offset = 0
-  m.rows = {}
-  for i = 1, VISIBLE do
-    local row = CreateFrame("Button", nil, m)
-    row:SetHeight(ROW_H)
-    row:SetPoint("TOPLEFT", m, "TOPLEFT", 6, -6 - (i - 1) * ROW_H)
-    row:SetPoint("TOPRIGHT", m, "TOPRIGHT", -6, -6 - (i - 1) * ROW_H)
-    row:EnableMouseWheel(true)
-    row:SetScript("OnMouseWheel", function()
-      m.offset = m.offset - arg1 * 3
-      UI:RefreshTypeMenu()
-    end)
-    row.sel = row:CreateTexture(nil, "BACKGROUND")
-    row.sel:SetTexture(WHITE)
-    row.sel:SetAllPoints(row)
-    row.sel:SetVertexColor(1, 0.82, 0.26, 0.25)
-    row.hl = row:CreateTexture(nil, "HIGHLIGHT")
-    row.hl:SetTexture(WHITE)
-    row.hl:SetAllPoints(row)
-    row.hl:SetVertexColor(1, 0.82, 0.3, 0.14)
-    row.fs = self:Font(row, 11, { 1, 1, 1 })
-    row.fs:SetWidth(170)
-    row.fs:SetHeight(14)
-    row:SetScript("OnClick", function()
-      local e = this.entry
-      if not e or e.header then return end
-      PlaySound("igMainMenuOptionCheckBoxOn")
-      UI.stock.type = e.key
-      UI.stock.page = 1
-      UI:CloseTypeMenu()
-      UI:RefreshStock()
-    end)
-    m.rows[i] = row
-  end
-  self.tmenu = m
-end
-
-function UI:ToggleTypeMenu()
-  self:BuildTypeMenu()
-  local m = self.tmenu
-  if m:IsVisible() then
-    self:CloseTypeMenu()
-    return
-  end
-  local S = self.stock
-  m:ClearAllPoints()
-  m:SetPoint("TOPLEFT", S.typeBtn, "BOTTOMLEFT", 0, -2)
-  m.offset = 0
-  -- gewaehlten Eintrag in Sicht scrollen
-  local list = entries()
-  for i = 1, getn(list) do
-    if list[i].key == S.type and i > VISIBLE then m.offset = i - VISIBLE + 2 end
-  end
-  m.catch:Show()
-  m:Show()
-  self:RefreshTypeMenu()
-end
-
 -- ------------------------------------------------------------
 -- Bestand im Auktionshaus-Stil: Kategorienbaum links, Ergebnisse nach Kategorien, Symbol- oder Listenansicht
 -- ------------------------------------------------------------
 local FONT = UI.FONT
 local ICON, GAPX = 24, 3
-local PER_ROW = 12
+local PER_ROW = 11
 local V_ROW_H = 26
 local V_ROWS = 12
 local TREE_H = 18
 local TREE_ROWS = 17
 
+local PROF_OF = { herb = "alch", ore = "bs", leather = "lw", cloth = "tail" }
+
+-- Gruppe eines Eintrags: Berufe (Material oder Rezept), BOE nach Slot, Traenke, Taschen, Sonstiges
 local function groupKey(entry)
   local k = entry.k or "other"
-  if k == "recipe" or k == "boe" or k == "trade" then return k .. ":" .. (entry.s or "other") end
+  if PROF_OF[k] then return "prof:" .. PROF_OF[k] .. ":mat" end
+  if k == "trade" then return "prof:" .. (entry.s or "other") .. ":mat" end
+  if k == "recipe" then return "prof:" .. (entry.s or "other") .. ":rec" end
+  if k == "boe" then return "boe:" .. (entry.s or "other") end
   return k
 end
 
--- Reihenfolge der Gruppen in der Ergebnisliste
 local GROUP_ORDER, GROUP_INDEX
 local function groupOrder()
   if GROUP_ORDER then return GROUP_ORDER end
   GROUP_ORDER = {}
-  local mats = { "cloth", "leather", "herb", "ore" }
-  for i = 1, getn(mats) do table.insert(GROUP_ORDER, mats[i]) end
-  for i = 1, getn(BB.TRADE_SUBS) do table.insert(GROUP_ORDER, "trade:" .. BB.TRADE_SUBS[i]) end
-  table.insert(GROUP_ORDER, "trade:other")
+  for i = 1, getn(BB.PROFS) do
+    table.insert(GROUP_ORDER, "prof:" .. BB.PROFS[i] .. ":mat")
+    table.insert(GROUP_ORDER, "prof:" .. BB.PROFS[i] .. ":rec")
+  end
   for i = 1, getn(BB.BOE_SUBS) do table.insert(GROUP_ORDER, "boe:" .. BB.BOE_SUBS[i]) end
   table.insert(GROUP_ORDER, "boe:other")
-  for i = 1, getn(BB.RECIPE_SUBS) do table.insert(GROUP_ORDER, "recipe:" .. BB.RECIPE_SUBS[i]) end
-  table.insert(GROUP_ORDER, "recipe:other")
-  local rest = { "potion", "bag", "other" }
-  for i = 1, getn(rest) do table.insert(GROUP_ORDER, rest[i]) end
+  table.insert(GROUP_ORDER, "potion")
+  table.insert(GROUP_ORDER, "bag")
+  table.insert(GROUP_ORDER, "other")
   GROUP_INDEX = {}
   for i = 1, getn(GROUP_ORDER) do GROUP_INDEX[GROUP_ORDER[i]] = i end
   return GROUP_ORDER
 end
 
 local function groupLabel(key)
-  local _, _, k, sub = string.find(key, "^(%a+):(%a+)$")
-  if k == "recipe" then return T("TF_H_RECIPES") .. "  -  " .. T("SUB_" .. string.upper(sub)) end
-  if k == "boe" then return T("TF_H_BOE") .. "  -  " .. T("SUB_" .. string.upper(sub)) end
-  if k == "trade" then return T("CAT_TRADE") .. "  -  " .. T("SUB_" .. string.upper(sub)) end
+  local _, _, prof, kind = string.find(key, "^prof:(%a+):(%a+)$")
+  if prof then
+    return T("SUB_" .. string.upper(prof)) .. "  -  " .. T(kind == "mat" and "TF_MAT_ALL" or "TF_REC_ALL")
+  end
+  local _, _, sub = string.find(key, "^boe:(%a+)$")
+  if sub then return T("TF_BOE_ALL") .. "  -  " .. T("SUB_" .. string.upper(sub)) end
   return BB:CatName(key)
 end
 
--- Baum: oberste Ebene, Rezepte und BOE klappen ihre Unterpunkte auf
+-- Baum: ein Knoten ist sichtbar, wenn sein Elternknoten sichtbar und aufgeklappt ist
+local function parentKey(key)
+  local _, _, p = string.find(key, "^(.*):[^:]+$")
+  return p
+end
+
 local function treeNodes(cur)
-  local out = {}
+  cur = cur or "all"
+  local out, shown = {}, {}
   local list = BB.TYPE_FILTERS
   for i = 1, getn(list) do
     local e = list[i]
-    if e.key and not e.grp then
-      local isParent = (e.key == "rec" or e.key == "boe" or e.key == "mat")
-      table.insert(out, { key = e.key, label = e.label, depth = 0, parent = isParent })
-      if isParent then
-        local open = (cur == e.key) or (string.sub(cur or "", 1, string.len(e.key) + 1) == e.key .. ":")
-        if open then
-          for j = 1, getn(list) do
-            if list[j].key and list[j].grp and string.sub(list[j].key, 1, string.len(e.key) + 1) == e.key .. ":" then
-              table.insert(out, { key = list[j].key, label = list[j].label, depth = 1 })
-            end
-          end
-        end
-      end
+    local pk = parentKey(e.key)
+    local visible = (pk == nil)
+    if pk and shown[pk] then
+      visible = (cur == pk) or (string.sub(cur, 1, string.len(pk) + 1) == pk .. ":")
+    end
+    if visible then
+      shown[e.key] = true
+      local hasKids = false
+      local nxt = list[i + 1]
+      if nxt and string.sub(nxt.key, 1, string.len(e.key) + 1) == e.key .. ":" then hasKids = true end
+      table.insert(out, { key = e.key, label = e.label, depth = e.depth, parent = hasKids })
     end
   end
   return out
@@ -282,7 +121,7 @@ function UI:BuildStockView(p)
   end
 
   -- Kategorienbaum
-  local tree = self:Panel(p, 132, 0)
+  local tree = self:Panel(p, 150, 0)
   tree:SetPoint("TOPLEFT", p, "TOPLEFT", 0, -52)
   tree:SetPoint("BOTTOMLEFT", p, "BOTTOMLEFT", 0, 26)
   tree:EnableMouseWheel(true)
@@ -323,7 +162,7 @@ function UI:BuildStockView(p)
 
   -- Ergebnisfeld
   local res = self:Panel(p, 0, 0)
-  res:SetPoint("TOPLEFT", p, "TOPLEFT", 138, -52)
+  res:SetPoint("TOPLEFT", p, "TOPLEFT", 156, -52)
   res:SetPoint("BOTTOMRIGHT", p, "BOTTOMRIGHT", -238, 26)
   S.resPanel = res
   local sf = CreateFrame("ScrollFrame", "BananaBankStockScroll", res, "FauxScrollFrameTemplate")
@@ -416,8 +255,8 @@ function UI:RefreshTree()
       b:Show()
       local on = (S.type == n.key)
       b.fs:ClearAllPoints()
-      b.fs:SetPoint("LEFT", b, "LEFT", 4 + n.depth * 12, 0)
-      b.fs:SetWidth(112 - n.depth * 12)
+      b.fs:SetPoint("LEFT", b, "LEFT", 4 + n.depth * 10, 0)
+      b.fs:SetWidth(132 - n.depth * 10)
       local label = T(n.label)
       if n.parent then
         local open = (S.type == n.key) or (string.sub(S.type or "", 1, string.len(n.key) + 1) == n.key .. ":")

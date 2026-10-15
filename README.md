@@ -91,6 +91,7 @@ Pull requests welcome, tested in-game on a 1.12 client. Lua 5.0 rules: no `#`, `
 
 ## Changelog
 
+- **2.3.0:** category tree by profession: Entire bank, **Professions** (every profession selectable: alchemy, blacksmithing, enchanting, engineering, leatherworking, tailoring, jewelcrafting, cooking, first aid, other), each with its trade materials and its recipes (herbs under alchemy, ore under blacksmithing, leather under leatherworking, cloth under tailoring), then BOE (by slot), Potions, Bags, Other. Results are grouped the same way, e.g. "Alchemy - Recipes". Jewelcrafting recipes are recognised.
 - **2.2.2:** category tree reordered: Entire bank, Trade materials, BOE, Recipes, Potions, Bags, Other (the results follow the same order). "Sellable" removed from the filter.
 - **2.2.1:** cloth, leather and ore are recognised by the item name ending even when the server reports the same sub type for all trade goods (they were listed under trade goods / other). Category renamed to **Trade goods** (German: Handwerkswaren).
 - **2.2.0:** the category tree gets a **All materials** group with sub-categories: cloth, leather, herbs, ore, and trade materials by profession (alchemy, enchanting, engineering, blacksmithing, jewelcrafting, tailoring, cooking, other). Results are grouped the same way, e.g. "Trade materials - Jewelcrafting". Banks scan the profession once more; until then it is derived from the item info or the name.
