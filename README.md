@@ -93,6 +93,7 @@ Pull requests welcome, tested in-game on a 1.12 client. Lua 5.0 rules: no `#`, `
 
 ## Changelog
 
+- **3.0.4:** guild crafter flow as agreed: only recipes the **player's own client claimed** (G button in the basket) can be accepted by the bank; the automatic "possible" marking by keyword is gone. The bank tab shows the claim directly under the item rows with the cash on delivery **now and after accepting** (e.g. 4 recipes at 50 silver: 2g now, 1g 50s after accepting one), the claimed recipe is tagged [G], accepted ones [frei]. The overlapping layout is fixed.
 - **3.0.3:** the bank also offers *Accept as guild crafter* when the player sent no claim (older client): recipes that fit keyword, profession and the ledger are marked `[guild crafter possible]`. New diagnostics: `/bb rights [name]` (keyword table, officer note keywords, rights list, effective keywords of a player) and `/bb craft [text]` (why a recipe can or cannot be requested for free on this character).
 - **3.0.2:** the missing-file message now also says that /reload does not re-read BananaBank.toc: after an update with new files, quit WoW completely and start it again.
 - **3.0.1:** if `Rules.lua` or `Craft.lua` are missing (incomplete update), the addon no longer throws errors; the file check names the missing file.

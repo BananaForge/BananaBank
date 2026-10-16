@@ -235,11 +235,8 @@ function BB:AcceptCrafter(r)
     return
   end
   if not r or r.s ~= "open" then return end
-  -- ohne Anspruch des Spielers (z.B. aelterer Client): die Bank prueft selbst, welche Rezepte passen
-  if not r.cl or next(r.cl) == nil then
-    r.cl = self:PotentialClaims(r)
-    if next(r.cl) == nil then r.cl = nil return end
-  end
+  -- nur Rezepte, die der Spieler selbst beansprucht hat (seine Pruefung findet auf seinem Client statt)
+  if not r.cl or next(r.cl) == nil then return end
   local ok, bad = self:CheckRequestRules(r)
   if not ok then
     if bad[1] and bad[1].why == "UNKNOWN" then self:RequestRoster() end
@@ -271,6 +268,19 @@ function BB:AcceptCrafter(r)
   self:SetStatus(r, "confirmed")
   self:Print(string.format(self.T("CR_B_ACCEPTED"), r.id, r.p))
   self:Notify(r, "WHISPER_CONFIRMED")
+end
+
+-- Nachnahme dieser Anfrage: jetzt (ohne bereits freie Rezepte) und nach dem Akzeptieren der beanspruchten Rezepte
+function BB:RequestCodTotals(r)
+  local now, after = 0, 0
+  for id, n in pairs(r.items) do
+    local u = self:GetPrice(id) or 0
+    if not (r.fr and r.fr[id]) then
+      now = now + u * n
+      if not (r.cl and r.cl[id]) then after = after + u * n end
+    end
+  end
+  return now, after
 end
 
 function BB:ConfirmRequest(r)

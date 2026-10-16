@@ -568,14 +568,15 @@ function UI:BuildBank(parent)
   Bk.send:SetPoint("LEFT", Bk.fetch, "RIGHT", 6, 0)
   -- Gildencrafter-Anfrage: eigene Zeile mit dem Knopf zum Akzeptieren
   Bk.craftInfo = self:Font(left, 10, { 1, 0.82, 0.3 })
-  Bk.craftInfo:SetPoint("BOTTOMLEFT", left, "BOTTOMLEFT", 14, 104)
+  Bk.craftInfo:SetPoint("TOPLEFT", left, "TOPLEFT", 14, -230)
   Bk.craftInfo:SetWidth(452)
-  Bk.craftInfo:SetHeight(12)
+  Bk.craftInfo:SetHeight(26)
+  Bk.craftInfo:SetJustifyV("TOP")
   Bk.craft = self:Button(left, 230, 24, "CR_B_BTN", function()
     BB:AcceptCrafter(Bk.current)
     UI:Refresh()
   end, "ok")
-  Bk.craft:SetPoint("BOTTOMLEFT", left, "BOTTOMLEFT", 12, 72)
+  Bk.craft:SetPoint("TOPLEFT", left, "TOPLEFT", 12, -260)
   Bk.craft:Hide()
   Bk.auto = self:Check(left, "OPT_AUTO_MAIL", function() return BananaBankDB.auto end, function(v) BananaBankDB.auto = v end)
   Bk.auto:SetPoint("BOTTOMLEFT", left, "BOTTOMLEFT", 14, 14)
@@ -694,7 +695,6 @@ function UI:RefreshBank()
   local ids = {}
   for id in pairs(r.items) do table.insert(ids, id) end
   table.sort(ids)
-  local potential = (r.s == "open" and not (r.cl and next(r.cl))) and BB:PotentialClaims(r) or nil
   local shortage = false
   for i = 1, BANK_ROWS do
     local row = Bk.rows[i]
@@ -707,7 +707,7 @@ function UI:RefreshBank()
       local qc = BB.QUALITY_COLOR[q or 1] or BB.QUALITY_COLOR[1]
       if r.fr and r.fr[id] then n = n .. " |cff80ff80" .. T("CR_TAG_FREE") .. "|r"
       elseif r.cl and r.cl[id] then n = n .. " |cffffd24d" .. T("CR_TAG_CLAIM") .. "|r"
-      elseif potential and potential[id] then n = n .. " |cff9cc8ff" .. T("CR_TAG_POSSIBLE") .. "|r" end
+      end
       row.name:SetText(n)
       row.name:SetTextColor(qc[1], qc[2], qc[3])
       local want = r.items[id]
@@ -766,11 +766,22 @@ function UI:RefreshBank()
   local prepHere = p and p.r == r
   Bk.confirm:SetOn(st == "open")
   local hasClaim = r.cl and next(r.cl) ~= nil
-  local hasPotential = potential and next(potential) ~= nil
-  Bk.confirm.fs:SetText(T(((hasClaim or hasPotential) and st == "open") and "CR_B_NORMAL" or "BTN_CONFIRM"))
-  if (hasClaim or hasPotential) and st == "open" then
+  Bk.confirm.fs:SetText(T((hasClaim and st == "open") and "CR_B_NORMAL" or "BTN_CONFIRM"))
+  if hasClaim and st == "open" then
+    -- direkt unter den Zeilen: Anspruch, Nachnahme jetzt und nach dem Akzeptieren, Knopf
+    local nrows = math.min(getn(ids), BANK_ROWS)
+    local y = 104 + nrows * 26 + 8
+    if y > 250 then y = 250 end
+    local ncl = 0
+    for _ in pairs(r.cl) do ncl = ncl + 1 end
+    local now, after = BB:RequestCodTotals(r)
+    Bk.craftInfo:ClearAllPoints()
+    Bk.craftInfo:SetPoint("TOPLEFT", Bk.left, "TOPLEFT", 14, -y)
+    Bk.craftInfo:SetText(string.format(T("CR_B_INFO"), ncl, BB.Money(now), BB.Money(after)))
+    Bk.craft:ClearAllPoints()
+    Bk.craft:SetPoint("TOPLEFT", Bk.left, "TOPLEFT", 12, -(y + 30))
     Bk.craft:Show()
-    Bk.craftInfo:SetText(T(hasClaim and "CR_B_NOTE" or "CR_B_POSSIBLE"))
+    Bk.elsewhere:SetText("")
   else
     Bk.craft:Hide()
     Bk.craftInfo:SetText("")

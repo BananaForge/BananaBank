@@ -169,15 +169,6 @@ end
 
 -- Rezepte dieser Anfrage, die die Bank selbst als Gildencrafter-Anspruch bestaetigen koennte
 -- (Keyword, Beruf des Rezepts, noch nicht erhalten). Hilft, wenn der Client des Spielers keinen Anspruch mitsendet.
-function BB:PotentialClaims(r)
-  local out = {}
-  for id in pairs(r.items or {}) do
-    local ok = self:VerifyClaim(r.p, id)
-    if ok then out[id] = 1 end
-  end
-  return out
-end
-
 -- /bb rights [Name]: Regeln, Keywords und Rechte eines Spielers, zum Nachvollziehen
 function BB:PrintRights(name)
   local rules = BananaBankDB.rules
