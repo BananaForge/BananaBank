@@ -175,8 +175,8 @@ function BB:PriceMaxAgeDays()
   return d
 end
 
--- Gezielte Suche: erst alle Items ohne bisherigen Scan, dann die mit dem aeltesten Scan, und nur die,
--- deren Scan aelter als die eingestellten Tage ist. Von Hand gesetzte Preise bleiben.
+-- Gezielte Suche: erst alle Items ohne Preis (nie gescannt oder nicht gefunden), dann die mit dem aeltesten Scan,
+-- und nur die, deren Preis aelter als die eingestellten Tage ist. Von Hand gesetzte Preise bleiben.
 -- Das ganze AH durchzublaettern dauert in 1.12 Minuten und liefert fast nur Angebote, die uns nicht interessieren.
 function BB:PriceTargets()
   local db = BananaBankDB
@@ -189,7 +189,8 @@ function BB:PriceTargets()
     if self:NeedsPrice(id) and not (cur and cur.src == "man") then
       local name = self:ItemInfo(id)
       if name and name ~= "" and not string.find(name, "^#%d") then
-        local scanned = cur and ((cur.src == "ah" and (cur.u or 0) > 0) or cur.src == "none")
+        -- ohne Preis (nie gescannt, zurueckgesetzt oder im AH nicht gefunden) wird immer neu gescannt, unabhaengig vom Alter
+        local scanned = cur and cur.src == "ah" and (cur.u or 0) > 0
         if not scanned then
           table.insert(fresh, id)
         elseif now - (cur.ts or 0) >= limit then
