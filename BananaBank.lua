@@ -36,7 +36,7 @@ local ev = CreateFrame("Frame", "BananaBankEvents")
 local EVENTS = {
   "ADDON_LOADED", "PLAYER_ENTERING_WORLD", "CHAT_MSG_ADDON",
   "BANKFRAME_OPENED", "BANKFRAME_CLOSED", "BAG_UPDATE", "PLAYERBANKSLOTS_CHANGED", "PLAYERBANKBAGSLOTS_CHANGED", "UNIT_INVENTORY_CHANGED", "PLAYER_MONEY",
-  "MAIL_SHOW", "MAIL_INBOX_UPDATE", "MAIL_CLOSED", "MAIL_SEND_SUCCESS", "MAIL_FAILED",
+  "TRADE_SKILL_SHOW", "TRADE_SKILL_UPDATE", "CRAFT_SHOW", "CRAFT_UPDATE", "MAIL_SHOW", "MAIL_INBOX_UPDATE", "MAIL_CLOSED", "MAIL_SEND_SUCCESS", "MAIL_FAILED",
   "TRADE_SHOW", "TRADE_CLOSED", "TRADE_ACCEPT_UPDATE", "TRADE_TARGET_ITEM_CHANGED",
   "TRADE_PLAYER_ITEM_CHANGED", "TRADE_MONEY_CHANGED", "UI_INFO_MESSAGE",
   "AUCTION_ITEM_LIST_UPDATE", "AUCTION_HOUSE_CLOSED", "AUCTION_HOUSE_SHOW",
@@ -107,6 +107,12 @@ ev:SetScript("OnEvent", function()
       BB:MailLog("-", true, "", 0, 0, "open", tostring(cnt or 0))
     end
     BB.UI:Refresh()
+
+  elseif event == "TRADE_SKILL_SHOW" or event == "TRADE_SKILL_UPDATE" then
+    if BB.ScanTradeSkills then BB:ScanTradeSkills() end
+
+  elseif event == "CRAFT_SHOW" or event == "CRAFT_UPDATE" then
+    if BB.ScanCrafts then BB:ScanCrafts() end
 
   elseif event == "MAIL_INBOX_UPDATE" then
     -- der Briefkasten hat sich geaendert: die naechste gleiche Entnahme ist ein neuer Brief, kein doppelter Aufruf

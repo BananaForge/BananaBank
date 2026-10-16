@@ -47,6 +47,19 @@ local PROF = {
   { "cook", { "cook", "koch" } }, { "fa", { "first aid", "erste hilfe" } },
   { "jc", { "jewelcraft", "juwelen" } },
 }
+BB.PROF = PROF
+
+-- Beruf (Kurzname) zu einem Berufsnamen des Clients, deutsch oder englisch
+function BB:ProfOfName(name)
+  local n = string.lower(name or "")
+  for i = 1, getn(PROF) do
+    for j = 1, getn(PROF[i][2]) do
+      if string.find(n, PROF[i][2][j], 1, true) then return PROF[i][1] end
+    end
+  end
+  return nil
+end
+
 local SLOT = {
   INVTYPE_HEAD = "head", INVTYPE_NECK = "neck", INVTYPE_SHOULDER = "shoulder", INVTYPE_CHEST = "chest",
   INVTYPE_ROBE = "chest", INVTYPE_BODY = "chest", INVTYPE_WAIST = "waist", INVTYPE_LEGS = "legs",

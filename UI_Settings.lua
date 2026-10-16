@@ -13,6 +13,7 @@ UI.set = {}
 local GEN_H, GUILD_H, BANK_H = 168, 108, 236
 local RULES_H = 246
 local DEPOT_H = 436
+local KW_H = 404
 
 -- ------------------------------------------------------------
 -- Kopf: Zahnrad und "Spenden an: <Hauptbank>"
@@ -118,7 +119,7 @@ function UI:BuildSettings()
   self:GlowLine(f, -50, 20, -20)
   S.tab = "gen"
   S.tabs = {}
-  local tdefs = { { "SET_TAB_GEN", "gen" }, { "SET_TAB_RULES", "rules" }, { "SET_TAB_DEPOT", "depots" } }
+  local tdefs = { { "SET_TAB_GEN", "gen" }, { "SET_TAB_RULES", "rules" }, { "SET_TAB_DEPOT", "depots" }, { "SET_TAB_KW", "keywords" } }
   for i = 1, getn(tdefs) do
     local key = tdefs[i][2]
     local chip = self:Chip(f, 100, tdefs[i][1], function()
@@ -365,6 +366,63 @@ function UI:BuildSettings()
   end, "primary")
   S.dpSave:SetPoint("TOPLEFT", g, "TOPLEFT", 4, -418)
 
+  -- Keywords der Offiziersnotiz
+  g = group(f, "SET_SEC_KW")
+  S.kw = g
+  g:SetHeight(KW_H)
+  local kh = self:Font(g, 10, C.muted)
+  kh:SetPoint("TOPLEFT", g, "TOPLEFT", 4, -22)
+  kh:SetWidth(420)
+  kh:SetHeight(28)
+  kh:SetJustifyV("TOP")
+  self:Loc(kh, "KW_HINT")
+  S.kwRows = {}
+  for i = 1, BB.KW_MAX do
+    local idx = i   -- Lua 5.0: Schleifenvariable nicht in Funktionen verwenden
+    local row = {}
+    local y = -56 - (i - 1) * 26
+    row.edit = self:EditBox("BananaBankKeyword" .. i, g, 80)
+    row.edit:SetPoint("TOPLEFT", g, "TOPLEFT", 8, y)
+    row.edit:SetMaxLetters(6)
+    row.edit:SetScript("OnTextChanged", function()
+      if S.depotLoading then return end
+      local k = S.edit and S.edit.keywords and S.edit.keywords[idx]
+      if k then
+        k.kw = BB.CleanKeyword(this:GetText())
+        S.editDirty = true
+      end
+    end)
+    row.edit:SetScript("OnEnterPressed", function() this:ClearFocus() end)
+    row.prof = self:Button(g, 210, 20, "", function(btn) UI:OpenKeywordProfPicker(btn, idx) end, "flat")
+    row.prof:SetPoint("TOPLEFT", g, "TOPLEFT", 100, y + 1)
+    row.del = self:Button(g, 24, 20, "x", function()
+      table.remove(S.edit.keywords, idx)
+      S.editDirty = true
+      UI:RefreshSettings()
+    end, "flat")
+    row.del:SetPoint("TOPLEFT", g, "TOPLEFT", 320, y + 1)
+    S.kwRows[i] = row
+  end
+  S.kwAdd = self:Button(g, 110, 20, "KW_ADD", function()
+    S.edit.keywords = S.edit.keywords or {}
+    if getn(S.edit.keywords) < BB.KW_MAX then
+      table.insert(S.edit.keywords, { kw = "", prof = "bags" })
+      S.editDirty = true
+      UI:RefreshSettings()
+    end
+  end, "flat")
+  S.kwAdd:SetPoint("TOPLEFT", g, "TOPLEFT", 4, -318)
+  S.kwNote = self:Font(g, 10, C.muted)
+  S.kwNote:SetPoint("TOPLEFT", g, "TOPLEFT", 4, -346)
+  S.kwNote:SetWidth(420)
+  S.kwNote:SetHeight(24)
+  S.kwNote:SetJustifyV("TOP")
+  S.kwSave = self:Button(g, 150, 22, "RL_SAVE", function()
+    if BB:SaveRules(S.edit or {}) then S.editDirty = false end
+    UI:RefreshSettings()
+  end, "primary")
+  S.kwSave:SetPoint("TOPLEFT", g, "TOPLEFT", 4, -374)
+
   f:SetScript("OnShow", function() UI:RefreshSettings() end)
 end
 
@@ -377,6 +435,7 @@ function UI:RefreshSettings()
   for i = 1, getn(S.tabs) do S.tabs[i]:SetActive(S.tabs[i].key == S.tab) end
   local y = -88
   if S.tab == "depots" then
+    S.kw:Hide()
     S.gen:Hide()
     S.guild:Hide()
     S.bank:Hide()
@@ -389,6 +448,21 @@ function UI:RefreshSettings()
     f:SetHeight(-y + 22)
     return
   end
+  if S.tab == "keywords" then
+    S.gen:Hide()
+    S.guild:Hide()
+    S.bank:Hide()
+    S.rules:Hide()
+    S.depot:Hide()
+    S.kw:Show()
+    S.kw:ClearAllPoints()
+    S.kw:SetPoint("TOPLEFT", f, "TOPLEFT", 20, y)
+    y = y - KW_H - 8
+    self:RefreshKeywordTab()
+    f:SetHeight(-y + 22)
+    return
+  end
+  S.kw:Hide()
   S.depot:Hide()
   if S.tab == "rules" then
     S.gen:Hide()
@@ -439,7 +513,12 @@ function UI:RefreshRulesData()
   local S = self.set
   if S.editDirty and S.edit then return end
   local rules = BananaBankDB.rules
-  S.edit = { depots = BB:DepotList(), depotTypes = BB:DepotTypeListForEdit() }
+  S.edit = { depots = BB:DepotList(), depotTypes = BB:DepotTypeListForEdit(), keywords = {} }
+  if rules and rules.keywords then
+    for i = 1, getn(rules.keywords) do
+      table.insert(S.edit.keywords, { kw = rules.keywords[i].kw, prof = rules.keywords[i].prof })
+    end
+  end
   if rules then
     for i = 1, getn(BB.RULE_KEYS) do
       local sp = rules[BB.RULE_KEYS[i]]
@@ -478,6 +557,51 @@ function UI:RefreshRulesTab()
   -- (Lager-Reiter: siehe RefreshDepotTab)
   S.rlHint:SetText(T(canEdit and "RL_HINT" or "RL_READONLY"))
   if canEdit then S.rlSave:Show() else S.rlSave:Hide() end
+end
+
+-- Inhalt des Reiters Keywords
+function UI:RefreshKeywordTab()
+  local S = self.set
+  local canEdit = BB:MayBeBank(BB:Me())
+  self:RefreshRulesData()
+  local list = S.edit.keywords or {}
+  S.depotLoading = true
+  for i = 1, BB.KW_MAX do
+    local row = S.kwRows[i]
+    local k = list[i]
+    if k then
+      row.edit:Show()
+      row.prof:Show()
+      if canEdit then row.del:Show() else row.del:Hide() end
+      if row.edit:GetText() ~= (k.kw or "") then row.edit:SetText(k.kw or "") end
+      row.edit:EnableMouse(canEdit and true or false)
+      row.prof.fs:SetText(BB:KeywordProfLabel(k.prof))
+      row.prof:SetOn(canEdit)
+    else
+      row.edit:Hide()
+      row.prof:Hide()
+      row.del:Hide()
+    end
+  end
+  S.depotLoading = false
+  if canEdit and getn(list) < BB.KW_MAX then S.kwAdd:Show() else S.kwAdd:Hide() end
+  S.kwNote:SetText(T(canEdit and "KW_NOTE" or "RL_READONLY"))
+  if canEdit then S.kwSave:Show() else S.kwSave:Hide() end
+end
+
+function UI:OpenKeywordProfPicker(btn, idx)
+  local entries = {}
+  for i = 1, getn(BB.KW_PROFS) do
+    table.insert(entries, { label = BB:KeywordProfLabel(BB.KW_PROFS[i]), value = BB.KW_PROFS[i] })
+  end
+  self:OpenPicker(btn, entries, function(prof)
+    local k = UI.set.edit.keywords[idx]
+    if k then
+      k.prof = prof
+      UI.set.editDirty = true
+      UI:RefreshSettings()
+    end
+  end)
 end
 
 -- Inhalt des Reiters Lager

@@ -227,6 +227,47 @@ function BB:Notify(r, key)
   SendChatMessage(string.format(self.T(key), r.id), "WHISPER", nil, r.p)
 end
 
+-- Gildencrafter: die Bank prueft, was sie sehen kann (Rang, Keyword, Beruf des Rezepts, noch nicht erhalten),
+-- setzt bei den beanspruchten Rezepten den Preis auf 0 und bestaetigt die Anfrage.
+function BB:AcceptCrafter(r)
+  if not self:BankActive() then
+    self:Print("|cffff4040" .. string.format(self.T("ERR_RANK_LOST"), BB.BANK_RANK_LABEL) .. "|r")
+    return
+  end
+  if not r or r.s ~= "open" or not r.cl or next(r.cl) == nil then return end
+  local ok, bad = self:CheckRequestRules(r)
+  if not ok then
+    if bad[1] and bad[1].why == "UNKNOWN" then self:RequestRoster() end
+    self:Print("|cffff4040" .. string.format(self.T("RB_REFUSED"), r.id, r.p) .. "|r")
+    for i = 1, getn(bad) do
+      local line = bad[i].text
+      if bad[i].id then line = self:ColoredName(bad[i].id) .. ": " .. line end
+      self:Print("|cffff9a2e" .. line .. "|r")
+    end
+    return
+  end
+  local problems = {}
+  for id in pairs(r.cl) do
+    if r.items[id] then
+      local ok2, why = self:VerifyClaim(r.p, id)
+      if not ok2 then table.insert(problems, self:ColoredName(id) .. ": " .. why) end
+    end
+  end
+  if getn(problems) > 0 then
+    self:Print("|cffff4040" .. string.format(self.T("CR_B_REFUSED"), r.id, r.p) .. "|r")
+    for i = 1, getn(problems) do self:Print("|cffff9a2e" .. problems[i] .. "|r") end
+    self:Print(self.T("CR_B_HINT"))
+    return
+  end
+  r.fr = {}
+  for id in pairs(r.cl) do
+    if r.items[id] then r.fr[id] = 1 end
+  end
+  self:SetStatus(r, "confirmed")
+  self:Print(string.format(self.T("CR_B_ACCEPTED"), r.id, r.p))
+  self:Notify(r, "WHISPER_CONFIRMED")
+end
+
 function BB:ConfirmRequest(r)
   if not self:BankActive() then
     self:Print("|cffff4040" .. string.format(self.T("ERR_RANK_LOST"), BB.BANK_RANK_LABEL) .. "|r")
@@ -438,9 +479,12 @@ end
 -- ------------------------------------------------------------
 -- Postversand: ein Stapel pro Brief (Vanilla erlaubt nur einen Anhang)
 -- ------------------------------------------------------------
-function BB:MailCod(e)
+function BB:MailCod(e, r)
   if BananaBankDB.cod == false then return 0 end
   if not SetSendMailCOD then return 0 end
+  r = r or (self.prep and self.prep.r)
+  -- von der Bank als Gildencrafter akzeptiert: dieses Rezept ist kostenlos
+  if r and r.fr and r.fr[e.id] then return 0 end
   local u = self:GetPrice(e.id)
   if not u or u <= 0 then return 0 end
   return u * e.c

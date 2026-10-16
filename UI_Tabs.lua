@@ -566,6 +566,17 @@ function UI:BuildBank(parent)
     UI:Refresh()
   end, "primary")
   Bk.send:SetPoint("LEFT", Bk.fetch, "RIGHT", 6, 0)
+  -- Gildencrafter-Anfrage: eigene Zeile mit dem Knopf zum Akzeptieren
+  Bk.craftInfo = self:Font(left, 10, { 1, 0.82, 0.3 })
+  Bk.craftInfo:SetPoint("BOTTOMLEFT", left, "BOTTOMLEFT", 14, 104)
+  Bk.craftInfo:SetWidth(452)
+  Bk.craftInfo:SetHeight(12)
+  Bk.craft = self:Button(left, 230, 24, "CR_B_BTN", function()
+    BB:AcceptCrafter(Bk.current)
+    UI:Refresh()
+  end, "ok")
+  Bk.craft:SetPoint("BOTTOMLEFT", left, "BOTTOMLEFT", 12, 72)
+  Bk.craft:Hide()
   Bk.auto = self:Check(left, "OPT_AUTO_MAIL", function() return BananaBankDB.auto end, function(v) BananaBankDB.auto = v end)
   Bk.auto:SetPoint("BOTTOMLEFT", left, "BOTTOMLEFT", 14, 14)
   Bk.whisper = self:Check(left, "OPT_WHISPER", function() return BananaBankDB.whisper ~= false end, function(v) BananaBankDB.whisper = v end)
@@ -670,6 +681,8 @@ function UI:RefreshBank()
     Bk.send:SetOn(false)
     Bk.send.fs:SetText(T("BTN_SEND"))
     Bk.status:SetText("")
+    Bk.craft:Hide()
+    Bk.craftInfo:SetText("")
     return
   end
   Bk.hint:Hide()
@@ -691,6 +704,8 @@ function UI:RefreshBank()
       row.ic.icon:SetTexture(BB.FullTex(t))
       row.ic:SetQuality(q)
       local qc = BB.QUALITY_COLOR[q or 1] or BB.QUALITY_COLOR[1]
+      if r.fr and r.fr[id] then n = n .. " |cff80ff80" .. T("CR_TAG_FREE") .. "|r"
+      elseif r.cl and r.cl[id] then n = n .. " |cffffd24d" .. T("CR_TAG_CLAIM") .. "|r" end
       row.name:SetText(n)
       row.name:SetTextColor(qc[1], qc[2], qc[3])
       local want = r.items[id]
@@ -748,6 +763,15 @@ function UI:RefreshBank()
   local p = BB.prep
   local prepHere = p and p.r == r
   Bk.confirm:SetOn(st == "open")
+  local hasClaim = r.cl and next(r.cl) ~= nil
+  Bk.confirm.fs:SetText(T((hasClaim and st == "open") and "CR_B_NORMAL" or "BTN_CONFIRM"))
+  if hasClaim and st == "open" then
+    Bk.craft:Show()
+    Bk.craftInfo:SetText(T("CR_B_NOTE"))
+  else
+    Bk.craft:Hide()
+    Bk.craftInfo:SetText("")
+  end
   Bk.reject:SetOn(st == "open" or st == "confirmed" or st == "expired")
   Bk.fetch:SetOn(st == "confirmed" and not BB.job)
   Bk.send:SetOn(prepHere and BB.mailOpen and not p.sending)

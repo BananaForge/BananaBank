@@ -120,7 +120,7 @@ function BB:SerializeRequests(list)
     local r = list[i]
     table.insert(recs, table.concat({
       r.id, BB.Clean(r.p), r.ts or 0, r.s, r.u or 0, BB.Clean(r.by or ""),
-      pairsToString(r.items), pairsToString(r.sent),
+      pairsToString(r.items), pairsToString(r.sent), pairsToString(r.cl or {}), pairsToString(r.fr or {}),
     }, "~"))
   end
   return table.concat(recs, "^")
@@ -134,6 +134,7 @@ function BB:ParseRequests(payload)
       local r = {
         id = f[1], p = f[2], ts = tonumber(f[3]) or 0, s = f[4], u = tonumber(f[5]) or 0,
         by = f[6], items = stringToPairs(f[7]), sent = stringToPairs(f[8]),
+        cl = stringToPairs(f[9] or ""), fr = stringToPairs(f[10] or ""),
       }
       r.code = BB:BuildCode(r.id, r.p, r.items)
       table.insert(out, r)
@@ -275,6 +276,8 @@ function BB:SendHello()
   local bn2, bs2 = self:BankInfoDigest()
   self:Send("H~" .. self.VERSION .. "~" .. qn .. "~" .. qs .. "~" .. table.concat(snaps, ";") ..
     "~" .. table.concat(seqs, ";") .. "~" .. (BananaBankDB.priceTs or 0) .. "~" .. qn2 .. "~" .. qs2 .. "~" .. bn2 .. "~" .. bs2 .. "~" .. (BananaBankDB.mainTs or 0) .. "~" .. ((BananaBankDB.rules and BananaBankDB.rules.ts) or 0))
+  -- zweite, kurze Hallo-Nachricht: Staende von Hauptbank, Regeln und Rechte-Liste (die erste kann bei vielen Banken zu lang werden)
+  self:Send("X~" .. (BananaBankDB.mainTs or 0) .. "~" .. ((BananaBankDB.rules and BananaBankDB.rules.ts) or 0) .. "~" .. ((BananaBankDB.rights and BananaBankDB.rights.ts) or 0))
 end
 
 local function parseList(s)
@@ -427,6 +430,8 @@ function BB:OnTransfer(sender, kind, meta, payload)
       if self:MergeBankInfo(r) then n = n + 1 end
     end
     self:Debug(n .. " Bank-Rollen von " .. sender)
+  elseif kind == "K" then
+    if self:MergeRights(payload) then self:Debug("Rechte von " .. sender) end
   elseif kind == "R" then
     if self:MergeRules(payload) then self:Debug("Regeln von " .. sender) end
   elseif kind == "N" then
@@ -460,6 +465,14 @@ function BB:OnTransfer(sender, kind, meta, payload)
     end
   end
   if self.UI then self.UI:Refresh() end
+end
+
+-- X~: Staende von Hauptbank, Regeln und Rechte-Liste: der neuere Stand wird gepusht
+function BB:OnHello2(sender, mt, rt, kt)
+  local db = BananaBankDB
+  if (db.mainTs or 0) > (tonumber(mt) or 0) then schedulePush("N", function() BB:PushMainBank() end) end
+  if ((db.rules and db.rules.ts) or 0) > (tonumber(rt) or 0) then schedulePush("R", function() BB:PushRules() end) end
+  if ((db.rights and db.rights.ts) or 0) > (tonumber(kt) or 0) then schedulePush("K", function() BB:PushRights() end) end
 end
 
 function BB:OnAddonMessage(prefix, msg, channel, sender)
@@ -507,7 +520,12 @@ function BB:OnAddonMessage(prefix, msg, channel, sender)
       pushes["N"] = nil
     elseif kind == "R" then
       pushes["R"] = nil
+    elseif kind == "K" then
+      pushes["K"] = nil
     end
+  elseif t == "X~" then
+    local f = BB.Split(msg, "~")
+    self:OnHello2(sender, f[2], f[3], f[4])
   elseif t == "H~" then
     local f = BB.Split(msg, "~")
     self:OnHello(sender, f[2], f[3], f[4], f[5], f[6], f[7], f[8], f[9], f[10], f[11], f[12], f[13])

@@ -706,11 +706,27 @@ function UI:BuildStock(parent)
     row.ic = ic
     row.name = self:Font(row, 11, C.text)
     row.name:SetPoint("LEFT", ic, "RIGHT", 6, 0)
-    row.name:SetWidth(94)
+    row.name:SetWidth(88)
     row.name:SetHeight(13)
     row.cnt = self:Font(row, 12, C.gold)
     row.cnt:SetPoint("RIGHT", row, "RIGHT", -46, 0)
     row.cnt:SetJustifyH("RIGHT")
+    -- Gildencrafter: Rezept kostenlos anfragen (nur sichtbar, wenn das Keyword zum Beruf des Rezepts passt)
+    row.claim = self:Button(row, 22, 20, "G", function()
+      BB:ToggleClaim(row.id)
+      UI:RefreshStock()
+    end, "flat")
+    row.claim:SetPoint("LEFT", row, "LEFT", 124, 0)
+    row.claim:SetScript("OnEnter", function()
+      if not row.id then return end
+      GameTooltip:SetOwner(this, "ANCHOR_RIGHT")
+      GameTooltip:AddLine(T("CR_BTN_TIP"), 1, 0.82, 0.2)
+      local why = BB:CraftText(row.id)
+      if why then GameTooltip:AddLine(why, 1, 0.5, 0.25, 1) else GameTooltip:AddLine(T("CR_BTN_OK"), 0.6, 1, 0.6, 1) end
+      GameTooltip:Show()
+    end)
+    row.claim:SetScript("OnLeave", function() GameTooltip:Hide() end)
+    row.claim:Hide()
     local minus = self:Button(row, 20, 20, "-", function() UI:CartAdd(row.id, -1) end, "flat")
     minus:SetPoint("RIGHT", row, "RIGHT", -22, 0)
     local plus = self:Button(row, 20, 20, "+", function() UI:CartAdd(row.id, 1) end, "flat")
@@ -942,6 +958,20 @@ function UI:RefreshCart()
       row.name:SetText(n)
       row.name:SetTextColor(c[1], c[2], c[3])
       row.cnt:SetText(basket[id] .. "x")
+      -- Gildencrafter-Haken
+      local ok, why = false, nil
+      if BB.CraftEligible then ok, why = BB:CraftEligible(id) end
+      if ok or (why and why ~= "NOTRECIPE" and why ~= "NOKEYWORD") then
+        row.claim:Show()
+        local on = ok and BananaBankDB.claims and BananaBankDB.claims[id]
+        row.claim:SetOn(ok)
+        if on then
+          row.claim.fs:SetTextColor(0.5, 1, 0.5)
+          row.claim:SetBackdropColor(0.10, 0.32, 0.12, 0.98)
+        end
+      else
+        row.claim:Hide()
+      end
       row:Show()
     else
       row.id = nil
@@ -954,8 +984,17 @@ function UI:RefreshCart()
   local extra = ""
   if positions > getn(S.cartRows) then extra = string.format(T("CART_MORE"), positions - getn(S.cartRows)) end
   S.cartSum:SetText(string.format(T("CART_SUM"), positions, items) .. extra)
-  local sum, missing = BB:PriceTotal(basket)
-  if sum > 0 then
+  -- Rezepte mit gueltigem Gildencrafter-Anspruch sind kostenlos (die Bank bestaetigt das noch)
+  local paid = {}
+  local claims = BB:ValidClaims(basket)
+  local nclaims = 0
+  for id, n in pairs(basket) do
+    if claims[id] then nclaims = nclaims + 1 else paid[id] = n end
+  end
+  local sum, missing = BB:PriceTotal(paid)
+  if nclaims > 0 then
+    S.cartPrice:SetText(string.format(T("CR_CART_PRICE"), BB.Money(sum), nclaims))
+  elseif sum > 0 then
     S.cartPrice:SetText(string.format(T("CART_PRICE"), BB.Money(sum)))
   elseif missing > 0 then
     S.cartPrice:SetText(T("CART_PRICE_OPEN"))
@@ -984,9 +1023,10 @@ function UI:MakeCode()
     BB:Print(T("MSG_CART_UNAVAILABLE"))
     return
   end
-  local r = BB:CreateRequest(items)
+  local r = BB:CreateRequest(items, BB:ValidClaims(items))
   if not r then return end
   BananaBankDB.basket = {}
+  BananaBankDB.claims = {}
   self.lastReq = r
   self:ShowExport(r)
   self:Refresh()

@@ -86,7 +86,13 @@ end
 
 function BB:ItemBlockText(name, id)
   local _, q = self:ItemInfo(id)
-  return self:BlockText(name, q)
+  local t = self:BlockText(name, q)
+  if t then return t end
+  if self:MayBeBank(name) then return nil end
+  -- Taschen nur mit dem Keyword fuer Taschen
+  if self:ItemIsBag(id) and not self:HasProfKeyword(name, "bags") then return self.T("RB_BAG") end
+  if self:InDepotOnly(id) then return self.T("RB_DEPOT") end
+  return nil
 end
 
 -- Pruefung einer fertigen Anfrage durch die Bank. Gibt true oder false und die Liste der Verstoesse zurueck.
@@ -277,6 +283,21 @@ function BB:SaveRules(edit)
       table.insert(rules.depots, { n = n, k = d.k })
     end
   end
+  -- Keywords (Offiziersnotiz): nur wenn bearbeitet, sonst bleiben die bisherigen
+  if edit.keywords then
+    rules.keywords = {}
+    local used = {}
+    for i = 1, getn(edit.keywords) do
+      local k = edit.keywords[i]
+      local kw = BB.CleanKeyword(k.kw)
+      if kw ~= "" and k.prof and BB.KW_PROF_SET[k.prof] and not used[kw] and getn(rules.keywords) < BB.KW_MAX then
+        used[kw] = true
+        table.insert(rules.keywords, { kw = kw, prof = k.prof })
+      end
+    end
+  elseif db.rules and db.rules.keywords then
+    rules.keywords = db.rules.keywords
+  end
   db.rules = rules
   self:PushRules()
   self:Print(self.T("RL_SAVED_MSG"))
@@ -315,6 +336,12 @@ function BB:SerializeRules(rules)
   local tyStr = "*"                       -- Standardtypen
   if tl then tyStr = (getn(ty) > 0) and table.concat(ty, ";") or "-" end
   table.insert(parts, tyStr)
+  local kws = {}
+  for i = 1, getn(rules.keywords or {}) do
+    local k = rules.keywords[i]
+    table.insert(kws, k.kw .. ":" .. k.prof)
+  end
+  table.insert(parts, (getn(kws) > 0) and table.concat(kws, ";") or "-")
   return table.concat(parts, "~")
 end
 
@@ -341,6 +368,16 @@ function BB:ParseRules(payload)
       end
     end
     rules.depotTypes = types
+  end
+  rules.keywords = {}
+  if f[9] and f[9] ~= "-" then
+    for _, part in ipairs(BB.Split(f[9], ";")) do
+      local d = BB.Split(part, ":")
+      local kw = BB.CleanKeyword(d[1])
+      if kw ~= "" and d[2] and BB.KW_PROF_SET[d[2]] and getn(rules.keywords) < BB.KW_MAX then
+        table.insert(rules.keywords, { kw = kw, prof = d[2] })
+      end
+    end
   end
   local valid = { welcome = true, raid = true }
   if rules.depotTypes then
@@ -377,4 +414,172 @@ function BB:MergeRules(payload)
   BananaBankDB.rules = r
   if self.UI then self.UI:Refresh() end
   return true
+end
+
+
+-- ------------------------------------------------------------
+-- Keywords in der Offiziersnotiz: [B, GSN, GE]
+-- ------------------------------------------------------------
+BB.KW_PROFS = { "bags", "alch", "bs", "ench", "eng", "lw", "tail", "jc", "cook", "fa" }
+BB.KW_PROF_SET = {}
+for i = 1, getn(BB.KW_PROFS) do BB.KW_PROF_SET[BB.KW_PROFS[i]] = true end
+BB.KW_MAX = 10
+
+function BB.CleanKeyword(x)
+  x = string.upper(BB.Clean(x or ""))
+  x = string.gsub(x, "[^%w]", "")
+  if string.len(x) > 6 then x = string.sub(x, 1, 6) end
+  return x
+end
+
+-- alle Keywords aus einem Notiztext: "[B, GS]" gibt { "B", "GS" }
+function BB:ParseNoteKeywords(note)
+  local out = {}
+  note = note or ""
+  local pos = 1
+  while true do
+    local a, b, inner = string.find(note, "%[([^%]]*)%]", pos)
+    if not a then break end
+    for _, part in ipairs(BB.Split(inner, ",")) do
+      local kw = BB.CleanKeyword(part)
+      if kw ~= "" then table.insert(out, kw) end
+    end
+    pos = b + 1
+  end
+  return out
+end
+
+-- Keywords eines Spielers: aus der Offiziersnotiz, wenn dieser Client sie lesen darf, sonst aus der
+-- Liste, die die Bank-Chars an die Gilde senden
+function BB:KeywordsOf(name)
+  local e = BananaBankDB.ranks[name]
+  if self.canSeeNotes then
+    local list = {}
+    if e and e.kw then list = BB.Split(e.kw, ",") end
+    return list
+  end
+  local r = BananaBankDB.rights
+  local kw = r and r.map and r.map[name]
+  if kw then return BB.Split(kw, ",") end
+  return {}
+end
+
+-- Hat der Spieler ein Keyword, das laut Regelsatz zu diesem Beruf (oder "bags") gehoert?
+function BB:HasProfKeyword(name, prof)
+  local rules = BananaBankDB.rules
+  if not rules or not rules.keywords then return false end
+  local mine = self:KeywordsOf(name)
+  for i = 1, getn(mine) do
+    for j = 1, getn(rules.keywords) do
+      if rules.keywords[j].kw == mine[i] and rules.keywords[j].prof == prof then return true end
+    end
+  end
+  return false
+end
+
+-- ------------------------------------------------------------
+-- Rechte-Liste: Bank-Chars mit "Offiziersnotiz sehen" senden Spieler -> Keywords an die Gilde,
+-- damit jeder Client seine eigenen Rechte kennt (die eigene Notiz sieht er sonst nicht).
+-- ------------------------------------------------------------
+function BB:RightsMap()
+  local map = {}
+  for name, e in pairs(BananaBankDB.ranks) do
+    if e.kw and e.kw ~= "" then map[name] = e.kw end
+  end
+  return map
+end
+
+local function rightsDigest(map)
+  local keys = {}
+  for name in pairs(map) do table.insert(keys, name) end
+  table.sort(keys)
+  local h = 0
+  for i = 1, getn(keys) do h = mod(h + BB.Hash(keys[i] .. map[keys[i]]), 16777213) end
+  return getn(keys) .. ":" .. h
+end
+
+function BB:RightsRefresh()
+  if not self:MayBeBank(self:Me()) then return end
+  local map = self:RightsMap()
+  local dg = rightsDigest(map)
+  local db = BananaBankDB
+  if db.rights and db.rights.dg == dg then return end
+  db.rights = { ts = math.max(time(), ((db.rights and db.rights.ts) or 0) + 1), by = self:Me(), map = map, dg = dg }
+  self:SchedulePush("K")
+end
+
+function BB:SchedulePush(kind)
+  if kind == "K" and self.After then
+    self:After(2 + math.random() * 3, function() BB:PushRights() end, "push:K")
+  end
+end
+
+function BB:SerializeRights(r)
+  local parts = { r.ts, BB.Clean(r.by or "") }
+  local n = 0
+  for name, kw in pairs(r.map) do
+    if n < 120 then
+      table.insert(parts, BB.Clean(name) .. ":" .. BB.Clean(kw))
+      n = n + 1
+    end
+  end
+  return table.concat(parts, "~")
+end
+
+function BB:ParseRights(payload)
+  local f = BB.Split(payload or "", "~")
+  local ts = tonumber(f[1])
+  if not ts or not f[2] or f[2] == "" then return nil end
+  local r = { ts = ts, by = f[2], map = {} }
+  for i = 3, getn(f) do
+    local d = BB.Split(f[i], ":")
+    if d[1] and d[1] ~= "" and d[2] and d[2] ~= "" then r.map[d[1]] = d[2] end
+  end
+  return r
+end
+
+function BB:PushRights()
+  local r = BananaBankDB.rights
+  if not r then return end
+  self:SendTransfer("K", "one", self:SerializeRights(r))
+end
+
+function BB:MergeRights(payload)
+  local r = self:ParseRights(payload)
+  if not r then return false end
+  local cur = BananaBankDB.rights
+  if r.ts > time() + 86400 or (cur and r.ts <= (cur.ts or 0)) then return false end
+  if not self:MayBeBank(r.by) then return false end
+  r.dg = rightsDigest(r.map)
+  BananaBankDB.rights = r
+  if self.UI then self.UI:Refresh() end
+  return true
+end
+
+-- ------------------------------------------------------------
+-- Items: Taschen nur mit Keyword B, Lager nie
+-- ------------------------------------------------------------
+-- liegt das Item nur in einem Lager (und nicht im normalen Bestand)?
+function BB:InDepotOnly(id)
+  if not (self.DepotChars and next(self:DepotChars())) then return false end
+  local main = self.stockCache and self.stockCache[id]
+  if main and main.c > 0 then return false end
+  local db = BananaBankDB
+  for name in pairs(self:DepotChars()) do
+    local snap = db.snaps[name]
+    if snap and snap.items[id] then return true end
+  end
+  return false
+end
+
+function BB:ItemIsBag(id)
+  local e = self.stockCache and self.stockCache[id]
+  if not e then return false end
+  local k = self:ResolveCategory(id, e)
+  return k == "bag"
+end
+
+function BB:KeywordProfLabel(prof)
+  if prof == "bags" then return self.T("KW_BAGS") end
+  return self.T("SUB_" .. string.upper(prof or "other"))
 end

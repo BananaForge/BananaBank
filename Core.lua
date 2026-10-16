@@ -10,7 +10,7 @@
 BananaBank = {}
 local BB = BananaBank
 
-BB.VERSION = "2.9.1"
+BB.VERSION = "3.0.0"
 BB.PREFIX = "BBNK"
 BB.DONATE_NAME = "Lumihunt"
 -- Einziger erlaubter Bank-Rang, deutsch und englisch. Fest eingebaut, es gibt
@@ -247,13 +247,22 @@ function BB:ReadRoster()
   end
   if n <= 0 then return end
   local exists = false
+  -- Offiziersnotiz nur lesbar mit der Berechtigung; ohne sie liefert die Gildenliste einen leeren Text
+  local canNotes = CanViewOfficerNote and CanViewOfficerNote() and true or false
+  self.canSeeNotes = canNotes
   for i = 1, n do
-    local name, rank, rankIndex, _, _, _, _, _, online = GetGuildRosterInfo(i)
+    local name, rank, rankIndex, _, _, _, _, onote, online = GetGuildRosterInfo(i)
     if name and rank then
-      db.ranks[name] = { r = rank, i = rankIndex or 99, online = online and true or false }
+      local kw
+      if canNotes and self.ParseNoteKeywords then
+        local list = self:ParseNoteKeywords(onote)
+        if getn(list) > 0 then kw = table.concat(list, ",") end
+      end
+      db.ranks[name] = { r = rank, i = rankIndex or 99, online = online and true or false, kw = kw }
       if isBankRank(rank) then exists = true end
     end
   end
+  if canNotes and self.RightsRefresh then self:RightsRefresh() end
   self.rankExists = exists
   self.rosterReady = true
   self.rankListCache = nil
@@ -514,7 +523,7 @@ end
 -- ------------------------------------------------------------
 BB.RANK = { open = 1, confirmed = 2, rejected = 3, cancelled = 3, sent = 4 }
 
-function BB:CreateRequest(items)
+function BB:CreateRequest(items, claims)
   if not self:Ready() then return nil end
   local clean = {}
   for id, n in pairs(items) do
@@ -533,6 +542,14 @@ function BB:CreateRequest(items)
   local r = {
     id = id, p = me, ts = time(), items = clean, s = "open", u = time(), by = me, sent = {},
   }
+  -- Gildencrafter-Anspruch: nur fuer Rezepte aus diesem Korb, die der Client selbst fuer berechtigt haelt
+  if claims then
+    r.cl = {}
+    for iid in pairs(claims) do
+      if clean[iid] and self.CraftEligible and self:CraftEligible(iid) then r.cl[iid] = 1 end
+    end
+    if next(r.cl) == nil then r.cl = nil end
+  end
   r.code = self:BuildCode(id, me, clean)
   BananaBankDB.reqs[id] = r
   self:PushRequests({ r })
@@ -563,16 +580,21 @@ end
 function BB:MergeRequest(r)
   local db = BananaBankDB
   local cur = db.reqs[r.id]
+  -- "frei" (Preis 0) darf nur eine Bank gesetzt haben, sonst koennte sich jeder Gratis-Items zuschreiben
+  if r.fr and next(r.fr) and not self:MayBeBank(r.by) then r.fr = nil end
+  if r.cl and next(r.cl) == nil then r.cl = nil end
   if not cur then
     db.reqs[r.id] = r
     return true
   end
   local changed = false
   local rc, rn = BB.RANK[cur.s] or 0, BB.RANK[r.s] or 0
+  if not cur.cl and r.cl then cur.cl = r.cl changed = true end
   if rn > rc or (rn == rc and (r.u or 0) > (cur.u or 0)) then
     if cur.s ~= r.s or cur.u ~= r.u then changed = true end
     local before = cur.s
     cur.s, cur.u, cur.by = r.s, r.u, r.by
+    if r.fr and next(r.fr) then cur.fr = r.fr end
     -- eigene Anfrage: Statuswechsel im Chat melden
     if cur.p == self:Me() and before ~= cur.s then
       self:Print(string.format(self.T("MSG_STATUS_CHANGED"), cur.id, self.T("STATUS_" .. string.upper(cur.s))))
@@ -814,6 +836,7 @@ function BB:CheckModules()
   if not (self.UI and self.UI.bankUIModule) then table.insert(missing, "UI_Banks.lua") end
   if not (self.UI and self.UI.filterModule) then table.insert(missing, "UI_Filter.lua") end
   if not self.rulesModule then table.insert(missing, "Rules.lua") end
+  if not self.craftModule then table.insert(missing, "Craft.lua") end
   if not (self.UI and self.UI.helpModule) then table.insert(missing, "UI_Help.lua") end
   if not (self.UI and self.UI.settingsModule) then table.insert(missing, "UI_Settings.lua") end
   if not self.summaryModule then table.insert(missing, "Summary.lua") end
