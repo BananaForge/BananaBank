@@ -11,6 +11,8 @@ local floor = math.floor
 
 BB.questModule = true
 BB.QUEST_MAX_ITEMS = 6
+BB.QUEST_MAX_GOLD = 6          -- Gold-Ziele (je ein Bank-Char); Items + Gold-Ziele zusammen hoechstens QUEST_MAX_ITEMS
+BB.GOLD = 10000
 BB.QUEST_MAX_OPEN = 8
 BB.QUEST_TITLE_LEN = 40
 BB.QUEST_TEXT_LEN = 180
@@ -79,7 +81,19 @@ end
 function BB:QuestNeed(q)
   local n = 0
   for _, need in pairs(q.items) do n = n + need end
+  -- Gold-Ziele zaehlen je 1 Gold als 1 Einheit
+  for _, c in pairs(q.gold or {}) do n = n + floor(c / BB.GOLD) end
   return n
+end
+
+-- Gold-Ziel in Kurzform: 5g, 1g 50s
+function BB.GoldText(c)
+  c = c or 0
+  local g, sil = floor(c / 10000), floor(mod(c, 10000) / 100)
+  if g > 0 and sil > 0 then return g .. "g " .. sil .. "s" end
+  if g > 0 then return g .. "g" end
+  if sil > 0 then return sil .. "s" end
+  return c .. "c"
 end
 
 -- Name, Qualitaet, Icon eines Quest-Items: zuerst der eigene Client, dann die Angaben der Quest
@@ -100,7 +114,7 @@ function BB:QuestStats()
   if self.qStats and not self.qDirty then return self.qStats end
   local db = BananaBankDB
   local out = {}
-  for id in pairs(db.quests) do out[id] = { got = {}, eff = {}, by = {}, done = 0, need = 0 } end
+  for id in pairs(db.quests) do out[id] = { got = {}, eff = {}, by = {}, gg = {}, geff = {}, gby = {}, done = 0, need = 0 } end
   for _, e in pairs(db.ledger) do
     if (e.k == "in" or e.k == "qfix") and e.code ~= "" then
       local s = out[e.code]
@@ -108,6 +122,14 @@ function BB:QuestStats()
       if q and q.items[e.i] then
         s.got[e.i] = (s.got[e.i] or 0) + e.c
         s.by[e.p] = (s.by[e.p] or 0) + e.c
+      end
+    elseif e.k == "gold" and e.code ~= "" then
+      -- Gold-Spende an einen Bank-Char der Quest (n = Bank-Char, der den Brief geleert hat)
+      local s = out[e.code]
+      local q = s and db.quests[e.code]
+      if q and q.gold and q.gold[e.n] then
+        s.gg[e.n] = (s.gg[e.n] or 0) + e.m
+        s.gby[e.p] = (s.gby[e.p] or 0) + e.m
       end
     end
   end
@@ -119,6 +141,14 @@ function BB:QuestStats()
       s.eff[iid] = g
       s.done = s.done + g
       s.need = s.need + need
+    end
+    -- Gold-Ziele: je Bank-Char gedeckelt, zaehlen in ganzen Gold
+    for bank, goal in pairs(q.gold or {}) do
+      local g = s.gg[bank] or 0
+      if g > goal then g = goal end
+      s.geff[bank] = g
+      s.done = s.done + floor(g / BB.GOLD)
+      s.need = s.need + floor(goal / BB.GOLD)
     end
     s.complete = s.need > 0 and s.done >= s.need
   end
@@ -147,11 +177,19 @@ function BB:QuestTop(q)
   local s = self:QuestStats()[q.id]
   local list = {}
   if s then
-    for p, c in pairs(s.by) do table.insert(list, { p = p, c = c }) end
+    local seen = {}
+    for p, c in pairs(s.by) do
+      seen[p] = { p = p, c = c, g = s.gby[p] or 0 }
+      table.insert(list, seen[p])
+    end
+    for p, g in pairs(s.gby) do
+      if not seen[p] then table.insert(list, { p = p, c = 0, g = g }) end
+    end
   end
+  local function score(e) return e.c + e.g / BB.GOLD end
   table.sort(list, function(a, b)
-    if a.c == b.c then return a.p < b.p end
-    return a.c > b.c
+    if score(a) == score(b) then return a.p < b.p end
+    return score(a) > score(b)
   end)
   return list
 end
@@ -176,6 +214,20 @@ function BB:QuestRanking(since)
         end
         r.pts = r.pts + e.c / need[q.id] * BB.QUEST_POINTS
         r.c = r.c + e.c
+        if not r.quests[q.id] then
+          r.quests[q.id] = true
+          r.nq = r.nq + 1
+        end
+      end
+    elseif e.k == "gold" and e.code ~= "" and (not since or e.t >= since) then
+      local q = db.quests[e.code]
+      if q and q.s ~= "cancelled" and q.gold and q.gold[e.n] and need[q.id] > 0 then
+        local r = per[e.p]
+        if not r then
+          r = { p = e.p, pts = 0, c = 0, quests = {}, nq = 0 }
+          per[e.p] = r
+        end
+        r.pts = r.pts + (e.m / BB.GOLD) / need[q.id] * BB.QUEST_POINTS
         if not r.quests[q.id] then
           r.quests[q.id] = true
           r.nq = r.nq + 1
@@ -241,6 +293,52 @@ function BB:QuestSplit(id, count)
   end
   if rest > 0 then table.insert(parts, { code = "", c = rest }) end
   return parts
+end
+
+-- Gold, das ein Bank-Char per Post/Handel bekommen hat: erst offene Quests mit Gold-Ziel fuer diesen
+-- Char (aelteste zuerst), der Rest ist eine normale Gold-Spende.
+function BB:QuestGoldSplit(bank, money)
+  local stats = self:QuestStats()
+  local cand = {}
+  for _, q in pairs(BananaBankDB.quests) do
+    local goal = q.gold and q.gold[bank]
+    if goal and self:QuestState(q) == "open" then
+      local s = stats[q.id]
+      local left = goal - ((s and s.gg[bank]) or 0)
+      if left > 0 then table.insert(cand, { q = q, left = left }) end
+    end
+  end
+  table.sort(cand, function(a, b)
+    if a.q.ts ~= b.q.ts then return a.q.ts < b.q.ts end
+    return a.q.id < b.q.id
+  end)
+  local parts, rest = {}, money
+  for i = 1, getn(cand) do
+    if rest <= 0 then break end
+    local take = cand[i].left
+    if take > rest then take = rest end
+    table.insert(parts, { code = cand[i].q.id, m = take })
+    rest = rest - take
+  end
+  if rest > 0 then table.insert(parts, { code = "", m = rest }) end
+  return parts
+end
+
+function BB:BookGold(sender, money)
+  local me = self:Me()
+  local parts = self:QuestGoldSplit(me, money)
+  for i = 1, getn(parts) do
+    local e = self:AddLedger({ k = "gold", p = sender, m = parts[i].m, n = me, code = parts[i].code })
+    if parts[i].code ~= "" then
+      local q = BananaBankDB.quests[parts[i].code]
+      if q then
+        self:QLog("deliver", q, me, string.format("%s: %s", e.p, BB.GoldText(e.m)), e.id)
+        local s = self:QuestStats()[q.id]
+        self:Print(string.format(self.T("QMSG_GOLD"), q.title, me, BB.GoldText((s and s.geff[me]) or 0), BB.GoldText(q.gold[me] or 0)))
+      end
+    end
+  end
+  if self.QuestTick then self:QuestTick() end
 end
 
 -- Bank-Char hat eine Lieferung fuer eine Quest gebucht
@@ -327,6 +425,20 @@ local function noPerm(self)
   self:Print("|cffff4040" .. self.T("ERR_QUEST_NOPERM") .. "|r")
 end
 
+-- Gold-Ziele bereinigen: { [Bank-Char] = Kupfer }, ganze Gold, 1..99999
+function BB:CleanGold(g)
+  local out, n = {}, 0
+  for name, c in pairs(g or {}) do
+    name = string.gsub(tostring(name), "[~%^,:|%c%s]", "")
+    c = floor((tonumber(c) or 0) / BB.GOLD) * BB.GOLD
+    if name ~= "" and c >= BB.GOLD and c <= 99999 * BB.GOLD and n < BB.QUEST_MAX_GOLD then
+      out[name] = c
+      n = n + 1
+    end
+  end
+  return out
+end
+
 function BB:CountOpenQuests()
   local n = 0
   for _, q in pairs(BananaBankDB.quests) do
@@ -336,12 +448,17 @@ function BB:CountOpenQuests()
 end
 
 -- items = { [id] = Bedarf }, meta = { [id] = { n=, q=, t= } }
-function BB:CreateQuest(title, text, items, meta, days, reserve, icon, tip)
+function BB:CreateQuest(title, text, items, meta, days, reserve, icon, tip, gold)
   if not self:CanManageQuests() then noPerm(self) return nil end
   title = cleanText(title, BB.QUEST_TITLE_LEN)
   text = cleanText(text, BB.QUEST_TEXT_LEN)
   if title == "" then self:Print("|cffff4040" .. self.T("ERR_QUEST_TITLE") .. "|r") return nil end
-  if BB.Count(items) == 0 then self:Print("|cffff4040" .. self.T("ERR_QUEST_ITEMS") .. "|r") return nil end
+  gold = self:CleanGold(gold)
+  if BB.Count(items) + BB.Count(gold) == 0 then self:Print("|cffff4040" .. self.T("ERR_QUEST_ITEMS") .. "|r") return nil end
+  if BB.Count(items) + BB.Count(gold) > BB.QUEST_MAX_ITEMS then
+    self:Print("|cffff4040" .. string.format(self.T("ERR_QUEST_ITEM_MAX"), BB.QUEST_MAX_ITEMS) .. "|r")
+    return nil
+  end
   if self:CountOpenQuests() >= BB.QUEST_MAX_OPEN then
     self:Print("|cffff4040" .. string.format(self.T("ERR_QUEST_MAX"), BB.QUEST_MAX_OPEN) .. "|r")
     return nil
@@ -352,7 +469,7 @@ function BB:CreateQuest(title, text, items, meta, days, reserve, icon, tip)
   local q = {
     id = id, c = self:Me(), ts = now, s = "open", u = now, by = self:Me(),
     due = (days and days > 0) and (now + days * 86400) or 0, rs = reserve and 1 or 0,
-    title = title, text = text, items = items, meta = meta or {},
+    title = title, text = text, items = items, meta = meta or {}, gold = gold,
     ic = cleanIcon(icon), tip = cleanText(tip or "", BB.QUEST_TIP_LEN),
   }
   BananaBankDB.quests[id] = q
@@ -363,14 +480,19 @@ function BB:CreateQuest(title, text, items, meta, days, reserve, icon, tip)
   return q
 end
 
-function BB:EditQuest(q, title, text, items, meta, days, reserve, icon, tip)
+function BB:EditQuest(q, title, text, items, meta, days, reserve, icon, tip, gold)
   if not self:CanManageQuests() then noPerm(self) return false end
   if q.s ~= "open" then return false end
   title = cleanText(title, BB.QUEST_TITLE_LEN)
   text = cleanText(text, BB.QUEST_TEXT_LEN)
   if title == "" then self:Print("|cffff4040" .. self.T("ERR_QUEST_TITLE") .. "|r") return false end
-  if BB.Count(items) == 0 then self:Print("|cffff4040" .. self.T("ERR_QUEST_ITEMS") .. "|r") return false end
-  q.title, q.text, q.items, q.meta = title, text, items, meta or {}
+  gold = self:CleanGold(gold)
+  if BB.Count(items) + BB.Count(gold) == 0 then self:Print("|cffff4040" .. self.T("ERR_QUEST_ITEMS") .. "|r") return false end
+  if BB.Count(items) + BB.Count(gold) > BB.QUEST_MAX_ITEMS then
+    self:Print("|cffff4040" .. string.format(self.T("ERR_QUEST_ITEM_MAX"), BB.QUEST_MAX_ITEMS) .. "|r")
+    return false
+  end
+  q.title, q.text, q.items, q.meta, q.gold = title, text, items, meta or {}, gold
   if icon ~= nil then q.ic = cleanIcon(icon) end
   if tip ~= nil then q.tip = cleanText(tip, BB.QUEST_TIP_LEN) end
   q.rs = reserve and 1 or 0
@@ -522,6 +644,21 @@ function BB:QuestChatLines(q)
     cur = (cur == prefix) and (cur .. part) or (cur .. ", " .. part)
   end
   if cur ~= prefix then table.insert(lines, cur) end
+  if q.gold and BB.Count(q.gold) > 0 then
+    local names = {}
+    for bank, c in pairs(q.gold) do table.insert(names, bank .. " " .. BB.GoldText(c)) end
+    table.sort(names)
+    local gl = self.T("QCHAT_GOLD")
+    for i = 1, getn(names) do
+      local part = names[i]
+      if string.len(gl) + string.len(part) + 2 > 245 then
+        table.insert(lines, gl)
+        gl = self.T("QCHAT_GOLD")
+      end
+      gl = (gl == self.T("QCHAT_GOLD")) and (gl .. part) or (gl .. ", " .. part)
+    end
+    table.insert(lines, gl)
+  end
   table.insert(lines, self.T("QCHAT_HOW"))
   return lines
 end
@@ -542,6 +679,22 @@ end
 -- ------------------------------------------------------------
 -- Netz: Quests serialisieren und zusammenfuehren
 -- ------------------------------------------------------------
+function BB:SerializeGold(g)
+  local parts = {}
+  for name, c in pairs(self:CleanGold(g)) do table.insert(parts, name .. ":" .. c) end
+  table.sort(parts)
+  return table.concat(parts, ",")
+end
+
+function BB:ParseGold(str)
+  local g = {}
+  for _, p in ipairs(BB.Split(str or "", ",")) do
+    local f = BB.Split(p, ":")
+    if f[1] and f[1] ~= "" and tonumber(f[2]) then g[f[1]] = tonumber(f[2]) end
+  end
+  return self:CleanGold(g)
+end
+
 function BB:SerializeQuests(list)
   local recs = {}
   for i = 1, getn(list) do
@@ -556,6 +709,7 @@ function BB:SerializeQuests(list)
       cleanText(q.title, BB.QUEST_TITLE_LEN), cleanText(q.text or "", BB.QUEST_TEXT_LEN),
       table.concat(its, ","),
       cleanIcon(q.ic or ""), cleanText(q.tip or "", BB.QUEST_TIP_LEN),
+      self:SerializeGold(q.gold),
     }, "~"))
   end
   return table.concat(recs, "^")
@@ -576,7 +730,8 @@ function BB:ParseQuests(payload)
           n = n + 1
         end
       end
-      if n > 0 then
+      local gold = f[14] and BB:ParseGold(f[14]) or nil
+      if n > 0 or (gold and BB.Count(gold) > 0) then
         table.insert(out, {
           id = f[1], c = f[2], ts = tonumber(f[3]) or 0, s = f[4], u = tonumber(f[5]) or 0,
           by = f[6], due = tonumber(f[7]) or 0, rs = tonumber(f[8]) or 0,
@@ -584,6 +739,7 @@ function BB:ParseQuests(payload)
           items = items, meta = meta,
           -- Felder 12/13 kennen nur Versionen ab 1.8.0; fehlen sie, bleibt der alte Wert erhalten (nil)
           ic = f[12] and cleanIcon(f[12]) or nil, tip = f[13] and cleanText(f[13], BB.QUEST_TIP_LEN) or nil,
+          gold = gold,
         })
       end
     end
@@ -638,6 +794,7 @@ function BB:MergeQuest(r)
     if rn == rc and rn == 1 then
       cur.title, cur.text, cur.items, cur.meta = r.title, r.text, r.items, r.meta
       cur.due, cur.rs = r.due, r.rs
+      if r.gold ~= nil then cur.gold = r.gold end
       if r.ic ~= nil then cur.ic = r.ic end
       if r.tip ~= nil then cur.tip = r.tip end
       self:QLog("edit", cur, r.by, nil, r.id .. ":open:" .. r.u)

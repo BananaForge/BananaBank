@@ -979,7 +979,11 @@ function BB:OnTakeInbox(i, isItem, j)
     -- Gold aus einer Nachnahme ist ein Verkaufserloes, keine Spende
     local kind = "gold"
     if subject and string.find(subject, "BananaBank", 1, true) then kind = "cod" end
-    self:AddLedger({ k = kind, p = sender, m = money })
+    if kind == "gold" then
+      self:BookGold(sender, money)
+    else
+      self:AddLedger({ k = kind, p = sender, m = money })
+    end
     local note
     if self:IsGuildMember(sender) == false then note = self.T("ML_EXTERN") end
     self:MailLog(sender, false, nil, 0, money, kind == "gold" and "gold" or "codin", note)
@@ -1077,7 +1081,7 @@ function BB:TradeCommit()
       self:Print(string.format(self.T("MSG_REQUEST_PARTIAL"), r.id))
     end
   end
-  if tr.min > 0 then self:AddLedger({ k = "gold", p = tr.p, m = tr.min }) end
+  if tr.min > 0 then self:BookGold(tr.p, tr.min) end
   if tr.mout > 0 then self:AddLedger({ k = "gout", p = tr.p, m = tr.mout }) end
   self:ScheduleSnapshot(3)
   if self.UI then self.UI:Refresh() end

@@ -656,8 +656,8 @@ function UI:RefreshDepotTab()
 end
 
 -- Auswahlmenue: entries = { { label = Text, value = beliebig } }, onPick(value)
-function UI:OpenPicker(btn, entries, onPick)
-  if not BB:MayBeBank(BB:Me()) then return end
+function UI:OpenPicker(btn, entries, onPick, anyone)
+  if not anyone and not BB:MayBeBank(BB:Me()) then return end
   local m = self.rankMenu
   if not m then
     local catch = CreateFrame("Button", nil, UIParent)

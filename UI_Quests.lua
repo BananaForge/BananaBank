@@ -111,6 +111,22 @@ local function panelHead(self, pnl, key, size)
   return t
 end
 
+local COIN_TEX = "Interface\\Icons\\INV_Misc_Coin_01"
+
+local function goldTooltip(owner, bank)
+  GameTooltip:SetOwner(owner, "ANCHOR_RIGHT")
+  GameTooltip:AddLine(string.format(T("QD_GOLD_NAME"), bank), C.gold[1], C.gold[2], C.gold[3])
+  GameTooltip:AddLine(string.format(T("QD_GOLD_TIP"), bank), 0.8, 0.8, 0.8, 1)
+  GameTooltip:Show()
+end
+
+local function sortedGoldBanks(q)
+  local names = {}
+  for bank in pairs(q.gold or {}) do table.insert(names, bank) end
+  table.sort(names)
+  return names
+end
+
 local function itemTooltip(owner, q, id)
   if GetItemInfo(id) then
     UI:ItemTooltip(owner, id)
@@ -153,7 +169,7 @@ function UI:QuestTooltip(owner, q)
   GameTooltip:AddLine(q.title, C.gold[1], C.gold[2], C.gold[3])
   if q.tip and q.tip ~= "" then GameTooltip:AddLine(q.tip, 1, 1, 1, 1) end
   GameTooltip:AddLine(" ")
-  GameTooltip:AddLine(string.format(T("QX_TT_NEED"), BB.Count(q.items)), 0.62, 0.64, 0.74)
+  GameTooltip:AddLine(string.format(T("QX_TT_NEED"), BB.Count(q.items) + BB.Count(q.gold or {})), 0.62, 0.64, 0.74)
   local pc = (need > 0 and done >= need) and STATE_COLOR.complete or STATE_COLOR.open
   GameTooltip:AddLine(string.format(T("QX_TT_PROGRESS"), done, need), pc[1], pc[2], pc[3])
   GameTooltip:AddLine(T("QX_TT_HINT"), 0.5, 0.7, 1)
@@ -383,6 +399,7 @@ function UI:BuildQuests(parent)
     r.slot:SetPoint("LEFT", r, "LEFT", 0, 0)
     r.slot:SetScript("OnEnter", function()
       local q = BananaBankDB.quests[Q.sel]
+      if this.goldBank then goldTooltip(this, this.goldBank) return end
       if q and this.id then itemTooltip(this, q, this.id) end
     end)
     r.slot:SetScript("OnLeave", function() GameTooltip:Hide() end)
@@ -394,6 +411,7 @@ function UI:BuildQuests(parent)
     r:EnableMouse(true)
     r:SetScript("OnEnter", function()
       local q = BananaBankDB.quests[Q.sel]
+      if this.goldBank then goldTooltip(this, this.goldBank) return end
       if q and this.slot.id then itemTooltip(this.slot, q, this.slot.id) end
     end)
     r:SetScript("OnLeave", function() GameTooltip:Hide() end)
@@ -710,7 +728,7 @@ function UI:RefreshQuestDetail()
     Q.cancelBtn:Show()
     Q.closeBtn:Show()
     Q.editBtn:Show()
-    if st == "complete" then Q.payBtn:Show() else Q.payBtn:Hide() end
+    if st == "complete" and BB.Count(q.items) > 0 then Q.payBtn:Show() else Q.payBtn:Hide() end
   else
     Q.cancelBtn:Hide()
     Q.closeBtn:Hide()
@@ -725,10 +743,31 @@ function UI:RefreshQuestDetail()
 
   -- Items
   local ids = sortedItemIds(q)
+  local banks = sortedGoldBanks(q)
   for i = 1, ITEM_ROWS do
     local r = Q.items[i]
     local id = ids[i]
-    if id then
+    local gbank = (not id) and banks[i - getn(ids)] or nil
+    r.goldBank, r.slot.goldBank = gbank, gbank
+    if gbank then
+      local goal = q.gold[gbank]
+      local got = (s and s.geff[gbank]) or 0
+      r.slot.id = nil
+      r.slot.icon:SetTexture(COIN_TEX)
+      r.slot:SetQuality(1)
+      r.name:SetText(string.format(T("QD_GOLD_NAME"), gbank))
+      r.name:SetTextColor(C.gold[1], C.gold[2], C.gold[3])
+      local p = goal > 0 and got / goal or 0
+      r.bar:SetValue(p, progColor(p, st), BB.GoldText(got) .. " / " .. BB.GoldText(goal))
+      if got >= goal then
+        r.rest:SetText(T("QD_ITEM_DONE"))
+        r.rest:SetTextColor(STATE_COLOR.complete[1], STATE_COLOR.complete[2], STATE_COLOR.complete[3])
+      else
+        r.rest:SetText("-" .. BB.GoldText(goal - got))
+        r.rest:SetTextColor(C.muted[1], C.muted[2], C.muted[3])
+      end
+      r:Show()
+    elseif id then
       local need = q.items[id]
       local got = (s and s.eff[id]) or 0
       local name, quality, tex = BB:QuestItemInfo(q, id)
@@ -762,7 +801,10 @@ function UI:RefreshQuestDetail()
       local m = MEDAL[i]
       row.rank:SetText(i .. ".")
       row.name:SetText(t.p)
-      row.val:SetText(t.c .. " " .. T("UNIT_ITEMS"))
+      local vtxt = ""
+      if t.c > 0 then vtxt = t.c .. " " .. T("UNIT_ITEMS") end
+      if t.g and t.g > 0 then vtxt = vtxt .. (vtxt ~= "" and "  " or "") .. BB.GoldText(t.g) end
+      row.val:SetText(vtxt)
       if m then
         row.rank:SetTextColor(m[1], m[2], m[3])
         row.name:SetTextColor(m[1], m[2], m[3])
@@ -780,16 +822,21 @@ function UI:RefreshQuestDetail()
 
   -- dein Beitrag
   local me = BB:Me()
-  local mineC, minePos = 0, 0
+  local mineC, mineG, minePos = 0, 0, 0
   for i = 1, getn(top) do
     if top[i].p == me then
-      mineC, minePos = top[i].c, i
+      mineC, mineG, minePos = top[i].c, top[i].g or 0, i
     end
   end
   local needAll = s and s.need or 1
-  if mineC > 0 then
-    Q.mine:SetText(string.format(T("QC_MINE"), mineC))
-    Q.mineRank:SetText(string.format(T("QC_RANK"), minePos, getn(top), floor(mineC * 100 / math.max(needAll, 1))))
+  -- Gold zaehlt in ganzen Gold als Einheit, wie beim Fortschritt
+  local mineU = mineC + floor(mineG / BB.GOLD)
+  if mineU > 0 then
+    local mtxt = ""
+    if mineC > 0 then mtxt = string.format(T("QC_MINE"), mineC) end
+    if mineG > 0 then mtxt = mtxt .. (mtxt ~= "" and "  " or "") .. string.format(T("QC_MINE_GOLD"), BB.GoldText(mineG)) end
+    Q.mine:SetText(mtxt)
+    Q.mineRank:SetText(string.format(T("QC_RANK"), minePos, getn(top), floor(mineU * 100 / math.max(needAll, 1))))
   else
     Q.mine:SetText(T("QC_NONE"))
     Q.mineRank:SetText("")
@@ -1041,6 +1088,9 @@ function UI:BuildQuestEditor()
   f.due:SetNumeric(true)
   f.due:SetMaxLetters(3)
   f.due:SetJustifyH("CENTER")
+  f.gold = {}
+  f.goldBtn = self:Button(f, 160, 20, "", function() UI:OpenGoldDialog() end)
+  f.goldBtn:SetPoint("TOPLEFT", f, "TOPLEFT", 354, -501)
   f.reserve = true
   f.chk = self:Check(f, "QE_RESERVE", function() return f.reserve end, function(v) f.reserve = v end)
   f.chk:SetWidth(440)
@@ -1062,7 +1112,11 @@ function UI:OpenQuestEditor(q)
   f.editing = q
   f.items = {}
   f.meta = {}
+  f.gold = {}
   if q then
+    for _, bank in ipairs(sortedGoldBanks(q)) do
+      table.insert(f.gold, { bank = bank, g = floor(q.gold[bank] / BB.GOLD) })
+    end
     f.heading:SetText(T("QE_TITLE_EDIT"))
     f.name:SetText(q.title)
     f.text:SetText(q.text or "")
@@ -1114,12 +1168,133 @@ function UI:RefreshQuestEditor()
     end
   end
   if f.items[1] then f.empty:Hide() else f.empty:Show() end
+  f.goldBtn.fs:SetText(string.format(T("QE_GOLD_BTN"), getn(f.gold)))
   -- Icon: gewaehltes, sonst das des ersten Items
   local tex
   if f.icon and f.icon ~= "" then tex = BB.FullTex(f.icon)
   elseif f.items[1] then tex = BB.FullTex(f.items[1].t)
   else tex = BB.FullTex("") end
   f.iconBtn.icon:SetTexture(tex)
+end
+
+-- ------------------------------------------------------------
+-- Gold-Ziele: je ein Bank-Char mit einem Goldbetrag (Spende per Post)
+-- ------------------------------------------------------------
+local GOLD_ROWS = BB.QUEST_MAX_GOLD
+
+function UI:BuildGoldDialog()
+  if self.qg then return end
+  local f = CreateFrame("Frame", "BananaBankGoldGoals", UIParent)
+  self.qg = f
+  f:SetWidth(400)
+  f:SetHeight(86 + GOLD_ROWS * 28 + 84)
+  f:SetPoint("CENTER", UIParent, "CENTER", 0, 20)
+  f:SetFrameStrata("FULLSCREEN_DIALOG")
+  f:SetMovable(true)
+  f:EnableMouse(true)
+  f:RegisterForDrag("LeftButton")
+  f:SetScript("OnDragStart", function() this:StartMoving() end)
+  f:SetScript("OnDragStop", function() this:StopMovingOrSizing() end)
+  f:SetBackdrop({
+    bgFile = WHITE, edgeFile = "Interface\\DialogFrame\\UI-DialogBox-Border",
+    tile = true, tileSize = 16, edgeSize = 32,
+    insets = { left = 11, right = 12, top = 12, bottom = 11 },
+  })
+  f:SetBackdropColor(C.bg[1], C.bg[2], C.bg[3], 1)
+  f:Hide()
+  local h = self:Font(f, 18, C.gold, FONT_TITLE)
+  h:SetPoint("TOPLEFT", f, "TOPLEFT", 26, -22)
+  self:Loc(h, "QE_GOLD_TITLE")
+  f.hint = self:Font(f, 10, { 0.70, 0.72, 0.80 })
+  f.hint:SetPoint("TOPLEFT", f, "TOPLEFT", 28, -46)
+  f.hint:SetWidth(344)
+  f.hint:SetHeight(28)
+  f.hint:SetJustifyV("TOP")
+  self:Loc(f.hint, "QE_GOLD_HINT")
+  f.rows = {}
+  for i = 1, GOLD_ROWS do
+    local r = CreateFrame("Frame", nil, f)
+    r:SetHeight(24)
+    r:SetPoint("TOPLEFT", f, "TOPLEFT", 28, -82 - (i - 1) * 28)
+    r:SetPoint("TOPRIGHT", f, "TOPRIGHT", -28, -82 - (i - 1) * 28)
+    local idx = i
+    r.bank = self:Button(r, 190, 22, "", function(b) UI:OpenGoldBankPicker(b, idx) end, "flat")
+    r.bank:SetPoint("LEFT", r, "LEFT", 0, 0)
+    r.amt = self:EditBox("BananaBankGoldAmt" .. i, r, 60)
+    r.amt:SetPoint("LEFT", r, "LEFT", 202, 0)
+    r.amt:SetNumeric(true)
+    r.amt:SetMaxLetters(5)
+    r.amt:SetJustifyH("CENTER")
+    r.amt:SetScript("OnTextChanged", function()
+      local g = UI.qe and UI.qe.gold[idx]
+      if g then g.g = tonumber(this:GetText()) or g.g end
+    end)
+    r.unit = self:Font(r, 12, C.gold)
+    r.unit:SetPoint("LEFT", r.amt, "RIGHT", 6, 0)
+    r.unit:SetText("g")
+    r.del = self:Button(r, 22, 20, "x", function()
+      table.remove(UI.qe.gold, idx)
+      UI:RefreshGoldDialog()
+    end, "danger")
+    r.del:SetPoint("RIGHT", r, "RIGHT", 0, 0)
+    f.rows[i] = r
+  end
+  f.add = self:Button(f, 130, 22, "QE_GOLD_ADD", function(b) UI:OpenGoldBankPicker(b, nil) end)
+  f.add:SetPoint("BOTTOMLEFT", f, "BOTTOMLEFT", 28, 24)
+  f.ok = self:Button(f, 120, 24, "QE_GOLD_OK", function() f:Hide() end, "ok")
+  f.ok:SetPoint("BOTTOMRIGHT", f, "BOTTOMRIGHT", -26, 24)
+  f:SetScript("OnHide", function()
+    UI:CloseRankPicker()
+    if UI.qe then UI:RefreshQuestEditor() end
+  end)
+end
+
+function UI:RefreshGoldDialog()
+  local f, ed = self.qg, self.qe
+  if not f or not ed then return end
+  for i = 1, GOLD_ROWS do
+    local r = f.rows[i]
+    local g = ed.gold[i]
+    if g then
+      r.bank.fs:SetText(g.bank)
+      r.amt:SetText(tostring(g.g or 1))
+      r:Show()
+    else
+      r:Hide()
+    end
+  end
+  if getn(ed.items) + getn(ed.gold) < BB.QUEST_MAX_ITEMS and getn(ed.gold) < GOLD_ROWS then f.add:Show() else f.add:Hide() end
+end
+
+-- Bank-Char waehlen: neu (idx = nil) oder einen vorhandenen Eintrag ersetzen
+function UI:OpenGoldBankPicker(btn, idx)
+  local ed = self.qe
+  if not ed then return end
+  local used = {}
+  for i = 1, getn(ed.gold) do
+    if i ~= idx then used[ed.gold[i].bank] = true end
+  end
+  local entries = {}
+  local names = BB:BankList()
+  for i = 1, getn(names) do
+    if not used[names[i]] then table.insert(entries, { label = names[i], value = names[i] }) end
+  end
+  if getn(entries) == 0 then return end
+  self:OpenPicker(btn, entries, function(name)
+    if idx and ed.gold[idx] then
+      ed.gold[idx].bank = name
+    else
+      table.insert(ed.gold, { bank = name, g = 5 })
+    end
+    UI:RefreshGoldDialog()
+  end, true)
+end
+
+function UI:OpenGoldDialog()
+  if not self.qe then return end
+  self:BuildGoldDialog()
+  self.qg:Show()
+  self:RefreshGoldDialog()
 end
 
 -- Item einfuegen (Shift-Klick in der Tasche, Strg-Klick im Bestand)
@@ -1133,7 +1308,7 @@ function UI:QuestAddItem(id, meta)
       return
     end
   end
-  if getn(f.items) >= BB.QUEST_MAX_ITEMS then
+  if getn(f.items) + getn(f.gold) >= BB.QUEST_MAX_ITEMS then
     BB:Print("|cffff4040" .. string.format(T("ERR_QUEST_ITEM_MAX"), BB.QUEST_MAX_ITEMS) .. "|r")
     return
   end
@@ -1161,6 +1336,11 @@ function UI:SaveQuestEditor()
     items[it.id] = need
     meta[it.id] = { n = it.n, q = it.q or 1, t = it.t or "" }
   end
+  local gold = {}
+  for i = 1, getn(f.gold) do
+    local g = f.gold[i]
+    if g.bank and g.g and g.g >= 1 then gold[g.bank] = g.g * BB.GOLD end
+  end
   local title, text = f.name:GetText(), f.text:GetText()
   local days = numberOf(f.due, 0)
   if days < 0 then days = 0 end
@@ -1168,9 +1348,9 @@ function UI:SaveQuestEditor()
   if f.editing then
     local dueArg = days
     if f.dueOrig and days == f.dueOrig then dueArg = nil end
-    if BB:EditQuest(f.editing, title, text, items, meta, dueArg, f.reserve, f.icon or "", f.tip:GetText()) then q = f.editing end
+    if BB:EditQuest(f.editing, title, text, items, meta, dueArg, f.reserve, f.icon or "", f.tip:GetText(), gold) then q = f.editing end
   else
-    q = BB:CreateQuest(title, text, items, meta, days, f.reserve, f.icon or "", f.tip:GetText())
+    q = BB:CreateQuest(title, text, items, meta, days, f.reserve, f.icon or "", f.tip:GetText(), gold)
   end
   if q then
     f:Hide()
@@ -1339,6 +1519,26 @@ function UI:RefreshQuestTracker()
         n:SetTextColor(c[1], c[2], c[3])
         v:SetText(got .. "/" .. need)
         local vc = got >= need and STATE_COLOR.complete or progColor(got / need, "open")
+        v:SetTextColor(vc[1], vc[2], vc[3])
+        n:ClearAllPoints()
+        n:SetPoint("TOPLEFT", f, "TOPLEFT", 18, -y)
+        v:ClearAllPoints()
+        v:SetPoint("TOPRIGHT", f, "TOPRIGHT", -12, -y)
+        n:Show()
+        v:Show()
+        y = y + 13
+      end
+      local gb = sortedGoldBanks(q)
+      for k = 1, getn(gb) do
+        li = li + 1
+        local n, v = f.names[li], f.vals[li]
+        local goal = q.gold[gb[k]]
+        local got = (stats and stats.geff[gb[k]]) or 0
+        n:SetText(string.format(T("QD_GOLD_NAME"), gb[k]))
+        local c = got >= goal and STATE_COLOR.complete or { 0.84, 0.84, 0.80 }
+        n:SetTextColor(c[1], c[2], c[3])
+        v:SetText(BB.GoldText(got) .. "/" .. BB.GoldText(goal))
+        local vc = got >= goal and STATE_COLOR.complete or progColor(got / goal, "open")
         v:SetTextColor(vc[1], vc[2], vc[3])
         n:ClearAllPoints()
         n:SetPoint("TOPLEFT", f, "TOPLEFT", 18, -y)
