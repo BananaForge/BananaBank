@@ -284,6 +284,7 @@ function UI:BuildSettings()
   self:Loc(th, "DP_TYPES_HINT")
   S.dpTypes = {}
   for i = 1, BB.DEPOT_TYPE_MAX do
+    local idx = i   -- Lua 5.0: Schleifenvariable nicht in Funktionen verwenden
     local row = {}
     local y = -54 - (i - 1) * 24
     row.edit = self:EditBox("BananaBankDepotType" .. i, g, 250)
@@ -291,7 +292,7 @@ function UI:BuildSettings()
     row.edit:SetMaxLetters(24)
     row.edit:SetScript("OnTextChanged", function()
       if S.depotLoading then return end
-      local t = S.edit and S.edit.depotTypes and S.edit.depotTypes[i]
+      local t = S.edit and S.edit.depotTypes and S.edit.depotTypes[idx]
       if t then
         t.name = this:GetText()
         S.editDirty = true
@@ -299,14 +300,14 @@ function UI:BuildSettings()
     end)
     row.edit:SetScript("OnEnterPressed", function() this:ClearFocus() end)
     row.del = self:Button(g, 24, 20, "x", function()
-      local t = S.edit.depotTypes[i]
+      local t = S.edit.depotTypes[idx]
       if t then
         -- Lagerchars dieses Typs verlieren die Zuordnung
         for j = getn(S.edit.depots), 1, -1 do
           if S.edit.depots[j].k == t.id then table.remove(S.edit.depots, j) end
         end
       end
-      table.remove(S.edit.depotTypes, i)
+      table.remove(S.edit.depotTypes, idx)
       S.editDirty = true
       UI:RefreshSettings()
     end, "flat")
@@ -327,15 +328,16 @@ function UI:BuildSettings()
   self:Loc(ct, "DP_CHARS_TITLE")
   S.rlDepot = {}
   for i = 1, BB.DEPOT_MAX do
+    local idx = i
     local row = {}
     local y = -258 - (i - 1) * 26
     -- links der Typ, rechts der Char
-    row.kind = self:Button(g, 170, 20, "", function(btn) UI:OpenDepotKindPicker(btn, i) end, "flat")
+    row.kind = self:Button(g, 170, 20, "", function(btn) UI:OpenDepotKindPicker(btn, idx) end, "flat")
     row.kind:SetPoint("TOPLEFT", g, "TOPLEFT", 4, y)
-    row.char = self:Button(g, 170, 20, "", function(btn) UI:OpenDepotCharPicker(btn, i) end, "flat")
+    row.char = self:Button(g, 170, 20, "", function(btn) UI:OpenDepotCharPicker(btn, idx) end, "flat")
     row.char:SetPoint("TOPLEFT", g, "TOPLEFT", 180, y)
     row.del = self:Button(g, 24, 20, "x", function()
-      table.remove(S.edit.depots, i)
+      table.remove(S.edit.depots, idx)
       S.editDirty = true
       UI:RefreshSettings()
     end, "flat")
