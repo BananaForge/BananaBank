@@ -135,7 +135,7 @@ function UI:PriceList()
   local list = {}
   for id, e in pairs(stock) do
     local u = BB:GetPrice(id)
-    local boe = BB:IsBOE(id)
+    local boe = BB:NeedsPrice(id)
     local take = boe or u
     if take then
       if P.filter == "with" then take = u ~= nil end
@@ -196,6 +196,7 @@ function UI:RefreshPrices()
       row.name:SetTextColor(qc[1], qc[2], qc[3])
       if entry.e.k == "recipe" then row.bind:SetText(T("BIND_RECIPE"))
       elseif BB:IsBOE(id) then row.bind:SetText(T("BIND_BOE"))
+      elseif BB:NeedsPrice(id) then row.bind:SetText(T("BIND_BAG"))
       else row.bind:SetText("-") end
       local u, src, ts, n = BB:GetPrice(id)
       if u then

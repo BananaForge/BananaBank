@@ -10,7 +10,7 @@
 BananaBank = {}
 local BB = BananaBank
 
-BB.VERSION = "2.6.0"
+BB.VERSION = "2.7.0"
 BB.PREFIX = "BBNK"
 BB.DONATE_NAME = "Lumihunt"
 -- Einziger erlaubter Bank-Rang, deutsch und englisch. Fest eingebaut, es gibt
@@ -724,6 +724,7 @@ end
 function BB:PriceTotal() return 0, 0 end
 function BB:GetPrice() return nil end
 function BB:IsBOE() return false end
+function BB:NeedsPrice() return false end
 function BB:MailCod() return 0 end
 function BB:PushPrices() end
 function BB:ResetPrice() end

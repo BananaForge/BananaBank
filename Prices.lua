@@ -10,7 +10,7 @@ local floor = math.floor
 BB.priceModule = true
 BB.PRICE_FACTOR = 0.5   -- Haelfte des Marktpreises
 BB.PRICE_SHARE = 0.30   -- Schnitt ueber die guenstigsten 30 Prozent
-BB.PRICE_MIN = 100      -- Mindestpreis 1 Silber
+BB.PRICE_MIN = 5000     -- Mindestpreis 50 Silber (gilt fuer den errechneten Gildenpreis)
 BB.AH_PAGE = 50
 BB.AH_MAX_PAGES = 5     -- kurze Namen treffen viel; mehr als das brauchen wir nicht
 
@@ -82,8 +82,22 @@ end
 -- ------------------------------------------------------------
 function BB:GetPrice(id)
   local p = BananaBankDB.prices[id]
-  if p and p.u and p.u > 0 then return p.u, p.src, p.ts, p.n end
+  if p and p.u and p.u > 0 then
+    local u = p.u
+    -- aus dem AH errechnete Preise haben einen Mindestwert; von Hand gesetzte bleiben, wie sie sind
+    if p.src ~= "man" and u < BB.PRICE_MIN then u = BB.PRICE_MIN end
+    return u, p.src, p.ts, p.n
+  end
   return nil
+end
+
+-- Braucht dieses Item einen Gildenpreis aus dem AH? BOE-Items, Rezepte und Taschen.
+function BB:NeedsPrice(id)
+  if self:IsBOE(id) then return true end
+  local e = self.stockCache and self.stockCache[id]
+  if not e then return false end
+  local k = self:ResolveCategory(id, e)
+  return k == "bag"
 end
 
 function BB:PriceTotal(items)
@@ -93,7 +107,7 @@ function BB:PriceTotal(items)
     local u = self:GetPrice(id)
     if u then
       sum = sum + u * n
-    elseif self:IsBOE(id) then
+    elseif self:NeedsPrice(id) then
       missing = missing + 1
     end
   end
@@ -160,7 +174,7 @@ function BB:PriceTargets()
   for id in pairs(stock) do
     local cur = db.prices[id]
     -- von Hand gesetzte Preise bleiben, die brauchen keine Abfrage
-    if self:IsBOE(id) and not (cur and cur.src == "man") then
+    if self:NeedsPrice(id) and not (cur and cur.src == "man") then
       local name = self:ItemInfo(id)
       if name and name ~= "" and not string.find(name, "^#%d") then
         table.insert(ids, id)
