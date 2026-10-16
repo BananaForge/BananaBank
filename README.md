@@ -93,6 +93,7 @@ Pull requests welcome, tested in-game on a 1.12 client. Lua 5.0 rules: no `#`, `
 
 ## Changelog
 
+- **2.8.0:** **depot characters** (step 3). In the Rules tab a Gildenbank character names one character for *Welcome packages* and one for *Raid stuff*. Their stock is left out of "Entire bank" and shown only in two new entries under "View only" in the category tree; items there cannot be requested (also not when such a character is picked in the bank selector). The depot names are part of the synced rule set.
 - **2.7.2:** items that had no price at the last scan (not found at the AH) are always scanned again, regardless of the age setting.
 - **2.7.1:** faster AH scan: items without any price scan come first, then the oldest scans; only prices older than N days are fetched again (setting for bank characters, default 10, 0 = scan everything). Hand-set prices are never fetched.
 - **2.7.0:** guild prices: the calculated guild price (half of the cheapest 30 percent at the AH) is at least **50 silver**; older AH-based prices are raised to 50 silver as well, hand-set prices are left alone. **Bags** are now priced by the AH scan like BOE items and recipes (bind column shows "Bag", the price shows in the tooltip and goes into the cash on delivery).

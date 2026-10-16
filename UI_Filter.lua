@@ -82,7 +82,7 @@ local function treeNodes(cur)
       local hasKids = false
       local nxt = list[i + 1]
       if nxt and string.sub(nxt.key, 1, string.len(e.key) + 1) == e.key .. ":" then hasKids = true end
-      table.insert(out, { key = e.key, label = e.label, depth = e.depth, parent = hasKids })
+      table.insert(out, { key = e.key, label = e.label, depth = e.depth, parent = hasKids, header = e.header })
     end
   end
   return out
@@ -152,9 +152,11 @@ function UI:BuildStockView(p)
     b.fs = self:Font(b, 11, { 0.88, 0.90, 0.96 })
     b.fs:SetHeight(14)
     b:SetScript("OnClick", function()
-      if not this.node then return end
+      if not this.node or this.node.header then return end
       PlaySound("igMainMenuOptionCheckBoxOn")
       if S.type == this.node.key and this.node.parent then S.type = "all" else S.type = this.node.key end
+      -- Lager zeigen immer ihren eigenen Bestand, nicht eine einzelne Bank
+      if string.sub(S.type, 1, 6) == "depot:" then S.bank = nil end
       UI:RefreshStock()
     end)
     S.treeRows[i] = b
@@ -253,7 +255,7 @@ function UI:RefreshTree()
       b:Hide()
     else
       b:Show()
-      local on = (S.type == n.key)
+      local on = (S.type == n.key) and not n.header
       b.fs:ClearAllPoints()
       b.fs:SetPoint("LEFT", b, "LEFT", 4 + n.depth * 10, 0)
       b.fs:SetWidth(132 - n.depth * 10)
@@ -263,7 +265,10 @@ function UI:RefreshTree()
         label = (open and "- " or "+ ") .. label
       end
       b.fs:SetText(label)
-      if on then
+      if n.header then
+        b.fs:SetTextColor(0.55, 0.70, 1)
+        b.sel:Hide()
+      elseif on then
         b.fs:SetTextColor(1, 0.95, 0.7)
         b.sel:Show()
       else

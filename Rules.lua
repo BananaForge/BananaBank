@@ -107,6 +107,55 @@ end
 -- ------------------------------------------------------------
 -- Speichern und Synchronisieren
 -- ------------------------------------------------------------
+BB.DEPOT_KINDS = { "welcome", "raid" }
+
+-- Lagerchars: Name -> Art ("welcome" oder "raid"). Ihr Bestand ist nur im eigenen Reiter zu sehen.
+function BB:DepotChars()
+  local map = {}
+  local d = BananaBankDB.rules and BananaBankDB.rules.depots
+  if d then
+    for kind, name in pairs(d) do
+      if name and name ~= "" then map[name] = kind end
+    end
+  end
+  return map
+end
+
+function BB:DepotName(kind)
+  for name, k in pairs(self:DepotChars()) do
+    if k == kind then return name end
+  end
+  return nil
+end
+
+function BB:DepotOf(name)
+  if not name then return nil end
+  return self:DepotChars()[name]
+end
+
+-- Bestand der Lagerchars einer Art, wie GetStock aufgebaut
+function BB:DepotStock(kind)
+  local out = {}
+  local db = BananaBankDB
+  for name, k in pairs(self:DepotChars()) do
+    local snap = k == kind and db.snaps[name]
+    if snap and self:MayBeBank(name) then
+      for id, it in pairs(snap.items) do
+        local e = out[id]
+        if not e then
+          e = { c = 0, q = it.q, t = it.t, n = it.n, per = {} }
+          out[id] = e
+        end
+        if it.k and not e.k then e.k = it.k end
+        if it.s and not e.s then e.s = it.s end
+        e.c = e.c + it.c
+        e.per[name] = (e.per[name] or 0) + it.c
+      end
+    end
+  end
+  return out
+end
+
 function BB:SaveRules(edit)
   local me = self:Me()
   if not self:MayBeBank(me) then
@@ -127,6 +176,14 @@ function BB:SaveRules(edit)
     local sp = edit[BB.RULE_KEYS[i]]
     rules[BB.RULE_KEYS[i]] = { n = sp.n, i = sp.i }
   end
+  -- Lagerchars (optional)
+  rules.depots = {}
+  for i = 1, getn(BB.DEPOT_KINDS) do
+    local kind = BB.DEPOT_KINDS[i]
+    local n = edit.depots and edit.depots[kind]
+    n = n and n ~= "" and BB.CleanCharName(n) or nil
+    if n then rules.depots[kind] = n end
+  end
   db.rules = rules
   self:PushRules()
   self:Print(self.T("RL_SAVED_MSG"))
@@ -146,6 +203,13 @@ function BB:SerializeRules(rules)
     local sp = rules[BB.RULE_KEYS[i]]
     table.insert(parts, cleanName(sp.n) .. "," .. (sp.i or 0))
   end
+  local dep = {}
+  for i = 1, getn(BB.DEPOT_KINDS) do
+    local kind = BB.DEPOT_KINDS[i]
+    local n = rules.depots and rules.depots[kind]
+    if n and n ~= "" then table.insert(dep, kind .. ":" .. cleanName(n)) end
+  end
+  table.insert(parts, table.concat(dep, ";"))
   return table.concat(parts, "~")
 end
 
@@ -158,6 +222,16 @@ function BB:ParseRules(payload)
     local sp = BB.Split(f[2 + i] or "", ",")
     if not sp[1] or sp[1] == "" or not tonumber(sp[2]) then return nil end
     rules[BB.RULE_KEYS[i]] = { n = sp[1], i = tonumber(sp[2]) }
+  end
+  rules.depots = {}
+  for _, part in ipairs(BB.Split(f[7] or "", ";")) do
+    local d = BB.Split(part, ":")
+    local kind = d[1]
+    for i = 1, getn(BB.DEPOT_KINDS) do
+      if BB.DEPOT_KINDS[i] == kind and BB.CleanCharName and d[2] and BB.CleanCharName(d[2]) then
+        rules.depots[kind] = BB.CleanCharName(d[2])
+      end
+    end
   end
   return rules
 end

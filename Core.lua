@@ -10,7 +10,7 @@
 BananaBank = {}
 local BB = BananaBank
 
-BB.VERSION = "2.7.2"
+BB.VERSION = "2.8.0"
 BB.PREFIX = "BBNK"
 BB.DONATE_NAME = "Lumihunt"
 -- Einziger erlaubter Bank-Rang, deutsch und englisch. Fest eingebaut, es gibt
@@ -383,7 +383,7 @@ function BB:GetStock()
   for bank, snap in pairs(db.snaps) do
    -- Bestaende von Chars ohne den Bank-Rang zaehlen nicht mit, auch wenn
    -- sie frueher einmal angenommen wurden.
-   if self:MayBeBank(bank) then
+   if self:MayBeBank(bank) and not (self.DepotOf and self:DepotOf(bank)) then
     for id, it in pairs(snap.items) do
       if not db.hidden[id] then
         local e = out[id]

@@ -772,6 +772,13 @@ function UI:StockList()
   end
   local list = {}
   local typeSpec = S.type and BB:FindTypeFilter(S.type) or nil
+  -- Lager (Willkommenspakete, Raid Stuff): eigener Bestand, nur zum Ansehen
+  S.depotStock = nil
+  if S.type and string.sub(S.type, 1, 6) == "depot:" then
+    stock, res = BB:DepotStock(string.sub(S.type, 7)), {}
+    S.depotStock = stock
+    typeSpec = nil
+  end
   for id, e in pairs(stock) do
     local avail = e.c - (res[id] or 0)
     local ok = (e.q or 1) >= S.filter
@@ -798,7 +805,11 @@ function UI:RefreshStock()
   local list, stock, res = self:StockList()
   self:RefreshStockView(list)
   if getn(list) == 0 then
-    if S.bank and not BananaBankDB.snaps[S.bank] then
+    if S.depotStock and not BB:DepotName(string.sub(S.type, 7)) then
+      S.empty:SetText(T("RB_DEPOT_NONE"))
+    elseif S.depotStock and BB.Count(S.depotStock) == 0 then
+      S.empty:SetText(T("RB_DEPOT_EMPTY"))
+    elseif S.bank and not BananaBankDB.snaps[S.bank] then
       S.empty:SetText(string.format(T("STOCK_BANK_NOSCAN"), S.bank))
     elseif S.bank and BB.Count(stock) == 0 then
       S.empty:SetText(string.format(T("STOCK_BANK_EMPTY"), S.bank))
@@ -829,7 +840,11 @@ function UI:CartAdd(id, delta, absolute)
   if not id then return end
   local basket = BananaBankDB.basket
   -- Regelsatz: wer nicht anfragen darf oder diese Qualitaet nicht, legt nichts in den Korb
-  if (absolute and delta > 0) or (not absolute and delta > 0) then
+  if delta > 0 and ((self.stock.type and string.sub(self.stock.type, 1, 6) == "depot:") or (self.stock.bank and BB:DepotOf(self.stock.bank))) then
+    BB:Print("|cffff4040" .. T("RB_DEPOT") .. "|r")
+    return
+  end
+  if delta > 0 then
     local why = BB:ItemBlockText(BB:Me(), id)
     if why then
       BB:Print("|cffff4040" .. why .. "|r")
@@ -870,6 +885,14 @@ end
 function UI:OnSlotEnter(slot)
   local id = slot.id
   if not id then return end
+  local depot = self.stock and self.stock.depotStock and self.stock.depotStock[id]
+  if depot then
+    local lines = { { T("TT_STOCK"), depot.c, 1, 1, 1 } }
+    for name, c in pairs(depot.per) do table.insert(lines, { string.format(T("TT_DEPOT"), name), c, 0.6, 0.75, 1 }) end
+    table.insert(lines, { T("RB_DEPOT"), "", 1, 0.5, 0.25 })
+    self:ItemTooltip(slot, id, lines)
+    return
+  end
   local avail, stock, res = BB:GetAvailable(id)
   local G, O, W = C.green, C.orange, C.text
   local lines = {

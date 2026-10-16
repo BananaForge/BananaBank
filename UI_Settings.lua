@@ -11,7 +11,7 @@ UI.settingsModule = true
 UI.set = {}
 
 local GEN_H, GUILD_H, BANK_H = 168, 108, 236
-local RULES_H = 246
+local RULES_H = 346
 
 -- ------------------------------------------------------------
 -- Kopf: Zahnrad und "Spenden an: <Hauptbank>"
@@ -260,8 +260,32 @@ function UI:BuildSettings()
     b:SetPoint("TOPLEFT", g, "TOPLEFT", 214, -56 - (i - 1) * 28)
     S.rlRows[key] = b
   end
+  -- Lagerchars
+  local dt = self:Font(g, 11, C.gold)
+  dt:SetPoint("TOPLEFT", g, "TOPLEFT", 4, -182)
+  self:Loc(dt, "RL_DEPOT_TITLE")
+  S.rlDepot = {}
+  local ddefs = { { "welcome", "RL_DEPOT_WELCOME", "BananaBankDepotWelcome" }, { "raid", "RL_DEPOT_RAID", "BananaBankDepotRaid" } }
+  for i = 1, getn(ddefs) do
+    local kind = ddefs[i][1]
+    local lbl = self:Font(g, 11, C.text)
+    lbl:SetPoint("TOPLEFT", g, "TOPLEFT", 4, -208 - (i - 1) * 28)
+    self:Loc(lbl, ddefs[i][2])
+    local e = self:EditBox(ddefs[i][3], g, 190)
+    e:SetPoint("TOPLEFT", g, "TOPLEFT", 214, -203 - (i - 1) * 28)
+    e:SetMaxLetters(24)
+    e:SetScript("OnTextChanged", function()
+      if S.depotLoading then return end
+      S.edit = S.edit or {}
+      S.edit.depots = S.edit.depots or {}
+      S.edit.depots[kind] = this:GetText()
+      S.editDirty = true
+    end)
+    e:SetScript("OnEnterPressed", function() this:ClearFocus() end)
+    S.rlDepot[kind] = e
+  end
   S.rlHint = self:Font(g, 10, C.muted)
-  S.rlHint:SetPoint("TOPLEFT", g, "TOPLEFT", 4, -176)
+  S.rlHint:SetPoint("TOPLEFT", g, "TOPLEFT", 4, -268)
   S.rlHint:SetWidth(420)
   S.rlHint:SetHeight(36)
   S.rlHint:SetJustifyV("TOP")
@@ -269,7 +293,7 @@ function UI:BuildSettings()
     if BB:SaveRules(S.edit or {}) then S.editDirty = false end
     UI:RefreshSettings()
   end, "primary")
-  S.rlSave:SetPoint("TOPLEFT", g, "TOPLEFT", 4, -216)
+  S.rlSave:SetPoint("TOPLEFT", g, "TOPLEFT", 4, -312)
 
   f:SetScript("OnShow", function() UI:RefreshSettings() end)
 end
@@ -332,7 +356,10 @@ function UI:RefreshRulesTab()
   local rules = BananaBankDB.rules
   local canEdit = BB:MayBeBank(BB:Me())
   if not S.editDirty then
-    S.edit = {}
+    S.edit = { depots = {} }
+    if rules and rules.depots then
+      for kind, name in pairs(rules.depots) do S.edit.depots[kind] = name end
+    end
     if rules then
       for i = 1, getn(BB.RULE_KEYS) do
         local sp = rules[BB.RULE_KEYS[i]]
@@ -361,6 +388,13 @@ function UI:RefreshRulesTab()
     end
     b:SetOn(canEdit)
   end
+  S.depotLoading = true
+  for kind, e in pairs(S.rlDepot) do
+    local want = (S.edit.depots and S.edit.depots[kind]) or ""
+    if e:GetText() ~= want then e:SetText(want) end
+    e:EnableMouse(canEdit and true or false)
+  end
+  S.depotLoading = false
   S.rlHint:SetText(T(canEdit and "RL_HINT" or "RL_READONLY"))
   if canEdit then S.rlSave:Show() else S.rlSave:Hide() end
 end

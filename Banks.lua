@@ -178,6 +178,10 @@ do
   table.insert(F, { key = "potion", label = "CAT_POTION", depth = 0, rules = { { k = "potion" } } })
   table.insert(F, { key = "bag", label = "CAT_BAG", depth = 0, rules = { { k = "bag" } } })
   table.insert(F, { key = "other", label = "CAT_OTHER", depth = 0, rules = { { k = "other" } } })
+  -- Lager: nur zum Ansehen, der Bestand kommt von den Lagerchars (Regelsatz)
+  table.insert(F, { key = "hdrview", label = "TF_H_VIEW", depth = 0, header = true })
+  table.insert(F, { key = "depot:welcome", label = "DEPOT_WELCOME", depth = 0, depot = "welcome" })
+  table.insert(F, { key = "depot:raid", label = "DEPOT_RAID", depth = 0, depot = "raid" })
 end
 
 function BB:FindTypeFilter(key)
