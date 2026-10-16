@@ -198,6 +198,10 @@ SlashCmdList["BANANABANK"] = function(msg)
     BB.UI:ToggleQuestTracker()
   elseif cmd == "questlog" then
     BB:PrintQuestLog(rest)
+  elseif cmd == "rights" or cmd == "rechte" then
+    BB:PrintRights(rest)
+  elseif cmd == "craft" then
+    BB:PrintCraft(rest)
   elseif cmd == "maildebug" then
     local info = BB:MailDebugInfo()
     for i = 1, table.getn(info) do BB:Print(info[i]) end

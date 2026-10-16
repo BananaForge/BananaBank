@@ -234,7 +234,12 @@ function BB:AcceptCrafter(r)
     self:Print("|cffff4040" .. string.format(self.T("ERR_RANK_LOST"), BB.BANK_RANK_LABEL) .. "|r")
     return
   end
-  if not r or r.s ~= "open" or not r.cl or next(r.cl) == nil then return end
+  if not r or r.s ~= "open" then return end
+  -- ohne Anspruch des Spielers (z.B. aelterer Client): die Bank prueft selbst, welche Rezepte passen
+  if not r.cl or next(r.cl) == nil then
+    r.cl = self:PotentialClaims(r)
+    if next(r.cl) == nil then r.cl = nil return end
+  end
   local ok, bad = self:CheckRequestRules(r)
   if not ok then
     if bad[1] and bad[1].why == "UNKNOWN" then self:RequestRoster() end

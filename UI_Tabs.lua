@@ -694,6 +694,7 @@ function UI:RefreshBank()
   local ids = {}
   for id in pairs(r.items) do table.insert(ids, id) end
   table.sort(ids)
+  local potential = (r.s == "open" and not (r.cl and next(r.cl))) and BB:PotentialClaims(r) or nil
   local shortage = false
   for i = 1, BANK_ROWS do
     local row = Bk.rows[i]
@@ -705,7 +706,8 @@ function UI:RefreshBank()
       row.ic:SetQuality(q)
       local qc = BB.QUALITY_COLOR[q or 1] or BB.QUALITY_COLOR[1]
       if r.fr and r.fr[id] then n = n .. " |cff80ff80" .. T("CR_TAG_FREE") .. "|r"
-      elseif r.cl and r.cl[id] then n = n .. " |cffffd24d" .. T("CR_TAG_CLAIM") .. "|r" end
+      elseif r.cl and r.cl[id] then n = n .. " |cffffd24d" .. T("CR_TAG_CLAIM") .. "|r"
+      elseif potential and potential[id] then n = n .. " |cff9cc8ff" .. T("CR_TAG_POSSIBLE") .. "|r" end
       row.name:SetText(n)
       row.name:SetTextColor(qc[1], qc[2], qc[3])
       local want = r.items[id]
@@ -764,10 +766,11 @@ function UI:RefreshBank()
   local prepHere = p and p.r == r
   Bk.confirm:SetOn(st == "open")
   local hasClaim = r.cl and next(r.cl) ~= nil
-  Bk.confirm.fs:SetText(T((hasClaim and st == "open") and "CR_B_NORMAL" or "BTN_CONFIRM"))
-  if hasClaim and st == "open" then
+  local hasPotential = potential and next(potential) ~= nil
+  Bk.confirm.fs:SetText(T(((hasClaim or hasPotential) and st == "open") and "CR_B_NORMAL" or "BTN_CONFIRM"))
+  if (hasClaim or hasPotential) and st == "open" then
     Bk.craft:Show()
-    Bk.craftInfo:SetText(T("CR_B_NOTE"))
+    Bk.craftInfo:SetText(T(hasClaim and "CR_B_NOTE" or "CR_B_POSSIBLE"))
   else
     Bk.craft:Hide()
     Bk.craftInfo:SetText("")

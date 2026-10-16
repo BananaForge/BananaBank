@@ -165,3 +165,50 @@ function BB:ValidClaims(items)
   end
   return out
 end
+
+
+-- Rezepte dieser Anfrage, die die Bank selbst als Gildencrafter-Anspruch bestaetigen koennte
+-- (Keyword, Beruf des Rezepts, noch nicht erhalten). Hilft, wenn der Client des Spielers keinen Anspruch mitsendet.
+function BB:PotentialClaims(r)
+  local out = {}
+  for id in pairs(r.items or {}) do
+    local ok = self:VerifyClaim(r.p, id)
+    if ok then out[id] = 1 end
+  end
+  return out
+end
+
+-- /bb rights [Name]: Regeln, Keywords und Rechte eines Spielers, zum Nachvollziehen
+function BB:PrintRights(name)
+  local rules = BananaBankDB.rules
+  self:Print(string.format(self.T("DBG_NOTES"), self.canSeeNotes and self.T("YES") or self.T("NO")))
+  local kws = {}
+  for i = 1, table.getn(rules and rules.keywords or {}) do
+    kws[i] = rules.keywords[i].kw .. "=" .. self:KeywordProfLabel(rules.keywords[i].prof)
+  end
+  self:Print(string.format(self.T("DBG_KWTABLE"), (table.getn(kws) > 0) and table.concat(kws, ", ") or "-"))
+  name = (name and name ~= "") and name or self:Me()
+  local e = BananaBankDB.ranks[name]
+  local r = BananaBankDB.rights
+  self:Print(string.format(self.T("DBG_PLAYER"), name, e and e.r or "?", (e and e.kw) or "-", (r and r.map and r.map[name]) or "-"))
+  local mine = self:KeywordsOf(name)
+  self:Print(string.format(self.T("DBG_EFFECTIVE"), table.concat(mine, ", ")))
+end
+
+-- /bb craft [Text]: warum ist (k)ein Rezept als Gildencrafter anfragbar?
+function BB:PrintCraft(text)
+  text = string.lower(text or "")
+  self:GetStock()
+  local n = 0
+  for id, e in pairs(self.stockCache or {}) do
+    local k = self:ResolveCategory(id, e)
+    if k == "recipe" and (text == "" or string.find(string.lower(e.n or ""), text, 1, true)) then
+      n = n + 1
+      if n <= 12 then
+        local ok, why, extra = self:CraftEligible(id)
+        self:Print(e.n .. ": " .. (ok and self.T("DBG_OK") or (why .. (extra and (" " .. tostring(extra)) or ""))))
+      end
+    end
+  end
+  if n == 0 then self:Print(self.T("DBG_NONE")) end
+end
