@@ -10,7 +10,7 @@
 BananaBank = {}
 local BB = BananaBank
 
-BB.VERSION = "3.0.0"
+BB.VERSION = "3.0.1"
 BB.PREFIX = "BBNK"
 BB.DONATE_NAME = "Lumihunt"
 -- Einziger erlaubter Bank-Rang, deutsch und englisch. Fest eingebaut, es gibt
@@ -748,6 +748,23 @@ function BB:GetPrice() return nil end
 function BB:IsBOE() return false end
 function BB:NeedsPrice() return false end
 function BB:MailCod() return 0 end
+-- Platzhalter fuer Rules.lua und Craft.lua (fehlen sie, laeuft der Rest ohne Fehler weiter, die Pruefung meldet die Datei)
+function BB:BlockText() return nil end
+function BB:ItemBlockText() return nil end
+function BB:CanRequest() return true end
+function BB:CheckRequestRules() return true, {} end
+function BB:DepotOf() return nil end
+function BB:DepotChars() return {} end
+function BB:DepotHas() return false end
+function BB:DepotStock() return {} end
+function BB:DepotTypes() return {} end
+function BB:DepotTypeById() return nil end
+function BB:KeywordsOf() return {} end
+function BB:HasProfKeyword() return false end
+function BB:ValidClaims() return {} end
+function BB:CraftEligible() return false, "NOTRECIPE" end
+function BB:CraftText() return nil end
+function BB:ToggleClaim() end
 function BB:PushPrices() end
 function BB:ResetPrice() end
 function BB:AHOpen() return false end
