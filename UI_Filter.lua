@@ -128,7 +128,7 @@ function UI:BuildStockView(p)
   end
 
   -- Kategorienbaum
-  local tree = self:Panel(p, 150, 0)
+  local tree = self:Panel(p, 124, 0)
   tree:SetPoint("TOPLEFT", p, "TOPLEFT", 0, -52)
   tree:SetPoint("BOTTOMLEFT", p, "BOTTOMLEFT", 0, 26)
   tree:EnableMouseWheel(true)
@@ -171,7 +171,7 @@ function UI:BuildStockView(p)
 
   -- Ergebnisfeld
   local res = self:Panel(p, 0, 0)
-  res:SetPoint("TOPLEFT", p, "TOPLEFT", 156, -52)
+  res:SetPoint("TOPLEFT", p, "TOPLEFT", 130, -52)
   res:SetPoint("BOTTOMRIGHT", p, "BOTTOMRIGHT", -238, 26)
   S.resPanel = res
   local sf = CreateFrame("ScrollFrame", "BananaBankStockScroll", res, "FauxScrollFrameTemplate")
@@ -265,7 +265,7 @@ function UI:RefreshTree()
       local on = (S.type == n.key) and not n.header
       b.fs:ClearAllPoints()
       b.fs:SetPoint("LEFT", b, "LEFT", 4 + n.depth * 10, 0)
-      b.fs:SetWidth(132 - n.depth * 10)
+      b.fs:SetWidth(108 - n.depth * 10)
       local label = n.literal and n.label or T(n.label)
       if n.parent then
         local open = (S.type == n.key) or (string.sub(S.type or "", 1, string.len(n.key) + 1) == n.key .. ":")

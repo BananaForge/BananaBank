@@ -93,6 +93,7 @@ Pull requests welcome, tested in-game on a 1.12 client. Lua 5.0 rules: no `#`, `
 
 ## Changelog
 
+- **3.1.13:** layout: stock tree is narrower so the result list is wider and the scrollbar no longer covers the prices; quest goal rows have a shorter bar and a wider status column so "done"/remaining text no longer overlaps.
 - **3.1.12:** ledger: hovering received donations (and gold entries) now shows a tooltip too; if the item id is not known yet it is looked up by name, otherwise a simple tooltip (name, amount, donor, date) is shown.
 - **3.1.11:** fix: gold donations for quests were discarded by other clients as "forged" (only item bookings were accepted). Gold bookings from verified bank chars now count everywhere; everyone needs this version to see the progress.
 - **3.1.10:** ledger: gold donations to a quest show the receiving bank char ("17s > Bananenweed") and a shortened quest title so the second line no longer wraps.
