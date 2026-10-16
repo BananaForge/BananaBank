@@ -604,6 +604,10 @@ function UI:BuildBank(parent)
   Bk.auto:SetPoint("BOTTOMLEFT", left, "BOTTOMLEFT", 14, 14)
   Bk.whisper = self:Check(left, "OPT_WHISPER", function() return BananaBankDB.whisper ~= false end, function(v) BananaBankDB.whisper = v end)
   Bk.whisper:SetPoint("LEFT", Bk.auto, "RIGHT", 60, 0)
+  Bk.cod = self:Font(left, 12, C.gold)
+  Bk.cod:SetPoint("BOTTOMLEFT", left, "BOTTOMLEFT", 14, 90)
+  Bk.cod:SetWidth(452)
+  Bk.cod:SetHeight(14)
   Bk.status = self:Font(left, 11, C.gold)
   Bk.status:SetPoint("BOTTOMLEFT", left, "BOTTOMLEFT", 14, 70)
   Bk.status:SetWidth(452)
@@ -706,6 +710,7 @@ function UI:RefreshBank()
     Bk.status:SetText("")
     Bk.craft:Hide()
     Bk.craftInfo:SetText("")
+    Bk.cod:SetText("")
     return
   end
   Bk.hint:Hide()
@@ -788,6 +793,11 @@ function UI:RefreshBank()
   local prepHere = p and p.r == r
   Bk.confirm:SetOn(st == "open")
   local hasClaim = r.cl and next(r.cl) ~= nil
+  -- Nachnahme der Mail, schon vor dem Bestaetigen sichtbar
+  local codNow, codAfter = BB:RequestCodTotals(r)
+  local codTxt = codNow > 0 and BB.Money(codNow) or T("MAIL_COD_NONE")
+  if hasClaim and st == "open" and codNow ~= codAfter then codTxt = codTxt .. "   >   " .. BB.Money(codAfter) .. "  (" .. T("CR_B_AFTER") .. ")" end
+  Bk.cod:SetText(string.format(T("MAIL_COD"), codTxt))
   Bk.confirm.fs:SetText(T((hasClaim and st == "open") and "CR_B_NORMAL" or "BTN_CONFIRM"))
   if hasClaim and st == "open" then
     -- direkt unter den Zeilen: Anspruch, Nachnahme jetzt und nach dem Akzeptieren, Knopf
