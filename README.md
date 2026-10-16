@@ -93,6 +93,7 @@ Pull requests welcome, tested in-game on a 1.12 client. Lua 5.0 rules: no `#`, `
 
 ## Changelog
 
+- **3.1.4:** Requests list: the whole row is clickable (bank: opens the request; members: shows the code), the "Open" button is gone, columns re-spaced so the cash on delivery is fully readable.
 - **3.1.3:** the bank view shows the cash on delivery of the request right away, before confirming (with a pending guild crafter claim: "now > after accepting").
 - **3.1.2:** cash on delivery is now visible before sending: the **Requests** list has a new COD column (for a pending guild crafter claim: "now > after accepting"), and the **mailbox helper** shows the COD of the next letter, the value currently entered in the send window (green "matches" / red "differs!", updated live) and the request total.
 - **3.1.1:** guild crafter claim is now **automatic**: every recipe in the basket that your own client finds eligible (keyword, scanned profession, not known yet, skill) is claimed without clicking; the G button only opts a recipe out/in again. A recipe whose required skill the client cannot read (item never seen) is no longer blocked.

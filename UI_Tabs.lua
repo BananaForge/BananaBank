@@ -65,7 +65,7 @@ function UI:BuildRequests(parent)
   list:SetPoint("TOPLEFT", p, "TOPLEFT", 0, -26)
   list:SetPoint("BOTTOMRIGHT", p, "BOTTOMRIGHT", 0, 28)
 
-  local cols = { { "COL_STATUS", 10 }, { "COL_CODE", 108 }, { "COL_PLAYER", 178 }, { "COL_ITEMS", 290 }, { "COL_DATE", 596 }, { "COL_COD", 672 } }
+  local cols = { { "COL_STATUS", 10 }, { "COL_CODE", 108 }, { "COL_PLAYER", 178 }, { "COL_ITEMS", 290 }, { "COL_DATE", 526 }, { "COL_COD", 618 } }
   for i = 1, getn(cols) do
     local h = self:Font(list, 10, C.goldDim)
     h:SetPoint("TOPLEFT", list, "TOPLEFT", cols[i][2], -9)
@@ -104,13 +104,13 @@ function UI:BuildRequests(parent)
     row.player:SetHeight(13)
     row.items = self:Font(row, 11, C.text)
     row.items:SetPoint("LEFT", row, "LEFT", 284, 0)
-    row.items:SetWidth(300)
+    row.items:SetWidth(230)
     row.items:SetHeight(13)
     row.date = self:Font(row, 10, C.muted)
-    row.date:SetPoint("LEFT", row, "LEFT", 590, 0)
+    row.date:SetPoint("LEFT", row, "LEFT", 520, 0)
     row.cod = self:Font(row, 10, C.gold)
-    row.cod:SetPoint("LEFT", row, "LEFT", 666, 0)
-    row.cod:SetWidth(150)
+    row.cod:SetPoint("LEFT", row, "LEFT", 612, 0)
+    row.cod:SetWidth(240)
     row.cod:SetHeight(13)
     row.cod:SetJustifyH("LEFT")
 
@@ -118,6 +118,10 @@ function UI:BuildRequests(parent)
     row.action:SetPoint("RIGHT", row, "RIGHT", -2, 0)
     row.action.row = row
 
+    -- ganze Zeile klickbar: Bank oeffnet die Anfrage, Spieler:in sieht den Code
+    row:SetScript("OnClick", function()
+      if this.actionKind == "open" or this.actionKind == "code" then UI:OnRequestAction(this) end
+    end)
     row:SetScript("OnEnter", function() UI:RequestTooltip(this) end)
     row:SetScript("OnLeave", function() GameTooltip:Hide() end)
     table.insert(R.rows, row)
@@ -190,7 +194,7 @@ function UI:RefreshRequests()
       row.code:SetText(r.id)
       row.player:SetText(r.p)
       if r.p == me then row.player:SetTextColor(C.gold[1], C.gold[2], C.gold[3]) else row.player:SetTextColor(C.text[1], C.text[2], C.text[3]) end
-      row.items:SetText(itemSummary(r.items, 58))
+      row.items:SetText(itemSummary(r.items, 42))
       row.date:SetText(BB.Date(r.ts))
       -- Nachnahme, mit der die Mail rausgeht (nach einem Gildencrafter-Anspruch entfaellt der Preis des Rezepts)
       if st == "open" or st == "confirmed" or st == "sent" then
@@ -214,7 +218,8 @@ function UI:RefreshRequests()
         row.actionKind = "code"
         row.action.fs:SetText(T("BTN_CODE"))
       end
-      if row.actionKind then row.action:Show() else row.action:Hide() end
+      -- "Oeffnen" braucht keinen Knopf: die Zeile selbst ist klickbar
+      if row.actionKind and row.actionKind ~= "open" then row.action:Show() else row.action:Hide() end
       row:Show()
     else
       row:Hide()
