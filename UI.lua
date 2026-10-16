@@ -423,7 +423,6 @@ function UI:Init()
     { key = "TAB_PRICES", page = "prices" },
     { key = "TAB_QUESTS", page = "quests" },
     { key = "TAB_BANKS", page = "banks" },
-    { key = "TAB_BANK", page = "bank" },
   }
   local prev
   for i = 1, getn(tabDefs) do
@@ -526,6 +525,9 @@ function UI:ShowPage(page)
   if page == "quests" and not self.pages.quests then page = "stock" end
   if page == "banks" and (not self.pages.banks or not BB:IsBank()) then page = "stock" end
   self.page = page
+  -- die Bankansicht ist kein eigener Reiter, sie liegt ueber den Anfragen
+  local hl = page
+  if hl == "bank" then hl = "requests" end
   for name, p in pairs(self.pages) do
     if name == page then p:Show() else p:Hide() end
   end
@@ -533,7 +535,7 @@ function UI:ShowPage(page)
   if self.tabs.quests and not self.pages.quests then self.tabs.quests:Hide() end
   if self.tabs.banks and not self.pages.banks then self.tabs.banks:Hide() end
   for name, tb in pairs(self.tabs) do
-    if name == page then
+    if name == hl then
       tb.fs:SetTextColor(C.gold[1], C.gold[2], C.gold[3])
       tb.bar:Show()
     else
@@ -547,7 +549,9 @@ end
 function UI:OnBankModeChanged()
   if not self.frame then return end
   -- Bank-Reiter und alles zum Bank-Verzeichnis gibt es nur auf Chars im Bank-Modus
-  if BB:IsBank() then self.tabs.bank:Show() else self.tabs.bank:Hide() end
+  if self.reqBankBtn then
+    if BB:IsBank() then self.reqBankBtn:Show() else self.reqBankBtn:Hide() end
+  end
   if self.tabs.banks then
     if BB:IsBank() and self.pages.banks then self.tabs.banks:Show() else self.tabs.banks:Hide() end
   end

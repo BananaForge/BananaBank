@@ -53,6 +53,10 @@ function UI:BuildRequests(parent)
     table.insert(R.chips, chip)
     prev = chip
   end
+  -- Bank-Chars: Bankansicht (Code einloesen, offene Anfrage, Bank-Werkzeuge) ueber den Anfragen
+  self.reqBankBtn = self:Button(p, 190, 20, "BTN_BANKVIEW", function() UI:ShowPage("bank") end)
+  self.reqBankBtn:SetPoint("TOPLEFT", p, "TOPLEFT", 260, -2)
+  if not BB:IsBank() then self.reqBankBtn:Hide() end
   R.info = self:Font(p, 11, C.muted)
   R.info:SetPoint("TOPRIGHT", p, "TOPRIGHT", -8, -5)
   R.info:SetJustifyH("RIGHT")
@@ -494,6 +498,8 @@ function UI:BuildBank(parent)
     this:ClearFocus()
   end)
   Bk.codeBox = codeBox
+  local back = self:Button(left, 130, 20, "BTN_BACK_REQ", function() UI:ShowPage("requests") end)
+  back:SetPoint("TOPRIGHT", left, "TOPRIGHT", -10, -8)
   local ph = self:Font(codeBox, 11, C.muted)
   ph:SetPoint("LEFT", codeBox, "LEFT", 2, 0)
   self:Loc(ph, "BANK_CODE_PLACEHOLDER")
