@@ -93,6 +93,7 @@ Pull requests welcome, tested in-game on a 1.12 client. Lua 5.0 rules: no `#`, `
 
 ## Changelog
 
+- **3.1.11:** fix: gold donations for quests were discarded by other clients as "forged" (only item bookings were accepted). Gold bookings from verified bank chars now count everywhere; everyone needs this version to see the progress.
 - **3.1.10:** ledger: gold donations to a quest show the receiving bank char ("17s > Bananenweed") and a shortened quest title so the second line no longer wraps.
 - **3.1.9:** quest detail: the scrollbar sits inside the panel, right of the rows. Bank chars now print a chat line when gold from the mailbox is booked ("Gold from X booked: ..."), and a char with the bank rank that is not in bank mode warns once when it empties a letter (nothing is booked there).
 - **3.1.8:** quest detail: item and gold-goal rows now have a scrollbar (no more overlap with "Best helpers"). Banks may store whatever they want: the role-vs-category plausibility is gone (no "misplaced items" warning, no category picker in the role editor, no stock tooltip hints); the Banks list shows the description instead.

@@ -406,7 +406,7 @@ function BB:OnTransfer(sender, kind, meta, payload)
         local o, s = seqOf(e.id)
         -- Buchungen, die eine Quest voranbringen, zaehlen nur von verifizierten Bank-Chars.
         -- Sonst koennte jedes Mitglied sich Fortschritt und Platz im Ranking schreiben.
-        local forged = e.code ~= "" and (not (e.k == "in" or e.k == "qfix") or not self:MayBeBank(o))
+        local forged = e.code ~= "" and (not (e.k == "in" or e.k == "qfix" or e.k == "gold") or not self:MayBeBank(o))
           and string.len(e.code) == 6 and string.sub(e.code, 1, 1) == "G"
         if forged then
           self:Debug("Quest-Buchung " .. e.id .. " verworfen (Herkunft ist keine Bank)")
@@ -417,6 +417,9 @@ function BB:OnTransfer(sender, kind, meta, payload)
           local q = e.code ~= "" and db.quests[e.code]
           if q and (e.k == "in" or e.k == "qfix") then
             self:QLog("deliver", q, o, string.format("%s: %dx %s", e.p, e.c, e.n), e.id)
+          end
+          if q and e.k == "gold" then
+            self:QLog("deliver", q, o, string.format("%s: %s", e.p, BB.GoldText(e.m)), e.id)
           end
         end
       end
