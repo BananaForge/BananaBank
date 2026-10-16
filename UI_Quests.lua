@@ -13,7 +13,7 @@ UI.q = { view = "quests", filter = "active", page = 1, sel = nil, period = "all"
 
 local LIST_ROWS = 6
 local ROW_H = 44
-local ITEM_ROWS = 6
+local ITEM_ROWS = 5   -- sichtbare Zeilen; mehr Eintraege (Items + Gold-Ziele, bis 6) scrollen
 local HELPER_ROWS = 5
 local RANK_ROWS = 9
 
@@ -388,13 +388,27 @@ function UI:BuildQuests(parent)
   end, "ok")
   Q.payBtn:SetPoint("RIGHT", Q.editBtn, "LEFT", -4, 0)
 
+  -- Scrollbalken fuer die Item-/Gold-Zeilen (nur sichtbar, wenn mehr Eintraege als Zeilen da sind)
+  local isf = CreateFrame("ScrollFrame", "BananaBankQuestItemScroll", dc, "FauxScrollFrameTemplate")
+  isf:SetPoint("TOPLEFT", dc, "TOPLEFT", 14, -112)
+  isf:SetPoint("BOTTOMRIGHT", dc, "TOPRIGHT", -14, -112 - ITEM_ROWS * 26)
+  isf:SetScript("OnVerticalScroll", function()
+    FauxScrollFrame_OnVerticalScroll(26, function() UI:RefreshQuestDetail() end)
+  end)
+  isf:EnableMouseWheel(true)
+  isf:SetScript("OnMouseWheel", function()
+    local sb = getglobal("BananaBankQuestItemScrollScrollBar")
+    if sb then sb:SetValue(sb:GetValue() - arg1 * 26) end
+  end)
+  Q.itemSF = isf
+
   -- Item-Zeilen
   Q.items = {}
   for i = 1, ITEM_ROWS do
     local r = CreateFrame("Frame", nil, dc)
     r:SetHeight(24)
     r:SetPoint("TOPLEFT", dc, "TOPLEFT", 14, -112 - (i - 1) * 26)
-    r:SetPoint("TOPRIGHT", dc, "TOPRIGHT", -14, -112 - (i - 1) * 26)
+    r:SetPoint("TOPRIGHT", dc, "TOPRIGHT", -36, -112 - (i - 1) * 26)
     r.slot = self:Slot(r, 24)
     r.slot:SetPoint("LEFT", r, "LEFT", 0, 0)
     r.slot:SetScript("OnEnter", function()
@@ -409,6 +423,11 @@ function UI:BuildQuests(parent)
       if q then UI:ItemClick(q, this.id, arg1) end
     end)
     r:EnableMouse(true)
+    r:EnableMouseWheel(true)
+    r:SetScript("OnMouseWheel", function()
+      local sb = getglobal("BananaBankQuestItemScrollScrollBar")
+      if sb then sb:SetValue(sb:GetValue() - arg1 * 26) end
+    end)
     r:SetScript("OnEnter", function()
       local q = BananaBankDB.quests[Q.sel]
       if this.goldBank then goldTooltip(this, this.goldBank) return end
@@ -744,10 +763,18 @@ function UI:RefreshQuestDetail()
   -- Items
   local ids = sortedItemIds(q)
   local banks = sortedGoldBanks(q)
+  local total = getn(ids) + getn(banks)
+  local offset = 0
+  if Q.itemSF and FauxScrollFrame_Update then
+    FauxScrollFrame_Update(Q.itemSF, total, ITEM_ROWS, 26)
+    offset = FauxScrollFrame_GetOffset(Q.itemSF)
+    if type(offset) ~= "number" then offset = 0 end
+  end
   for i = 1, ITEM_ROWS do
     local r = Q.items[i]
-    local id = ids[i]
-    local gbank = (not id) and banks[i - getn(ids)] or nil
+    local idx = offset + i
+    local id = ids[idx]
+    local gbank = (not id) and banks[idx - getn(ids)] or nil
     r.goldBank, r.slot.goldBank = gbank, gbank
     if gbank then
       local goal = q.gold[gbank]
@@ -1455,7 +1482,7 @@ function UI:BuildQuestTracker()
     end)
     table.insert(f.titles, b)
   end
-  for i = 1, TRACK_MAX * ITEM_ROWS do
+  for i = 1, TRACK_MAX * BB.QUEST_MAX_ITEMS do
     local n = self:Font(f, 10, C.text)
     n:SetWidth(150)
     n:SetHeight(12)

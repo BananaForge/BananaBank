@@ -93,6 +93,7 @@ Pull requests welcome, tested in-game on a 1.12 client. Lua 5.0 rules: no `#`, `
 
 ## Changelog
 
+- **3.1.8:** quest detail: item and gold-goal rows now have a scrollbar (no more overlap with "Best helpers"). Banks may store whatever they want: the role-vs-category plausibility is gone (no "misplaced items" warning, no category picker in the role editor, no stock tooltip hints); the Banks list shows the description instead.
 - **3.1.7:** Banks tab: bigger summary header (banks / items / gold), taller bank rows with three lines, and the "misplaced items" warning is spelled out and lists the items in the tooltip.
 - **3.1.6:** fix: the quantity columns in the bank view were placed outside the visible area. They are back, written out (REQUESTED / SENT / HERE), with the item name taking the rest of the width; request list columns re-spaced as well.
 - **3.1.5:** guild crafter claim covers exactly **one copy** of a recipe (a second copy in the same request is paid at the normal price, in the basket price, the request COD and the mail). Bank view: the [G]/[frei] tag now sits in front of the item name, the quantity columns moved to the far right so names are readable, and the "Bank character" box is collapsed into a button that drops down over the table.

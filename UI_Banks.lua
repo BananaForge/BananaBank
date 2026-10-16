@@ -11,8 +11,8 @@ local WHITE, FONT, FONT_TITLE = UI.WHITE, UI.FONT, UI.FONT_TITLE
 UI.bankUIModule = true
 UI.bk = {}
 
-local ROW_H = 58
-local VISIBLE = 6
+local ROW_H = 50
+local VISIBLE = 7
 local MENU_ROW = 38
 local MENU_MAX = 9
 
@@ -303,10 +303,9 @@ local lastRoster = 0
 function UI:BankCardTooltip(card)
   local info = card.info
   if not card.bank then return end
-  local st = BB:BankStats(card.bank)
   local hasDesc = info and info.desc and info.desc ~= ""
-  local hasWrong = st and st.wrong > 0
-  if not hasDesc and not hasWrong then return end
+  local hasWrong = false
+  if not hasDesc then return end
   GameTooltip:SetOwner(card, "ANCHOR_BOTTOMRIGHT")
   GameTooltip:AddLine(card.bank, C.gold[1], C.gold[2], C.gold[3])
   if hasDesc then GameTooltip:AddLine(info.desc, 1, 1, 1, 1) end
@@ -371,24 +370,16 @@ function UI:RefreshBanks()
         card.role:SetTextColor(C.muted[1], C.muted[2], C.muted[3])
       end
       card.info = info
-      local tl = BB:BankTagList(name)
-      if getn(tl) > 0 then
-        local names2 = {}
-        for j = 1, getn(tl) do table.insert(names2, BB:CatName(tl[j])) end
-        card.tags:SetText(string.format(T("BK_CATS"), table.concat(names2, "  -  ")))
-      else
-        card.tags:SetText("")
-      end
+      -- Zeile 2 links: die Beschreibung der Bank (kein Abgleich mit Kategorien, jede Bank lagert, was sie will)
+      local d = (info and info.desc) or ""
+      if string.len(d) > 60 then d = string.sub(d, 1, 57) .. "..." end
+      card.tags:SetText(d)
       if st then
         card.s1:SetText(string.format(T("BK_STATS"), st.items, st.kinds) .. "   " .. string.format(T("BK_GOLD"), BB.Money(st.gold)))
         local line = string.format(T("BK_SCAN"), BB.Date(st.ts))
         line = line .. "  -  " .. (BB:IsOnline(name) and T("BK_ONLINE") or T("BK_OFFLINE"))
         card.s3:SetText(line)
-        if st.wrong > 0 then
-          card.warn:SetText(string.format(T("BK_MISPLACED"), st.wrong))
-        else
-          card.warn:SetText("")
-        end
+        card.warn:SetText("")
         card.show:SetOn(true)
       else
         card.s1:SetText(T("SB_NOSCAN"))
@@ -446,6 +437,7 @@ function UI:BuildBankEditor()
     local fs = self:Font(f, 10, C.goldDim)
     fs:SetPoint("TOPLEFT", f, "TOPLEFT", 28, y)
     self:Loc(fs, key)
+    return fs
   end
   label("BE_ROLE", -78)
   f.role = self:EditBox("BananaBankInfoRole", f, 478)
@@ -467,7 +459,8 @@ function UI:BuildBankEditor()
   tp:EnableMouse(true)
   tp:SetScript("OnMouseDown", function() f.desc:SetFocus() end)
 
-  label("BE_CATS", -214)
+  local catLabel = label("BE_CATS", -214)
+  catLabel:Hide()
   f.tags = {}
   f.chips = {}
   for i = 1, getn(BB.CATS) do
@@ -481,6 +474,7 @@ function UI:BuildBankEditor()
     chip:SetHeight(22)
     chip:SetPoint("TOPLEFT", f, "TOPLEFT", 28 + rowi * 162, -230 - col * 28)
     f.chips[cat] = chip
+    chip:Hide()
   end
   local hint = self:Font(f, 10, { 0.62, 0.64, 0.74 })
   hint:SetPoint("TOPLEFT", f, "TOPLEFT", 28, -346)
@@ -488,6 +482,8 @@ function UI:BuildBankEditor()
   hint:SetHeight(26)
   hint:SetJustifyV("TOP")
   self:Loc(hint, "BE_HINT")
+  hint:Hide()
+  f:SetHeight(300)
 
   f.cancel = self:Button(f, 110, 26, "QE_CANCEL", function() f:Hide() end)
   f.cancel:SetPoint("BOTTOMRIGHT", f, "BOTTOMRIGHT", -154, 22)

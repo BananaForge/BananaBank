@@ -318,6 +318,7 @@ end
 -- Tooltip-Zeilen zu einem Item: wohin es gehoert, und was falsch liegt
 -- stockEntry = Eintrag aus GetStock (e.k = Kategorie, e.per = Menge je Bank)
 function BB:BankHintLines(stockEntry)
+  if true then return nil end   -- Banken duerfen lagern, was sie wollen: keine Zuordnungshinweise
   local cat = stockEntry and stockEntry.k
   if not cat then return nil end
   local targets = self:BankTargets(cat)
