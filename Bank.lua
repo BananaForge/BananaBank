@@ -273,6 +273,7 @@ end
 -- Nachnahme dieser Anfrage: jetzt (ohne bereits freie Rezepte) und nach dem Akzeptieren der beanspruchten Rezepte
 function BB:RequestCodTotals(r)
   local now, after = 0, 0
+  if BananaBankDB.cod == false then return 0, 0 end
   for id, n in pairs(r.items) do
     local u = self:GetPrice(id) or 0
     if not (r.fr and r.fr[id]) then
@@ -281,6 +282,27 @@ function BB:RequestCodTotals(r)
     end
   end
   return now, after
+end
+
+-- Nachnahme des naechsten Briefs (so viele Stapel, wie der Client in einen Brief laesst)
+function BB:LetterCod(p)
+  if not p or not p.slots then return 0 end
+  local last = p.idx + self:MailSlots() - 1
+  if last > table.getn(p.slots) then last = table.getn(p.slots) end
+  local sum = 0
+  for k = p.idx, last do
+    if p.slots[k] then sum = sum + self:MailCod(p.slots[k], p.r) end
+  end
+  return sum
+end
+
+-- Was steht gerade im Senden-Fenster als Nachnahme? 0, wenn der Brief keine Nachnahme ist oder das Fenster fehlt
+function BB:EnteredCod()
+  if not (SendMailMoney and MoneyInputFrame_GetCopper) then return nil end
+  local ok, c = pcall(MoneyInputFrame_GetCopper, SendMailMoney)
+  if not ok then return nil end
+  if SendMailCODButton and SendMailCODButton.GetChecked and not SendMailCODButton:GetChecked() then return 0 end
+  return c or 0
 end
 
 function BB:ConfirmRequest(r)

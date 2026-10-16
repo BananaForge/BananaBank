@@ -65,7 +65,7 @@ function UI:BuildRequests(parent)
   list:SetPoint("TOPLEFT", p, "TOPLEFT", 0, -26)
   list:SetPoint("BOTTOMRIGHT", p, "BOTTOMRIGHT", 0, 28)
 
-  local cols = { { "COL_STATUS", 10 }, { "COL_CODE", 108 }, { "COL_PLAYER", 178 }, { "COL_ITEMS", 290 }, { "COL_DATE", 596 } }
+  local cols = { { "COL_STATUS", 10 }, { "COL_CODE", 108 }, { "COL_PLAYER", 178 }, { "COL_ITEMS", 290 }, { "COL_DATE", 596 }, { "COL_COD", 672 } }
   for i = 1, getn(cols) do
     local h = self:Font(list, 10, C.goldDim)
     h:SetPoint("TOPLEFT", list, "TOPLEFT", cols[i][2], -9)
@@ -108,6 +108,11 @@ function UI:BuildRequests(parent)
     row.items:SetHeight(13)
     row.date = self:Font(row, 10, C.muted)
     row.date:SetPoint("LEFT", row, "LEFT", 590, 0)
+    row.cod = self:Font(row, 10, C.gold)
+    row.cod:SetPoint("LEFT", row, "LEFT", 666, 0)
+    row.cod:SetWidth(150)
+    row.cod:SetHeight(13)
+    row.cod:SetJustifyH("LEFT")
 
     row.action = self:Button(row, 64, 20, "", function(b) UI:OnRequestAction(b.row) end, "flat")
     row.action:SetPoint("RIGHT", row, "RIGHT", -2, 0)
@@ -187,6 +192,17 @@ function UI:RefreshRequests()
       if r.p == me then row.player:SetTextColor(C.gold[1], C.gold[2], C.gold[3]) else row.player:SetTextColor(C.text[1], C.text[2], C.text[3]) end
       row.items:SetText(itemSummary(r.items, 58))
       row.date:SetText(BB.Date(r.ts))
+      -- Nachnahme, mit der die Mail rausgeht (nach einem Gildencrafter-Anspruch entfaellt der Preis des Rezepts)
+      if st == "open" or st == "confirmed" or st == "sent" then
+        local now, after = BB:RequestCodTotals(r)
+        local txt = now > 0 and BB.Money(now) or "-"
+        if st ~= "sent" and r.cl and next(r.cl) ~= nil and now ~= after and not (r.fr and next(r.fr) ~= nil) then
+          txt = txt .. "  >  " .. BB.Money(after)
+        end
+        row.cod:SetText(txt)
+      else
+        row.cod:SetText("")
+      end
       row.actionKind = nil
       if isBank and (st == "open" or st == "confirmed") then
         row.actionKind = "open"
@@ -825,7 +841,7 @@ function UI:BuildMailHelper()
   local m = CreateFrame("Frame", "BananaBankMailHelper", MailFrame)
   self.mail = m
   m:SetWidth(230)
-  m:SetHeight(150)
+  m:SetHeight(196)
   m:SetPoint("TOPLEFT", MailFrame, "TOPRIGHT", -34, -14)
   m:SetBackdrop({
     bgFile = "Interface\\Tooltips\\UI-Tooltip-Background",
@@ -852,6 +868,26 @@ function UI:BuildMailHelper()
   m.line2:SetWidth(204)
   m.line2:SetHeight(28)
   m.line2:SetJustifyV("TOP")
+  -- Nachnahme: erwartet fuer den naechsten Brief, tatsaechlich im Fenster, Summe der Anfrage
+  m.cod1 = self:Font(m, 10, C.text)
+  m.cod1:SetPoint("TOPLEFT", m, "TOPLEFT", 14, -96)
+  m.cod1:SetWidth(204)
+  m.cod1:SetHeight(13)
+  m.cod2 = self:Font(m, 10, C.text)
+  m.cod2:SetPoint("TOPLEFT", m, "TOPLEFT", 14, -110)
+  m.cod2:SetWidth(204)
+  m.cod2:SetHeight(13)
+  m.cod3 = self:Font(m, 10, C.muted)
+  m.cod3:SetPoint("TOPLEFT", m, "TOPLEFT", 14, -124)
+  m.cod3:SetWidth(204)
+  m.cod3:SetHeight(13)
+  m.acc = 0
+  m:SetScript("OnUpdate", function()
+    this.acc = this.acc + (arg1 or 0)
+    if this.acc < 0.3 then return end
+    this.acc = 0
+    UI:RefreshMailCod()
+  end)
   m.send = self:Button(m, 204, 24, "BTN_SEND", function()
     BB:SendNextMail()
     UI:Refresh()
@@ -859,6 +895,34 @@ function UI:BuildMailHelper()
   m.send:SetPoint("BOTTOMLEFT", m, "BOTTOMLEFT", 13, 32)
   m.auto = self:Check(m, "OPT_AUTO_MAIL", function() return BananaBankDB.auto end, function(v) BananaBankDB.auto = v end)
   m.auto:SetPoint("BOTTOMLEFT", m, "BOTTOMLEFT", 14, 12)
+end
+
+-- Nachnahme-Anzeige am Briefkasten: das Fenster wird mehrmals pro Sekunde mit dem Soll verglichen
+function UI:RefreshMailCod()
+  local m = self.mail
+  if not m or not m:IsVisible() then return end
+  local p = BB.prep
+  if not p or not p.slots[p.idx] then
+    m.cod1:SetText("")
+    m.cod2:SetText("")
+    m.cod3:SetText("")
+    return
+  end
+  local want = BB:LetterCod(p)
+  local now = BB:RequestCodTotals(p.r)
+  m.cod1:SetText(string.format(T("MAIL_COD_NEXT"), want > 0 and BB.Money(want) or T("MAIL_COD_NONE")))
+  m.cod3:SetText(string.format(T("MAIL_COD_TOTAL"), now > 0 and BB.Money(now) or T("MAIL_COD_NONE")))
+  local got = BB:EnteredCod()
+  if p.sending or got == nil then
+    m.cod2:SetText("")
+  else
+    local txt = string.format(T("MAIL_COD_WINDOW"), got > 0 and BB.Money(got) or T("MAIL_COD_NONE"))
+    if got == want then
+      m.cod2:SetText(txt .. "  |cff60e070" .. T("MAIL_COD_OK") .. "|r")
+    else
+      m.cod2:SetText(txt .. "  |cffff5040" .. T("MAIL_COD_BAD") .. "|r")
+    end
+  end
 end
 
 function UI:RefreshMailHelper()
@@ -898,4 +962,5 @@ function UI:RefreshMailHelper()
     m.send.fs:SetText(T("BTN_SEND"))
     m.send:SetOn(false)
   end
+  self:RefreshMailCod()
 end
