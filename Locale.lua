@@ -79,6 +79,8 @@ BB.L.deDE = {
   TT_REQUEST = "Anfrage %s von %s",
   TT_SENT = "versendet",
   TT_BOOKED = "Gebucht",
+  TT_COUNT = "Anzahl",
+  TT_FROM = "Von",
 
   CART_TITLE = "Deine Anfrage",
   CART_EMPTY = "Klicke links auf Items, um sie hier zu sammeln.",
@@ -862,6 +864,8 @@ BB.L.enUS = {
   TT_REQUEST = "Request %s from %s",
   TT_SENT = "sent",
   TT_BOOKED = "Booked",
+  TT_COUNT = "Amount",
+  TT_FROM = "From",
 
   CART_TITLE = "Your request",
   CART_EMPTY = "Click items on the left to collect them here.",

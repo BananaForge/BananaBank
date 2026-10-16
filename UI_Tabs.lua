@@ -375,8 +375,24 @@ function UI:BuildLedger(parent)
     row:SetScript("OnEnter", function()
       local e = this.e
       if not e then return end
-      if e.i and e.i > 0 then
-        UI:ItemTooltip(this, e.i, { { T("TT_BOOKED"), BB.Date(e.t) } })
+      local id = e.i
+      -- Spenden werden oft gebucht, bevor das Item im Bestand steht: Id jetzt nachschlagen
+      if (not id or id == 0) and e.n and e.n ~= "" then id = BB:IdByName(e.n) end
+      if id and id > 0 then
+        UI:ItemTooltip(this, id, { { T("TT_BOOKED"), BB.Date(e.t) } })
+      else
+        -- ohne bekannte Item-Id: einfacher Tooltip aus dem Buchungseintrag
+        GameTooltip:SetOwner(this, "ANCHOR_RIGHT")
+        if e.n and e.n ~= "" then
+          local qc = BB.QUALITY_COLOR[e.q or 1] or BB.QUALITY_COLOR[1]
+          GameTooltip:AddLine(e.n, qc[1], qc[2], qc[3])
+          GameTooltip:AddDoubleLine(T("TT_COUNT"), e.c .. "x", 0.7, 0.7, 0.7, 1, 1, 1)
+        else
+          GameTooltip:AddLine(BB.Money(e.m or 0), C.gold[1], C.gold[2], C.gold[3])
+        end
+        GameTooltip:AddDoubleLine(T("TT_FROM"), e.p, 0.7, 0.7, 0.7, 1, 1, 1)
+        GameTooltip:AddDoubleLine(T("TT_BOOKED"), BB.Date(e.t), 0.7, 0.7, 0.7, 1, 1, 1)
+        GameTooltip:Show()
       end
     end)
     row:SetScript("OnLeave", function() GameTooltip:Hide() end)
