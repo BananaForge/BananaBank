@@ -326,6 +326,7 @@ end
 
 function BB:BookGold(sender, money)
   local me = self:Me()
+  self:Print(string.format(self.T("MSG_GOLD_BOOKED"), sender, BB.GoldText(money)))
   local parts = self:QuestGoldSplit(me, money)
   for i = 1, getn(parts) do
     local e = self:AddLedger({ k = "gold", p = sender, m = parts[i].m, n = me, code = parts[i].code })

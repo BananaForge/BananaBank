@@ -1045,6 +1045,10 @@ function BB:HookMail()
   end
   local origMoney = TakeInboxMoney
   TakeInboxMoney = function(i)
+    if not BB:IsBank() and BB:MayBeBank(BB:Me()) and not BB.warnedNoBank then
+      BB.warnedNoBank = true
+      BB:Print("|cffff8000" .. BB.T("MSG_MAIL_NOTBANK") .. "|r")
+    end
     BB:OnTakeInbox(i, false)
     return origMoney(i)
   end
