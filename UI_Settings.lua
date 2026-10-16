@@ -10,7 +10,7 @@ local WHITE = UI.WHITE
 UI.settingsModule = true
 UI.set = {}
 
-local GEN_H, GUILD_H, BANK_H = 168, 108, 208
+local GEN_H, GUILD_H, BANK_H = 168, 108, 236
 local RULES_H = 246
 
 -- ------------------------------------------------------------
@@ -220,6 +220,25 @@ function UI:BuildSettings()
   ah:SetHeight(24)
   ah:SetJustifyV("TOP")
   self:Loc(ah, "SET_AUTOBANK_HINT")
+  local al = self:Font(g, 11, C.text)
+  al:SetPoint("TOPLEFT", g, "TOPLEFT", 4, -208)
+  self:Loc(al, "SET_AGE")
+  S.age = self:EditBox("BananaBankPriceAge", g, 44)
+  S.age:SetPoint("TOPLEFT", g, "TOPLEFT", 290, -203)
+  S.age:SetMaxLetters(3)
+  S.age:SetNumeric(true)
+  local function saveAge()
+    local n = tonumber(S.age:GetText())
+    if n and n >= 0 and n <= 365 then BananaBankDB.priceMaxAge = math.floor(n) end
+    S.ageFocus = false
+    S.age:SetText(tostring(BB:PriceMaxAgeDays()))
+  end
+  S.age:SetScript("OnEditFocusGained", function() S.ageFocus = true end)
+  S.age:SetScript("OnEditFocusLost", saveAge)
+  S.age:SetScript("OnEnterPressed", function() saveAge() this:ClearFocus() end)
+  local ad = self:Font(g, 11, C.muted)
+  ad:SetPoint("LEFT", S.age, "RIGHT", 6, 0)
+  self:Loc(ad, "SET_AGE_DAYS")
 
   -- Regeln (Rang und Qualitaet)
   g = group(f, "SET_SEC_RULES")
@@ -303,6 +322,7 @@ function UI:RefreshSettings()
   S.cTrack.Update()
   S.cDebug.Update()
   if S.cBank then S.cBank.Update() S.cCod.Update() S.cWhisper.Update() S.cAuto.Update() end
+  if S.age and not S.ageFocus then S.age:SetText(tostring(BB:PriceMaxAgeDays())) end
   if not S.mainFocus then S.main:SetText(BB:MainBank()) end
 end
 

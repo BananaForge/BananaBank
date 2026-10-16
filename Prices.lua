@@ -167,21 +167,47 @@ end
 -- Gezielte Suche: fuer jedes BOE-Item im Bestand eine Abfrage mit dem
 -- Item-Namen. Das ganze AH durchzublaettern dauert in 1.12 Minuten und
 -- liefert fast nur Angebote, die uns nicht interessieren.
+-- Wie alt (in Tagen) darf ein AH-Preis sein, bevor der Scan ihn erneut holt? Einstellbar, Standard 10.
+BB.PRICE_MAX_AGE_DEFAULT = 10
+function BB:PriceMaxAgeDays()
+  local d = BananaBankDB.priceMaxAge
+  if type(d) ~= "number" or d < 0 then return BB.PRICE_MAX_AGE_DEFAULT end
+  return d
+end
+
+-- Gezielte Suche: erst alle Items ohne bisherigen Scan, dann die mit dem aeltesten Scan, und nur die,
+-- deren Scan aelter als die eingestellten Tage ist. Von Hand gesetzte Preise bleiben.
+-- Das ganze AH durchzublaettern dauert in 1.12 Minuten und liefert fast nur Angebote, die uns nicht interessieren.
 function BB:PriceTargets()
   local db = BananaBankDB
   local stock = self:GetStock()
-  local ids = {}
+  local fresh, old = {}, {}
+  local limit = self:PriceMaxAgeDays() * 86400
+  local now = time()
   for id in pairs(stock) do
     local cur = db.prices[id]
-    -- von Hand gesetzte Preise bleiben, die brauchen keine Abfrage
     if self:NeedsPrice(id) and not (cur and cur.src == "man") then
       local name = self:ItemInfo(id)
       if name and name ~= "" and not string.find(name, "^#%d") then
-        table.insert(ids, id)
+        local scanned = cur and ((cur.src == "ah" and (cur.u or 0) > 0) or cur.src == "none")
+        if not scanned then
+          table.insert(fresh, id)
+        elseif now - (cur.ts or 0) >= limit then
+          table.insert(old, id)
+        end
       end
     end
   end
-  table.sort(ids)
+  table.sort(fresh)
+  table.sort(old, function(a, b)
+    local ta, tb = db.prices[a].ts or 0, db.prices[b].ts or 0
+    if ta ~= tb then return ta < tb end
+    return a < b
+  end)
+  self.priceFreshCount = getn(fresh)
+  local ids = {}
+  for i = 1, getn(fresh) do table.insert(ids, fresh[i]) end
+  for i = 1, getn(old) do table.insert(ids, old[i]) end
   return ids
 end
 
@@ -202,7 +228,7 @@ function BB:StartAHScan()
   end
   self.scan = { ids = ids, idx = 1, set = 0, seen = 0, none = 0, page = 0, hits = {},
     started = GetTime() }
-  self:Print(string.format(self.T("MSG_AH_START"), getn(ids)))
+  self:Print(string.format(self.T("MSG_AH_START"), getn(ids), self.priceFreshCount or 0, self:PriceMaxAgeDays()))
   self:AHQuery()
 end
 
