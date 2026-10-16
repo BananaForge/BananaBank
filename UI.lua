@@ -805,7 +805,7 @@ function UI:RefreshStock()
   local list, stock, res = self:StockList()
   self:RefreshStockView(list)
   if getn(list) == 0 then
-    if S.depotStock and not BB:DepotName(string.sub(S.type, 7)) then
+    if S.depotStock and not BB:DepotHas(string.sub(S.type, 7)) then
       S.empty:SetText(T("RB_DEPOT_NONE"))
     elseif S.depotStock and BB.Count(S.depotStock) == 0 then
       S.empty:SetText(T("RB_DEPOT_EMPTY"))

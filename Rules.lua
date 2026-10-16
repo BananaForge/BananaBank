@@ -109,23 +109,39 @@ end
 -- ------------------------------------------------------------
 BB.DEPOT_KINDS = { "welcome", "raid" }
 
--- Lagerchars: Name -> Art ("welcome" oder "raid"). Ihr Bestand ist nur im eigenen Reiter zu sehen.
-function BB:DepotChars()
-  local map = {}
+-- Lagerchars: Liste { n = Name, k = Art ("welcome" oder "raid") }. Ihr Bestand ist nur im eigenen Reiter zu sehen.
+-- (Aeltere Staende hatten eine Zuordnung Art -> Name; die wird hier mit gelesen.)
+BB.DEPOT_MAX = 4
+
+function BB:DepotList()
+  local out = {}
   local d = BananaBankDB.rules and BananaBankDB.rules.depots
-  if d then
+  if not d then return out end
+  if d[1] ~= nil then
+    for i = 1, getn(d) do
+      if d[i].n and d[i].n ~= "" then table.insert(out, { n = d[i].n, k = d[i].k }) end
+    end
+  else
     for kind, name in pairs(d) do
-      if name and name ~= "" then map[name] = kind end
+      if type(name) == "string" and name ~= "" then table.insert(out, { n = name, k = kind }) end
     end
   end
+  return out
+end
+
+function BB:DepotChars()
+  local map = {}
+  local list = self:DepotList()
+  for i = 1, getn(list) do map[list[i].n] = list[i].k end
   return map
 end
 
-function BB:DepotName(kind)
-  for name, k in pairs(self:DepotChars()) do
-    if k == kind then return name end
+function BB:DepotHas(kind)
+  local list = self:DepotList()
+  for i = 1, getn(list) do
+    if list[i].k == kind then return true end
   end
-  return nil
+  return false
 end
 
 function BB:DepotOf(name)
@@ -178,11 +194,16 @@ function BB:SaveRules(edit)
   end
   -- Lagerchars (optional)
   rules.depots = {}
-  for i = 1, getn(BB.DEPOT_KINDS) do
-    local kind = BB.DEPOT_KINDS[i]
-    local n = edit.depots and edit.depots[kind]
-    n = n and n ~= "" and BB.CleanCharName(n) or nil
-    if n then rules.depots[kind] = n end
+  local seen = {}
+  for i = 1, getn(edit.depots or {}) do
+    local d = edit.depots[i]
+    local n = d.n and d.n ~= "" and BB.CleanCharName(d.n) or nil
+    local ok = false
+    for j = 1, getn(BB.DEPOT_KINDS) do if BB.DEPOT_KINDS[j] == d.k then ok = true end end
+    if n and ok and not seen[n] and getn(rules.depots) < BB.DEPOT_MAX then
+      seen[n] = true
+      table.insert(rules.depots, { n = n, k = d.k })
+    end
   end
   db.rules = rules
   self:PushRules()
@@ -204,10 +225,12 @@ function BB:SerializeRules(rules)
     table.insert(parts, cleanName(sp.n) .. "," .. (sp.i or 0))
   end
   local dep = {}
-  for i = 1, getn(BB.DEPOT_KINDS) do
-    local kind = BB.DEPOT_KINDS[i]
-    local n = rules.depots and rules.depots[kind]
-    if n and n ~= "" then table.insert(dep, kind .. ":" .. cleanName(n)) end
+  local list = {}
+  local d = rules.depots
+  if d and d[1] ~= nil then list = d
+  elseif d then for kind, name in pairs(d) do table.insert(list, { n = name, k = kind }) end end
+  for i = 1, getn(list) do
+    if list[i].n and list[i].n ~= "" then table.insert(dep, list[i].k .. ":" .. cleanName(list[i].n)) end
   end
   table.insert(parts, table.concat(dep, ";"))
   return table.concat(parts, "~")
@@ -228,8 +251,8 @@ function BB:ParseRules(payload)
     local d = BB.Split(part, ":")
     local kind = d[1]
     for i = 1, getn(BB.DEPOT_KINDS) do
-      if BB.DEPOT_KINDS[i] == kind and BB.CleanCharName and d[2] and BB.CleanCharName(d[2]) then
-        rules.depots[kind] = BB.CleanCharName(d[2])
+      if BB.DEPOT_KINDS[i] == kind and BB.CleanCharName and d[2] and BB.CleanCharName(d[2]) and getn(rules.depots) < BB.DEPOT_MAX then
+        table.insert(rules.depots, { n = BB.CleanCharName(d[2]), k = kind })
       end
     end
   end

@@ -11,7 +11,7 @@ UI.settingsModule = true
 UI.set = {}
 
 local GEN_H, GUILD_H, BANK_H = 168, 108, 236
-local RULES_H = 346
+local RULES_H = 424
 
 -- ------------------------------------------------------------
 -- Kopf: Zahnrad und "Spenden an: <Hauptbank>"
@@ -265,27 +265,32 @@ function UI:BuildSettings()
   dt:SetPoint("TOPLEFT", g, "TOPLEFT", 4, -182)
   self:Loc(dt, "RL_DEPOT_TITLE")
   S.rlDepot = {}
-  local ddefs = { { "welcome", "RL_DEPOT_WELCOME", "BananaBankDepotWelcome" }, { "raid", "RL_DEPOT_RAID", "BananaBankDepotRaid" } }
-  for i = 1, getn(ddefs) do
-    local kind = ddefs[i][1]
-    local lbl = self:Font(g, 11, C.text)
-    lbl:SetPoint("TOPLEFT", g, "TOPLEFT", 4, -208 - (i - 1) * 28)
-    self:Loc(lbl, ddefs[i][2])
-    local e = self:EditBox(ddefs[i][3], g, 190)
-    e:SetPoint("TOPLEFT", g, "TOPLEFT", 214, -203 - (i - 1) * 28)
-    e:SetMaxLetters(24)
-    e:SetScript("OnTextChanged", function()
-      if S.depotLoading then return end
-      S.edit = S.edit or {}
-      S.edit.depots = S.edit.depots or {}
-      S.edit.depots[kind] = this:GetText()
+  for i = 1, BB.DEPOT_MAX do
+    local row = {}
+    local y = -206 - (i - 1) * 26
+    row.char = self:Button(g, 170, 20, "", function(btn) UI:OpenDepotCharPicker(btn, i) end, "flat")
+    row.char:SetPoint("TOPLEFT", g, "TOPLEFT", 4, y)
+    row.kind = self:Button(g, 160, 20, "", function(btn) UI:OpenDepotKindPicker(btn, i) end, "flat")
+    row.kind:SetPoint("TOPLEFT", g, "TOPLEFT", 180, y)
+    row.del = self:Button(g, 24, 20, "x", function()
+      table.remove(S.edit.depots, i)
       S.editDirty = true
-    end)
-    e:SetScript("OnEnterPressed", function() this:ClearFocus() end)
-    S.rlDepot[kind] = e
+      UI:RefreshSettings()
+    end, "flat")
+    row.del:SetPoint("TOPLEFT", g, "TOPLEFT", 346, y)
+    S.rlDepot[i] = row
   end
+  S.rlAdd = self:Button(g, 110, 20, "RL_DEPOT_ADD", function()
+    S.edit.depots = S.edit.depots or {}
+    if getn(S.edit.depots) < BB.DEPOT_MAX then
+      table.insert(S.edit.depots, { n = nil, k = "welcome" })
+      S.editDirty = true
+      UI:RefreshSettings()
+    end
+  end, "flat")
+  S.rlAdd:SetPoint("TOPLEFT", g, "TOPLEFT", 4, -314)
   S.rlHint = self:Font(g, 10, C.muted)
-  S.rlHint:SetPoint("TOPLEFT", g, "TOPLEFT", 4, -268)
+  S.rlHint:SetPoint("TOPLEFT", g, "TOPLEFT", 4, -342)
   S.rlHint:SetWidth(420)
   S.rlHint:SetHeight(36)
   S.rlHint:SetJustifyV("TOP")
@@ -293,7 +298,7 @@ function UI:BuildSettings()
     if BB:SaveRules(S.edit or {}) then S.editDirty = false end
     UI:RefreshSettings()
   end, "primary")
-  S.rlSave:SetPoint("TOPLEFT", g, "TOPLEFT", 4, -312)
+  S.rlSave:SetPoint("TOPLEFT", g, "TOPLEFT", 4, -386)
 
   f:SetScript("OnShow", function() UI:RefreshSettings() end)
 end
@@ -356,10 +361,7 @@ function UI:RefreshRulesTab()
   local rules = BananaBankDB.rules
   local canEdit = BB:MayBeBank(BB:Me())
   if not S.editDirty then
-    S.edit = { depots = {} }
-    if rules and rules.depots then
-      for kind, name in pairs(rules.depots) do S.edit.depots[kind] = name end
-    end
+    S.edit = { depots = BB:DepotList() }
     if rules then
       for i = 1, getn(BB.RULE_KEYS) do
         local sp = rules[BB.RULE_KEYS[i]]
@@ -388,19 +390,31 @@ function UI:RefreshRulesTab()
     end
     b:SetOn(canEdit)
   end
-  S.depotLoading = true
-  for kind, e in pairs(S.rlDepot) do
-    local want = (S.edit.depots and S.edit.depots[kind]) or ""
-    if e:GetText() ~= want then e:SetText(want) end
-    e:EnableMouse(canEdit and true or false)
+  local dl = S.edit.depots or {}
+  for i = 1, BB.DEPOT_MAX do
+    local row = S.rlDepot[i]
+    local d = dl[i]
+    if d then
+      row.char:Show()
+      row.kind:Show()
+      if canEdit then row.del:Show() else row.del:Hide() end
+      row.char.fs:SetText(d.n or T("RL_PICK"))
+      row.kind.fs:SetText(T(d.k == "raid" and "DEPOT_RAID" or "DEPOT_WELCOME"))
+      row.char:SetOn(canEdit)
+      row.kind:SetOn(canEdit)
+    else
+      row.char:Hide()
+      row.kind:Hide()
+      row.del:Hide()
+    end
   end
-  S.depotLoading = false
+  if canEdit and getn(dl) < BB.DEPOT_MAX then S.rlAdd:Show() else S.rlAdd:Hide() end
   S.rlHint:SetText(T(canEdit and "RL_HINT" or "RL_READONLY"))
   if canEdit then S.rlSave:Show() else S.rlSave:Hide() end
 end
 
--- Auswahlmenue der Raenge
-function UI:OpenRankPicker(btn, key)
+-- Auswahlmenue: entries = { { label = Text, value = beliebig } }, onPick(value)
+function UI:OpenPicker(btn, entries, onPick)
   if not BB:MayBeBank(BB:Me()) then return end
   local m = self.rankMenu
   if not m then
@@ -437,37 +451,75 @@ function UI:OpenRankPicker(btn, key)
       row.fs:SetWidth(190)
       row.fs:SetHeight(14)
       row:SetScript("OnClick", function()
-        local pick = this.pick
-        if not pick then return end
-        UI.set.edit = UI.set.edit or {}
-        UI.set.edit[UI.rankMenu.key] = { n = pick.n, i = pick.i }
-        UI.set.editDirty = true
+        local e = this.entry
+        local cb = UI.rankMenu.onPick
         UI:CloseRankPicker()
-        UI:RefreshSettings()
+        if e and cb then cb(e.value) end
       end)
       m.rows[i] = row
     end
     self.rankMenu = m
   end
-  m.key = key
-  local list = BB:RankList()
+  m.onPick = onPick
   for i = 1, 14 do
     local row = m.rows[i]
-    local e = list[i]
-    row.pick = e
+    local e = entries[i]
+    row.entry = e
     if e then
-      row.fs:SetText(e.n)
+      row.fs:SetText(e.label)
       row:Show()
     else
       row:Hide()
     end
   end
-  local n = math.min(getn(list), 14)
+  local n = math.min(getn(entries), 14)
   m:SetHeight(12 + n * 19)
   m:ClearAllPoints()
   m:SetPoint("TOPLEFT", btn, "BOTTOMLEFT", 0, -2)
   m.catch:Show()
   m:Show()
+end
+
+function UI:OpenRankPicker(btn, key)
+  local entries = {}
+  local list = BB:RankList()
+  for i = 1, getn(list) do table.insert(entries, { label = list[i].n, value = list[i] }) end
+  self:OpenPicker(btn, entries, function(rank)
+    UI.set.edit = UI.set.edit or {}
+    UI.set.edit[key] = { n = rank.n, i = rank.i }
+    UI.set.editDirty = true
+    UI:RefreshSettings()
+  end)
+end
+
+-- Lagerchar waehlen: alle Bank-Chars, die das Addon kennt (diese Konten und die Gilde)
+function UI:OpenDepotCharPicker(btn, idx)
+  local entries = {}
+  local names = BB:BankList()
+  for i = 1, getn(names) do table.insert(entries, { label = names[i], value = names[i] }) end
+  self:OpenPicker(btn, entries, function(name)
+    local d = UI.set.edit.depots[idx]
+    if d then
+      d.n = name
+      UI.set.editDirty = true
+      UI:RefreshSettings()
+    end
+  end)
+end
+
+function UI:OpenDepotKindPicker(btn, idx)
+  local entries = {
+    { label = T("DEPOT_WELCOME"), value = "welcome" },
+    { label = T("DEPOT_RAID"), value = "raid" },
+  }
+  self:OpenPicker(btn, entries, function(kind)
+    local d = UI.set.edit.depots[idx]
+    if d then
+      d.k = kind
+      UI.set.editDirty = true
+      UI:RefreshSettings()
+    end
+  end)
 end
 
 function UI:CloseRankPicker()
