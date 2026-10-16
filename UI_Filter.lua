@@ -278,7 +278,9 @@ local function fillSlot(s, entry, basket)
   s.id = entry.id
   s.icon:SetTexture(BB.FullTex(entry.e.t))
   s:SetQuality(entry.e.q)
-  if entry.avail > 0 then s.icon:SetVertexColor(1, 1, 1) else s.icon:SetVertexColor(0.35, 0.35, 0.35) end
+  if BB:ItemBlockText(BB:Me(), entry.id) then
+    s.icon:SetVertexColor(0.65, 0.3, 0.3)   -- laut Regelsatz nicht anfragbar
+  elseif entry.avail > 0 then s.icon:SetVertexColor(1, 1, 1) else s.icon:SetVertexColor(0.35, 0.35, 0.35) end
   s.count:SetText(entry.avail > 1 and entry.avail or (entry.avail == 1 and "" or "0"))
   if entry.res > 0 then s.res:SetText(entry.res) else s.res:SetText("") end
   if basket[entry.id] then s.badge:SetText("x" .. basket[entry.id]) else s.badge:SetText("") end

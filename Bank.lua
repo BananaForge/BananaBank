@@ -233,6 +233,18 @@ function BB:ConfirmRequest(r)
     return
   end
   if not r or r.s ~= "open" then return end
+  -- Regelsatz: die Bank prueft Rang und Qualitaet noch einmal (aeltere oder veraenderte Clients umgehen das Fenster)
+  local ok, bad = self:CheckRequestRules(r)
+  if not ok then
+    if bad[1] and bad[1].why == "UNKNOWN" then self:RequestRoster() end
+    self:Print("|cffff4040" .. string.format(self.T("RB_REFUSED"), r.id, r.p) .. "|r")
+    for i = 1, getn(bad) do
+      local line = bad[i].text
+      if bad[i].id then line = self:ColoredName(bad[i].id) .. ": " .. line end
+      self:Print("|cffff9a2e" .. line .. "|r")
+    end
+    return
+  end
   self:SetStatus(r, "confirmed")
   self:Print(string.format(self.T("MSG_CONFIRMED"), r.id, r.p))
   self:Notify(r, "WHISPER_CONFIRMED")

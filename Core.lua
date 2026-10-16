@@ -10,7 +10,7 @@
 BananaBank = {}
 local BB = BananaBank
 
-BB.VERSION = "2.5.0"
+BB.VERSION = "2.6.0"
 BB.PREFIX = "BBNK"
 BB.DONATE_NAME = "Lumihunt"
 -- Einziger erlaubter Bank-Rang, deutsch und englisch. Fest eingebaut, es gibt
@@ -256,6 +256,7 @@ function BB:ReadRoster()
   end
   self.rankExists = exists
   self.rosterReady = true
+  self.rankListCache = nil
   self:BankModeNudge()
 end
 
@@ -520,8 +521,15 @@ function BB:CreateRequest(items)
     if n and n > 0 then clean[id] = n end
   end
   if BB.Count(clean) == 0 then return nil end
-  local id = self:NewCodeId()
   local me = self:Me()
+  -- Regelsatz: Rang und Qualitaet
+  local why = self:BlockText(me, nil)
+  if why then self:Print("|cffff4040" .. why .. "|r") return nil end
+  for iid in pairs(clean) do
+    local t = self:ItemBlockText(me, iid)
+    if t then self:Print("|cffff4040" .. self:ColoredName(iid) .. ": " .. t .. "|r") return nil end
+  end
+  local id = self:NewCodeId()
   local r = {
     id = id, p = me, ts = time(), items = clean, s = "open", u = time(), by = me, sent = {},
   }
@@ -804,6 +812,7 @@ function BB:CheckModules()
   if not self.bankModule then table.insert(missing, "Banks.lua") end
   if not (self.UI and self.UI.bankUIModule) then table.insert(missing, "UI_Banks.lua") end
   if not (self.UI and self.UI.filterModule) then table.insert(missing, "UI_Filter.lua") end
+  if not self.rulesModule then table.insert(missing, "Rules.lua") end
   if not (self.UI and self.UI.helpModule) then table.insert(missing, "UI_Help.lua") end
   if not (self.UI and self.UI.settingsModule) then table.insert(missing, "UI_Settings.lua") end
   if not self.summaryModule then table.insert(missing, "Summary.lua") end

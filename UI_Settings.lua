@@ -11,6 +11,7 @@ UI.settingsModule = true
 UI.set = {}
 
 local GEN_H, GUILD_H, BANK_H = 168, 108, 208
+local RULES_H = 246
 
 -- ------------------------------------------------------------
 -- Kopf: Zahnrad und "Spenden an: <Hauptbank>"
@@ -114,6 +115,20 @@ function UI:BuildSettings()
   title:SetPoint("TOPLEFT", f, "TOPLEFT", 26, -20)
   self:Loc(title, "SET_TITLE")
   self:GlowLine(f, -50, 20, -20)
+  S.tab = "gen"
+  S.tabs = {}
+  local tdefs = { { "SET_TAB_GEN", "gen" }, { "SET_TAB_RULES", "rules" } }
+  for i = 1, getn(tdefs) do
+    local key = tdefs[i][2]
+    local chip = self:Chip(f, 120, tdefs[i][1], function()
+      S.tab = key
+      UI:RefreshSettings()
+    end)
+    chip:SetHeight(22)
+    chip:SetPoint("TOPLEFT", f, "TOPLEFT", 26 + (i - 1) * 126, -56)
+    chip.key = key
+    S.tabs[i] = chip
+  end
 
   -- Allgemein (alle)
   local g = group(f, "SET_SEC_GEN")
@@ -206,6 +221,37 @@ function UI:BuildSettings()
   ah:SetJustifyV("TOP")
   self:Loc(ah, "SET_AUTOBANK_HINT")
 
+  -- Regeln (Rang und Qualitaet)
+  g = group(f, "SET_SEC_RULES")
+  S.rules = g
+  g:SetHeight(RULES_H)
+  S.rlStatus = self:Font(g, 10, C.orange)
+  S.rlStatus:SetPoint("TOPLEFT", g, "TOPLEFT", 4, -22)
+  S.rlStatus:SetWidth(420)
+  S.rlStatus:SetHeight(28)
+  S.rlStatus:SetJustifyV("TOP")
+  S.rlRows = {}
+  local rdefs = { { "req", "RL_REQ" }, { "q2", "RL_Q2" }, { "q3", "RL_Q3" }, { "q4", "RL_Q4" } }
+  for i = 1, getn(rdefs) do
+    local key = rdefs[i][1]
+    local lbl = self:Font(g, 11, C.text)
+    lbl:SetPoint("TOPLEFT", g, "TOPLEFT", 4, -60 - (i - 1) * 28)
+    self:Loc(lbl, rdefs[i][2])
+    local b = self:Button(g, 210, 20, "", function(btn) UI:OpenRankPicker(btn, key) end, "flat")
+    b:SetPoint("TOPLEFT", g, "TOPLEFT", 214, -56 - (i - 1) * 28)
+    S.rlRows[key] = b
+  end
+  S.rlHint = self:Font(g, 10, C.muted)
+  S.rlHint:SetPoint("TOPLEFT", g, "TOPLEFT", 4, -176)
+  S.rlHint:SetWidth(420)
+  S.rlHint:SetHeight(36)
+  S.rlHint:SetJustifyV("TOP")
+  S.rlSave = self:Button(g, 150, 22, "RL_SAVE", function()
+    if BB:SaveRules(S.edit or {}) then S.editDirty = false end
+    UI:RefreshSettings()
+  end, "primary")
+  S.rlSave:SetPoint("TOPLEFT", g, "TOPLEFT", 4, -216)
+
   f:SetScript("OnShow", function() UI:RefreshSettings() end)
 end
 
@@ -215,7 +261,22 @@ function UI:RefreshSettings()
   local S = self.set
   local isMgr = BB:CanManageQuests()
   local isBank = BB:IsBank()
-  local y = -62
+  for i = 1, getn(S.tabs) do S.tabs[i]:SetActive(S.tabs[i].key == S.tab) end
+  local y = -88
+  if S.tab == "rules" then
+    S.gen:Hide()
+    S.guild:Hide()
+    S.bank:Hide()
+    S.rules:Show()
+    S.rules:ClearAllPoints()
+    S.rules:SetPoint("TOPLEFT", f, "TOPLEFT", 20, y)
+    y = y - RULES_H - 8
+    self:RefreshRulesTab()
+    f:SetHeight(-y + 22)
+    return
+  end
+  S.rules:Hide()
+  S.gen:Show()
   S.gen:ClearAllPoints()
   S.gen:SetPoint("TOPLEFT", f, "TOPLEFT", 20, y)
   y = y - GEN_H - 8
@@ -243,6 +304,122 @@ function UI:RefreshSettings()
   S.cDebug.Update()
   if S.cBank then S.cBank.Update() S.cCod.Update() S.cWhisper.Update() S.cAuto.Update() end
   if not S.mainFocus then S.main:SetText(BB:MainBank()) end
+end
+
+-- Inhalt des Reiters Regeln
+function UI:RefreshRulesTab()
+  local S = self.set
+  local rules = BananaBankDB.rules
+  local canEdit = BB:MayBeBank(BB:Me())
+  if not S.editDirty then
+    S.edit = {}
+    if rules then
+      for i = 1, getn(BB.RULE_KEYS) do
+        local sp = rules[BB.RULE_KEYS[i]]
+        if sp then S.edit[BB.RULE_KEYS[i]] = { n = sp.n, i = sp.i } end
+      end
+    end
+  end
+  if rules then
+    S.rlStatus:SetText(string.format(T("RL_STATUS_SAVED"), BB.Date(rules.ts), rules.by or "?"))
+    S.rlStatus:SetTextColor(C.muted[1], C.muted[2], C.muted[3])
+  else
+    S.rlStatus:SetText(T("RL_STATUS_NONE"))
+    S.rlStatus:SetTextColor(C.orange[1], C.orange[2], C.orange[3])
+  end
+  for i = 1, getn(BB.RULE_KEYS) do
+    local key = BB.RULE_KEYS[i]
+    local b = S.rlRows[key]
+    local sp = S.edit[key]
+    if sp then
+      local _, now, found = BB:RuleRank(sp)
+      local text = sp.n
+      if now and not found then text = sp.n .. " |cffff9a2e> " .. now .. "|r" end
+      b.fs:SetText(text)
+    else
+      b.fs:SetText(T("RL_PICK"))
+    end
+    b:SetOn(canEdit)
+  end
+  S.rlHint:SetText(T(canEdit and "RL_HINT" or "RL_READONLY"))
+  if canEdit then S.rlSave:Show() else S.rlSave:Hide() end
+end
+
+-- Auswahlmenue der Raenge
+function UI:OpenRankPicker(btn, key)
+  if not BB:MayBeBank(BB:Me()) then return end
+  local m = self.rankMenu
+  if not m then
+    local catch = CreateFrame("Button", nil, UIParent)
+    catch:SetAllPoints(UIParent)
+    catch:SetFrameStrata("FULLSCREEN")
+    catch:Hide()
+    catch:SetScript("OnClick", function() UI:CloseRankPicker() end)
+    m = CreateFrame("Frame", nil, UIParent)
+    m:SetWidth(210)
+    m:SetBackdrop({
+      bgFile = WHITE, edgeFile = "Interface\\Tooltips\\UI-Tooltip-Border",
+      tile = true, tileSize = 16, edgeSize = 14,
+      insets = { left = 3, right = 3, top = 3, bottom = 3 },
+    })
+    m:SetBackdropColor(0.015, 0.025, 0.06, 1)
+    m:SetBackdropBorderColor(C.gold[1], C.gold[2], C.gold[3], 1)
+    m:SetFrameStrata("TOOLTIP")
+    m:EnableMouse(true)
+    m:Hide()
+    m.catch = catch
+    m.rows = {}
+    for i = 1, 14 do
+      local row = CreateFrame("Button", nil, m)
+      row:SetHeight(18)
+      row:SetPoint("TOPLEFT", m, "TOPLEFT", 6, -6 - (i - 1) * 19)
+      row:SetPoint("TOPRIGHT", m, "TOPRIGHT", -6, -6 - (i - 1) * 19)
+      local hl = row:CreateTexture(nil, "HIGHLIGHT")
+      hl:SetTexture(WHITE)
+      hl:SetAllPoints(row)
+      hl:SetVertexColor(1, 0.82, 0.3, 0.16)
+      row.fs = self:Font(row, 11, { 1, 1, 1 })
+      row.fs:SetPoint("LEFT", row, "LEFT", 4, 0)
+      row.fs:SetWidth(190)
+      row.fs:SetHeight(14)
+      row:SetScript("OnClick", function()
+        local pick = this.pick
+        if not pick then return end
+        UI.set.edit = UI.set.edit or {}
+        UI.set.edit[UI.rankMenu.key] = { n = pick.n, i = pick.i }
+        UI.set.editDirty = true
+        UI:CloseRankPicker()
+        UI:RefreshSettings()
+      end)
+      m.rows[i] = row
+    end
+    self.rankMenu = m
+  end
+  m.key = key
+  local list = BB:RankList()
+  for i = 1, 14 do
+    local row = m.rows[i]
+    local e = list[i]
+    row.pick = e
+    if e then
+      row.fs:SetText(e.n)
+      row:Show()
+    else
+      row:Hide()
+    end
+  end
+  local n = math.min(getn(list), 14)
+  m:SetHeight(12 + n * 19)
+  m:ClearAllPoints()
+  m:SetPoint("TOPLEFT", btn, "BOTTOMLEFT", 0, -2)
+  m.catch:Show()
+  m:Show()
+end
+
+function UI:CloseRankPicker()
+  if not self.rankMenu then return end
+  self.rankMenu:Hide()
+  self.rankMenu.catch:Hide()
 end
 
 function UI:ToggleSettings()

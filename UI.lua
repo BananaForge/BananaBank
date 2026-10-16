@@ -727,6 +727,11 @@ function UI:BuildStock(parent)
   S.cartPrice = self:Font(cart, 11, C.gold)
   S.cartPrice:SetPoint("BOTTOMLEFT", cart, "BOTTOMLEFT", 12, 90)
   S.cartPrice:SetWidth(208)
+  S.cartLock = self:Font(cart, 10, C.orange)
+  S.cartLock:SetPoint("BOTTOMLEFT", cart, "BOTTOMLEFT", 12, 112)
+  S.cartLock:SetWidth(208)
+  S.cartLock:SetHeight(26)
+  S.cartLock:SetJustifyV("BOTTOM")
   local hint = self:Font(cart, 9, C.muted)
   hint:SetPoint("BOTTOMLEFT", cart, "BOTTOMLEFT", 12, 62)
   hint:SetWidth(208)
@@ -823,6 +828,14 @@ end
 function UI:CartAdd(id, delta, absolute)
   if not id then return end
   local basket = BananaBankDB.basket
+  -- Regelsatz: wer nicht anfragen darf oder diese Qualitaet nicht, legt nichts in den Korb
+  if (absolute and delta > 0) or (not absolute and delta > 0) then
+    local why = BB:ItemBlockText(BB:Me(), id)
+    if why then
+      BB:Print("|cffff4040" .. why .. "|r")
+      return
+    end
+  end
   local avail = BB:GetAvailable(id)
   local n = (basket[id] or 0) + delta
   if absolute then n = delta end
@@ -880,6 +893,8 @@ function UI:OnSlotEnter(slot)
   elseif BB:IsBOE(id) then
     table.insert(lines, { T("TT_PRICE"), T("TT_PRICE_NONE"), 0.8, 0.8, 0.8 })
   end
+  local block = BB:ItemBlockText(BB:Me(), id)
+  if block then table.insert(lines, { block, "", 1, 0.5, 0.25 }) end
   table.insert(lines, { T("TT_HINT"), "", 0.5, 0.5, 0.5 })
   self:ItemTooltip(slot, id, lines)
 end
@@ -924,7 +939,9 @@ function UI:RefreshCart()
   else
     S.cartPrice:SetText("")
   end
-  S.makeBtn:SetOn(positions > 0)
+  local lock = BB:BlockText(BB:Me(), nil)
+  S.cartLock:SetText(lock or "")
+  S.makeBtn:SetOn(positions > 0 and not lock)
   S.lastCodeBtn:SetOn(self.lastReq ~= nil)
 end
 
