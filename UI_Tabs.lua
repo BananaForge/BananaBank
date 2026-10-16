@@ -475,11 +475,23 @@ function UI:RefreshLedger()
       if (e.k == "in" or e.k == "gold" or e.k == "back") and BB:IsGuildMember(e.p) == false then
         who = who .. " |cffff9a2e" .. T("LEDGER_EXTERN") .. "|r"
       end
+      -- Gold-Spende an einen bestimmten Bank-Char (Gold-Ziel einer Quest)
+      if e.k == "gold" and e.n ~= "" then what = what .. "  >  " .. e.n end
       row.txt:SetText(who .. ": " .. what)
       local sub = BB.Date(e.t) .. "  " .. T("KIND_" .. string.upper(e.k))
       local qq = e.code ~= "" and BananaBankDB.quests[e.code]
       if qq then
-        sub = sub .. "  |cffffd100" .. qq.title .. "|r"
+        -- Titel kuerzen, sonst bricht die Zeile um
+        local title = qq.title
+        if string.len(title) > 14 then
+          local cut = 13
+          while cut > 0 do
+            local nb = string.byte(title, cut + 1)
+            if nb and nb >= 128 and nb < 192 then cut = cut - 1 else break end
+          end
+          title = string.sub(title, 1, cut) .. ".."
+        end
+        sub = sub .. "  |cffffd100" .. title .. "|r"
       elseif e.code ~= "" and e.code ~= "TRADE" then
         sub = sub .. "  " .. e.code
       end
