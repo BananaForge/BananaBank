@@ -93,6 +93,7 @@ Pull requests welcome, tested in-game on a 1.12 client. Lua 5.0 rules: no `#`, `
 
 ## Changelog
 
+- **2.9.0:** depot types are editable. New **Depots** tab in the settings: up to 6 freely named types (default: Welcome packages, Raid stuff; rename, add with + Type, delete with x), every type shows up in the stock tree under "View only". Below, up to 4 depot characters: the type on the left, the character on the right (menus). The types are part of the synced rule set.
 - **2.8.1:** depot characters are chosen from a menu of the known bank characters instead of typed in; each row has a character menu, a kind menu (welcome packages / raid stuff) and an x; **+ Depot** adds a row (up to 4, several characters per kind are merged).
 - **2.8.0:** **depot characters** (step 3). In the Rules tab a Gildenbank character names one character for *Welcome packages* and one for *Raid stuff*. Their stock is left out of "Entire bank" and shown only in two new entries under "View only" in the category tree; items there cannot be requested (also not when such a character is picked in the bank selector). The depot names are part of the synced rule set.
 - **2.7.2:** items that had no price at the last scan (not found at the AH) are always scanned again, regardless of the age setting.

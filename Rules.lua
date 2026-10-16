@@ -107,12 +107,58 @@ end
 -- ------------------------------------------------------------
 -- Speichern und Synchronisieren
 -- ------------------------------------------------------------
-BB.DEPOT_KINDS = { "welcome", "raid" }
 
--- Lagerchars: Liste { n = Name, k = Art ("welcome" oder "raid") }. Ihr Bestand ist nur im eigenen Reiter zu sehen.
--- (Aeltere Staende hatten eine Zuordnung Art -> Name; die wird hier mit gelesen.)
+-- Lagertypen: frei benennbar, erscheinen im Baum unter "Nur ansehen". Standard: Willkommenspakete und Raid Stuff.
+BB.DEPOT_TYPE_MAX = 6
 BB.DEPOT_MAX = 4
 
+local function cleanLabel(x)
+  x = BB.Clean(x or "")
+  x = string.gsub(x, "[;:,]", "")
+  x = string.gsub(x, "^%s+", "")
+  x = string.gsub(x, "%s+$", "")
+  if string.len(x) > 24 then x = string.sub(x, 1, 24) end
+  return x
+end
+BB.CleanDepotLabel = cleanLabel
+
+-- Liste { id = , name = } mit aufgeloesten Namen (Standardtypen ohne Namen heissen wie in der Sprache)
+function BB:DepotTypes()
+  local rules = BananaBankDB.rules
+  local out = {}
+  local list = rules and rules.depotTypes
+  if list then
+    for i = 1, getn(list) do
+      local t = list[i]
+      local name = t.name
+      if not name or name == "" then
+        if t.id == "welcome" then name = self.T("DEPOT_WELCOME") elseif t.id == "raid" then name = self.T("DEPOT_RAID") else name = t.id end
+      end
+      table.insert(out, { id = t.id, name = name })
+    end
+    return out
+  end
+  return { { id = "welcome", name = self.T("DEPOT_WELCOME") }, { id = "raid", name = self.T("DEPOT_RAID") } }
+end
+
+-- Arbeitskopie der Typen fuer die Einstellungen
+function BB:DepotTypeListForEdit()
+  local out = {}
+  local list = self:DepotTypes()
+  for i = 1, getn(list) do table.insert(out, { id = list[i].id, name = list[i].name }) end
+  return out
+end
+
+function BB:DepotTypeById(id)
+  local list = self:DepotTypes()
+  for i = 1, getn(list) do
+    if list[i].id == id then return list[i] end
+  end
+  return nil
+end
+
+-- Lagerchars: Liste { n = Name, k = Typ-ID }. Ihr Bestand ist nur im eigenen Eintrag zu sehen.
+-- (Aeltere Staende hatten eine Zuordnung Art -> Name; die wird hier mit gelesen.)
 function BB:DepotList()
   local out = {}
   local d = BananaBankDB.rules and BananaBankDB.rules.depots
@@ -192,15 +238,41 @@ function BB:SaveRules(edit)
     local sp = edit[BB.RULE_KEYS[i]]
     rules[BB.RULE_KEYS[i]] = { n = sp.n, i = sp.i }
   end
+  -- Lagertypen (nur wenn bearbeitet, sonst bleiben die bisherigen)
+  local types = {}
+  local ids = {}
+  if edit.depotTypes then
+    local nextNum = 1
+    for i = 1, getn(edit.depotTypes) do
+      local id = edit.depotTypes[i].id
+      local num = id and tonumber(string.sub(id, 2))
+      if num and string.sub(id, 1, 1) == "c" and num >= nextNum then nextNum = num + 1 end
+    end
+    for i = 1, getn(edit.depotTypes) do
+      local t = edit.depotTypes[i]
+      local name = cleanLabel(t.name)
+      local id = t.id
+      if name ~= "" and getn(types) < BB.DEPOT_TYPE_MAX then
+        if not id or id == "" then id = "c" .. nextNum nextNum = nextNum + 1 end
+        if not ids[id] then
+          ids[id] = true
+          table.insert(types, { id = id, name = name })
+        end
+      end
+    end
+    rules.depotTypes = types
+  else
+    local cur = self:DepotTypes()
+    for i = 1, getn(cur) do ids[cur[i].id] = true end
+    if db.rules and db.rules.depotTypes then rules.depotTypes = db.rules.depotTypes end
+  end
   -- Lagerchars (optional)
   rules.depots = {}
   local seen = {}
   for i = 1, getn(edit.depots or {}) do
     local d = edit.depots[i]
     local n = d.n and d.n ~= "" and BB.CleanCharName(d.n) or nil
-    local ok = false
-    for j = 1, getn(BB.DEPOT_KINDS) do if BB.DEPOT_KINDS[j] == d.k then ok = true end end
-    if n and ok and not seen[n] and getn(rules.depots) < BB.DEPOT_MAX then
+    if n and d.k and ids[d.k] and not seen[n] and getn(rules.depots) < BB.DEPOT_MAX then
       seen[n] = true
       table.insert(rules.depots, { n = n, k = d.k })
     end
@@ -233,6 +305,16 @@ function BB:SerializeRules(rules)
     if list[i].n and list[i].n ~= "" then table.insert(dep, list[i].k .. ":" .. cleanName(list[i].n)) end
   end
   table.insert(parts, table.concat(dep, ";"))
+  local ty = {}
+  local tl = rules.depotTypes
+  if tl then
+    for i = 1, getn(tl) do
+      if tl[i].id and tl[i].name and tl[i].name ~= "" then table.insert(ty, tl[i].id .. ":" .. cleanLabel(tl[i].name)) end
+    end
+  end
+  local tyStr = "*"                       -- Standardtypen
+  if tl then tyStr = (getn(ty) > 0) and table.concat(ty, ";") or "-" end
+  table.insert(parts, tyStr)
   return table.concat(parts, "~")
 end
 
@@ -246,14 +328,31 @@ function BB:ParseRules(payload)
     if not sp[1] or sp[1] == "" or not tonumber(sp[2]) then return nil end
     rules[BB.RULE_KEYS[i]] = { n = sp[1], i = tonumber(sp[2]) }
   end
+  -- Typen zuerst, damit die Lagerchars auf gueltige Typen zeigen ("*" oder fehlend = Standardtypen)
+  if f[8] ~= nil and f[8] ~= "*" then
+    local types = {}
+    if f[8] ~= "-" then
+      for _, part in ipairs(BB.Split(f[8], ";")) do
+        local d = BB.Split(part, ":")
+        local id, name = d[1], cleanLabel(d[2] or "")
+        if id and string.find(id, "^[%a%d]+$") and name ~= "" and getn(types) < BB.DEPOT_TYPE_MAX then
+          table.insert(types, { id = id, name = name })
+        end
+      end
+    end
+    rules.depotTypes = types
+  end
+  local valid = { welcome = true, raid = true }
+  if rules.depotTypes then
+    valid = {}
+    for i = 1, getn(rules.depotTypes) do valid[rules.depotTypes[i].id] = true end
+  end
   rules.depots = {}
   for _, part in ipairs(BB.Split(f[7] or "", ";")) do
     local d = BB.Split(part, ":")
     local kind = d[1]
-    for i = 1, getn(BB.DEPOT_KINDS) do
-      if BB.DEPOT_KINDS[i] == kind and BB.CleanCharName and d[2] and BB.CleanCharName(d[2]) and getn(rules.depots) < BB.DEPOT_MAX then
-        table.insert(rules.depots, { n = BB.CleanCharName(d[2]), k = kind })
-      end
+    if valid[kind] and BB.CleanCharName and d[2] and BB.CleanCharName(d[2]) and getn(rules.depots) < BB.DEPOT_MAX then
+      table.insert(rules.depots, { n = BB.CleanCharName(d[2]), k = kind })
     end
   end
   return rules

@@ -11,7 +11,8 @@ UI.settingsModule = true
 UI.set = {}
 
 local GEN_H, GUILD_H, BANK_H = 168, 108, 236
-local RULES_H = 424
+local RULES_H = 246
+local DEPOT_H = 436
 
 -- ------------------------------------------------------------
 -- Kopf: Zahnrad und "Spenden an: <Hauptbank>"
@@ -117,15 +118,15 @@ function UI:BuildSettings()
   self:GlowLine(f, -50, 20, -20)
   S.tab = "gen"
   S.tabs = {}
-  local tdefs = { { "SET_TAB_GEN", "gen" }, { "SET_TAB_RULES", "rules" } }
+  local tdefs = { { "SET_TAB_GEN", "gen" }, { "SET_TAB_RULES", "rules" }, { "SET_TAB_DEPOT", "depots" } }
   for i = 1, getn(tdefs) do
     local key = tdefs[i][2]
-    local chip = self:Chip(f, 120, tdefs[i][1], function()
+    local chip = self:Chip(f, 100, tdefs[i][1], function()
       S.tab = key
       UI:RefreshSettings()
     end)
     chip:SetHeight(22)
-    chip:SetPoint("TOPLEFT", f, "TOPLEFT", 26 + (i - 1) * 126, -56)
+    chip:SetPoint("TOPLEFT", f, "TOPLEFT", 26 + (i - 1) * 106, -56)
     chip.key = key
     S.tabs[i] = chip
   end
@@ -260,37 +261,8 @@ function UI:BuildSettings()
     b:SetPoint("TOPLEFT", g, "TOPLEFT", 214, -56 - (i - 1) * 28)
     S.rlRows[key] = b
   end
-  -- Lagerchars
-  local dt = self:Font(g, 11, C.gold)
-  dt:SetPoint("TOPLEFT", g, "TOPLEFT", 4, -182)
-  self:Loc(dt, "RL_DEPOT_TITLE")
-  S.rlDepot = {}
-  for i = 1, BB.DEPOT_MAX do
-    local row = {}
-    local y = -206 - (i - 1) * 26
-    row.char = self:Button(g, 170, 20, "", function(btn) UI:OpenDepotCharPicker(btn, i) end, "flat")
-    row.char:SetPoint("TOPLEFT", g, "TOPLEFT", 4, y)
-    row.kind = self:Button(g, 160, 20, "", function(btn) UI:OpenDepotKindPicker(btn, i) end, "flat")
-    row.kind:SetPoint("TOPLEFT", g, "TOPLEFT", 180, y)
-    row.del = self:Button(g, 24, 20, "x", function()
-      table.remove(S.edit.depots, i)
-      S.editDirty = true
-      UI:RefreshSettings()
-    end, "flat")
-    row.del:SetPoint("TOPLEFT", g, "TOPLEFT", 346, y)
-    S.rlDepot[i] = row
-  end
-  S.rlAdd = self:Button(g, 110, 20, "RL_DEPOT_ADD", function()
-    S.edit.depots = S.edit.depots or {}
-    if getn(S.edit.depots) < BB.DEPOT_MAX then
-      table.insert(S.edit.depots, { n = nil, k = "welcome" })
-      S.editDirty = true
-      UI:RefreshSettings()
-    end
-  end, "flat")
-  S.rlAdd:SetPoint("TOPLEFT", g, "TOPLEFT", 4, -314)
   S.rlHint = self:Font(g, 10, C.muted)
-  S.rlHint:SetPoint("TOPLEFT", g, "TOPLEFT", 4, -342)
+  S.rlHint:SetPoint("TOPLEFT", g, "TOPLEFT", 4, -176)
   S.rlHint:SetWidth(420)
   S.rlHint:SetHeight(36)
   S.rlHint:SetJustifyV("TOP")
@@ -298,7 +270,98 @@ function UI:BuildSettings()
     if BB:SaveRules(S.edit or {}) then S.editDirty = false end
     UI:RefreshSettings()
   end, "primary")
-  S.rlSave:SetPoint("TOPLEFT", g, "TOPLEFT", 4, -386)
+  S.rlSave:SetPoint("TOPLEFT", g, "TOPLEFT", 4, -216)
+
+  -- Lager: frei benennbare Typen und die Lagerchars dazu
+  g = group(f, "SET_SEC_DEPOT")
+  S.depot = g
+  g:SetHeight(DEPOT_H)
+  local th = self:Font(g, 10, C.muted)
+  th:SetPoint("TOPLEFT", g, "TOPLEFT", 4, -22)
+  th:SetWidth(420)
+  th:SetHeight(26)
+  th:SetJustifyV("TOP")
+  self:Loc(th, "DP_TYPES_HINT")
+  S.dpTypes = {}
+  for i = 1, BB.DEPOT_TYPE_MAX do
+    local row = {}
+    local y = -54 - (i - 1) * 24
+    row.edit = self:EditBox("BananaBankDepotType" .. i, g, 250)
+    row.edit:SetPoint("TOPLEFT", g, "TOPLEFT", 8, y)
+    row.edit:SetMaxLetters(24)
+    row.edit:SetScript("OnTextChanged", function()
+      if S.depotLoading then return end
+      local t = S.edit and S.edit.depotTypes and S.edit.depotTypes[i]
+      if t then
+        t.name = this:GetText()
+        S.editDirty = true
+      end
+    end)
+    row.edit:SetScript("OnEnterPressed", function() this:ClearFocus() end)
+    row.del = self:Button(g, 24, 20, "x", function()
+      local t = S.edit.depotTypes[i]
+      if t then
+        -- Lagerchars dieses Typs verlieren die Zuordnung
+        for j = getn(S.edit.depots), 1, -1 do
+          if S.edit.depots[j].k == t.id then table.remove(S.edit.depots, j) end
+        end
+      end
+      table.remove(S.edit.depotTypes, i)
+      S.editDirty = true
+      UI:RefreshSettings()
+    end, "flat")
+    row.del:SetPoint("TOPLEFT", g, "TOPLEFT", 270, y + 1)
+    S.dpTypes[i] = row
+  end
+  S.dpAddType = self:Button(g, 110, 20, "DP_ADD_TYPE", function()
+    S.edit.depotTypes = S.edit.depotTypes or {}
+    if getn(S.edit.depotTypes) < BB.DEPOT_TYPE_MAX then
+      table.insert(S.edit.depotTypes, { id = nil, name = T("DP_NEW_NAME") })
+      S.editDirty = true
+      UI:RefreshSettings()
+    end
+  end, "flat")
+  S.dpAddType:SetPoint("TOPLEFT", g, "TOPLEFT", 4, -202)
+  local ct = self:Font(g, 11, C.gold)
+  ct:SetPoint("TOPLEFT", g, "TOPLEFT", 4, -234)
+  self:Loc(ct, "DP_CHARS_TITLE")
+  S.rlDepot = {}
+  for i = 1, BB.DEPOT_MAX do
+    local row = {}
+    local y = -258 - (i - 1) * 26
+    -- links der Typ, rechts der Char
+    row.kind = self:Button(g, 170, 20, "", function(btn) UI:OpenDepotKindPicker(btn, i) end, "flat")
+    row.kind:SetPoint("TOPLEFT", g, "TOPLEFT", 4, y)
+    row.char = self:Button(g, 170, 20, "", function(btn) UI:OpenDepotCharPicker(btn, i) end, "flat")
+    row.char:SetPoint("TOPLEFT", g, "TOPLEFT", 180, y)
+    row.del = self:Button(g, 24, 20, "x", function()
+      table.remove(S.edit.depots, i)
+      S.editDirty = true
+      UI:RefreshSettings()
+    end, "flat")
+    row.del:SetPoint("TOPLEFT", g, "TOPLEFT", 356, y)
+    S.rlDepot[i] = row
+  end
+  S.rlAdd = self:Button(g, 110, 20, "RL_DEPOT_ADD", function()
+    S.edit.depots = S.edit.depots or {}
+    local first = S.edit.depotTypes and S.edit.depotTypes[1] and S.edit.depotTypes[1].id
+    if getn(S.edit.depots) < BB.DEPOT_MAX then
+      table.insert(S.edit.depots, { n = nil, k = first })
+      S.editDirty = true
+      UI:RefreshSettings()
+    end
+  end, "flat")
+  S.rlAdd:SetPoint("TOPLEFT", g, "TOPLEFT", 4, -366)
+  S.dpHint = self:Font(g, 10, C.muted)
+  S.dpHint:SetPoint("TOPLEFT", g, "TOPLEFT", 4, -392)
+  S.dpHint:SetWidth(420)
+  S.dpHint:SetHeight(24)
+  S.dpHint:SetJustifyV("TOP")
+  S.dpSave = self:Button(g, 150, 22, "RL_SAVE", function()
+    if BB:SaveRules(S.edit or {}) then S.editDirty = false end
+    UI:RefreshSettings()
+  end, "primary")
+  S.dpSave:SetPoint("TOPLEFT", g, "TOPLEFT", 4, -418)
 
   f:SetScript("OnShow", function() UI:RefreshSettings() end)
 end
@@ -311,6 +374,20 @@ function UI:RefreshSettings()
   local isBank = BB:IsBank()
   for i = 1, getn(S.tabs) do S.tabs[i]:SetActive(S.tabs[i].key == S.tab) end
   local y = -88
+  if S.tab == "depots" then
+    S.gen:Hide()
+    S.guild:Hide()
+    S.bank:Hide()
+    S.rules:Hide()
+    S.depot:Show()
+    S.depot:ClearAllPoints()
+    S.depot:SetPoint("TOPLEFT", f, "TOPLEFT", 20, y)
+    y = y - DEPOT_H - 8
+    self:RefreshDepotTab()
+    f:SetHeight(-y + 22)
+    return
+  end
+  S.depot:Hide()
   if S.tab == "rules" then
     S.gen:Hide()
     S.guild:Hide()
@@ -355,20 +432,26 @@ function UI:RefreshSettings()
   if not S.mainFocus then S.main:SetText(BB:MainBank()) end
 end
 
+-- Arbeitskopie der Regeln fuer die Reiter Regeln und Lager
+function UI:RefreshRulesData()
+  local S = self.set
+  if S.editDirty and S.edit then return end
+  local rules = BananaBankDB.rules
+  S.edit = { depots = BB:DepotList(), depotTypes = BB:DepotTypeListForEdit() }
+  if rules then
+    for i = 1, getn(BB.RULE_KEYS) do
+      local sp = rules[BB.RULE_KEYS[i]]
+      if sp then S.edit[BB.RULE_KEYS[i]] = { n = sp.n, i = sp.i } end
+    end
+  end
+end
+
 -- Inhalt des Reiters Regeln
 function UI:RefreshRulesTab()
   local S = self.set
   local rules = BananaBankDB.rules
   local canEdit = BB:MayBeBank(BB:Me())
-  if not S.editDirty then
-    S.edit = { depots = BB:DepotList() }
-    if rules then
-      for i = 1, getn(BB.RULE_KEYS) do
-        local sp = rules[BB.RULE_KEYS[i]]
-        if sp then S.edit[BB.RULE_KEYS[i]] = { n = sp.n, i = sp.i } end
-      end
-    end
-  end
+  self:RefreshRulesData()
   if rules then
     S.rlStatus:SetText(string.format(T("RL_STATUS_SAVED"), BB.Date(rules.ts), rules.by or "?"))
     S.rlStatus:SetTextColor(C.muted[1], C.muted[2], C.muted[3])
@@ -390,6 +473,33 @@ function UI:RefreshRulesTab()
     end
     b:SetOn(canEdit)
   end
+  -- (Lager-Reiter: siehe RefreshDepotTab)
+  S.rlHint:SetText(T(canEdit and "RL_HINT" or "RL_READONLY"))
+  if canEdit then S.rlSave:Show() else S.rlSave:Hide() end
+end
+
+-- Inhalt des Reiters Lager
+function UI:RefreshDepotTab()
+  local S = self.set
+  local canEdit = BB:MayBeBank(BB:Me())
+  if not S.editDirty or not S.edit then self:RefreshRulesData() end
+  local types = S.edit.depotTypes or {}
+  S.depotLoading = true
+  for i = 1, BB.DEPOT_TYPE_MAX do
+    local row = S.dpTypes[i]
+    local t = types[i]
+    if t then
+      row.edit:Show()
+      if canEdit then row.del:Show() else row.del:Hide() end
+      if row.edit:GetText() ~= (t.name or "") then row.edit:SetText(t.name or "") end
+      row.edit:EnableMouse(canEdit and true or false)
+    else
+      row.edit:Hide()
+      row.del:Hide()
+    end
+  end
+  S.depotLoading = false
+  if canEdit and getn(types) < BB.DEPOT_TYPE_MAX then S.dpAddType:Show() else S.dpAddType:Hide() end
   local dl = S.edit.depots or {}
   for i = 1, BB.DEPOT_MAX do
     local row = S.rlDepot[i]
@@ -399,7 +509,11 @@ function UI:RefreshRulesTab()
       row.kind:Show()
       if canEdit then row.del:Show() else row.del:Hide() end
       row.char.fs:SetText(d.n or T("RL_PICK"))
-      row.kind.fs:SetText(T(d.k == "raid" and "DEPOT_RAID" or "DEPOT_WELCOME"))
+      local tname = T("RL_PICK")
+      for j = 1, getn(types) do
+        if types[j].id == d.k then tname = types[j].name end
+      end
+      row.kind.fs:SetText(tname)
       row.char:SetOn(canEdit)
       row.kind:SetOn(canEdit)
     else
@@ -408,9 +522,9 @@ function UI:RefreshRulesTab()
       row.del:Hide()
     end
   end
-  if canEdit and getn(dl) < BB.DEPOT_MAX then S.rlAdd:Show() else S.rlAdd:Hide() end
-  S.rlHint:SetText(T(canEdit and "RL_HINT" or "RL_READONLY"))
-  if canEdit then S.rlSave:Show() else S.rlSave:Hide() end
+  if canEdit and getn(dl) < BB.DEPOT_MAX and getn(types) > 0 then S.rlAdd:Show() else S.rlAdd:Hide() end
+  S.dpHint:SetText(T(canEdit and "DP_HINT" or "RL_READONLY"))
+  if canEdit then S.dpSave:Show() else S.dpSave:Hide() end
 end
 
 -- Auswahlmenue: entries = { { label = Text, value = beliebig } }, onPick(value)
@@ -508,10 +622,11 @@ function UI:OpenDepotCharPicker(btn, idx)
 end
 
 function UI:OpenDepotKindPicker(btn, idx)
-  local entries = {
-    { label = T("DEPOT_WELCOME"), value = "welcome" },
-    { label = T("DEPOT_RAID"), value = "raid" },
-  }
+  local entries = {}
+  local types = UI.set.edit.depotTypes or {}
+  for i = 1, getn(types) do
+    if types[i].id then table.insert(entries, { label = types[i].name, value = types[i].id }) end
+  end
   self:OpenPicker(btn, entries, function(kind)
     local d = UI.set.edit.depots[idx]
     if d then

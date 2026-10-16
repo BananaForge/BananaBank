@@ -83,6 +83,13 @@ local function treeNodes(cur)
       local nxt = list[i + 1]
       if nxt and string.sub(nxt.key, 1, string.len(e.key) + 1) == e.key .. ":" then hasKids = true end
       table.insert(out, { key = e.key, label = e.label, depth = e.depth, parent = hasKids, header = e.header })
+      -- die frei benennbaren Lagertypen stehen direkt unter der Ueberschrift "Nur ansehen"
+      if e.key == "hdrview" then
+        local types = BB:DepotTypes()
+        for j = 1, getn(types) do
+          table.insert(out, { key = "depot:" .. types[j].id, label = types[j].name, literal = true, depth = 0 })
+        end
+      end
     end
   end
   return out
@@ -259,7 +266,7 @@ function UI:RefreshTree()
       b.fs:ClearAllPoints()
       b.fs:SetPoint("LEFT", b, "LEFT", 4 + n.depth * 10, 0)
       b.fs:SetWidth(132 - n.depth * 10)
-      local label = T(n.label)
+      local label = n.literal and n.label or T(n.label)
       if n.parent then
         local open = (S.type == n.key) or (string.sub(S.type or "", 1, string.len(n.key) + 1) == n.key .. ":")
         label = (open and "- " or "+ ") .. label
@@ -336,7 +343,10 @@ function UI:RefreshStockView(list)
     S.viewChips[i]:ClearAllPoints()
     S.viewChips[i]:SetPoint("TOPLEFT", S.viewChips[i]:GetParent(), "TOPLEFT", (BB:IsBank() and 280 or 126) + (i - 1) * 78, -27)
   end
-  if S.type ~= "all" and not BB:FindTypeFilter(S.type) then S.type = "all" end
+  if S.type ~= "all" and not BB:FindTypeFilter(S.type) then
+    local depotId = string.sub(S.type, 1, 6) == "depot:" and string.sub(S.type, 7)
+    if not (depotId and BB:DepotTypeById(depotId)) then S.type = "all" end
+  end
   self:RefreshTree()
   -- bei geaenderten Suchkriterien wieder nach oben
   local sig = table.concat({ tostring(S.bank), tostring(S.type), S.filter, S.search, tostring(S.onlyAvail), S.view }, "|")
