@@ -996,7 +996,12 @@ function UI:RefreshCart()
   local claims = BB:ValidClaims(basket)
   local nclaims = 0
   for id, n in pairs(basket) do
-    if claims[id] then nclaims = nclaims + 1 else paid[id] = n end
+    if claims[id] then
+      nclaims = nclaims + 1
+      if n > 1 then paid[id] = n - 1 end   -- nur ein Exemplar ist frei
+    else
+      paid[id] = n
+    end
   end
   local sum, missing = BB:PriceTotal(paid)
   if nclaims > 0 then

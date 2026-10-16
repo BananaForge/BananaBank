@@ -276,9 +276,15 @@ function BB:RequestCodTotals(r)
   if BananaBankDB.cod == false then return 0, 0 end
   for id, n in pairs(r.items) do
     local u = self:GetPrice(id) or 0
-    if not (r.fr and r.fr[id]) then
+    -- ein Gildencrafter-Anspruch gilt fuer genau ein Exemplar, jedes weitere kostet normal
+    local left = n - 1
+    if left < 0 then left = 0 end
+    if r.fr and r.fr[id] then
+      now = now + u * left
+      after = after + u * left
+    else
       now = now + u * n
-      if not (r.cl and r.cl[id]) then after = after + u * n end
+      if r.cl and r.cl[id] then after = after + u * left else after = after + u * n end
     end
   end
   return now, after
@@ -521,10 +527,25 @@ function BB:MailCod(e, r)
   if not SetSendMailCOD then return 0 end
   r = r or (self.prep and self.prep.r)
   -- von der Bank als Gildencrafter akzeptiert: dieses Rezept ist kostenlos
-  if r and r.fr and r.fr[e.id] then return 0 end
   local u = self:GetPrice(e.id)
   if not u or u <= 0 then return 0 end
-  return u * e.c
+  local free = 0
+  if r and r.fr and r.fr[e.id] then
+    -- genau ein Exemplar ist frei: der erste Stapel dieses Items im Versand
+    local used = 0
+    local p = self.prep
+    if p and p.r == r then
+      for k = 1, table.getn(p.slots) do
+        local s = p.slots[k]
+        if s == e then break end
+        if s.id == e.id then used = used + s.c end
+      end
+    end
+    free = 1 - used
+    if free < 0 then free = 0 end
+    if free > e.c then free = e.c end
+  end
+  return u * (e.c - free)
 end
 
 -- Wie viele Anhaenge nimmt dieser Client? Vanilla kann einen, OctoWoW
