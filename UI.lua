@@ -967,11 +967,14 @@ function UI:RefreshCart()
       if BB.CraftEligible then ok, why = BB:CraftEligible(id) end
       if ok or (why and why ~= "NOTRECIPE" and why ~= "NOKEYWORD") then
         row.claim:Show()
-        local on = ok and BananaBankDB.claims and BananaBankDB.claims[id]
+        local on = ok and BB:ClaimOn(id)
         row.claim:SetOn(ok)
         if on then
           row.claim.fs:SetTextColor(0.5, 1, 0.5)
           row.claim:SetBackdropColor(0.10, 0.32, 0.12, 0.98)
+        else
+          row.claim.fs:SetTextColor(C.gold[1], C.gold[2], C.gold[3])
+          row.claim:SetBackdropColor(0.09, 0.13, 0.27, 0.95)
         end
       else
         row.claim:Hide()

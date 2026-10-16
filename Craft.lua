@@ -104,9 +104,10 @@ function BB:CraftEligible(id)
   if not known or not known.skill[sub] then return false, "NOSCAN", sub end
   local rname = self:RecipeName(e.n)
   if known.recipes[sub] and known.recipes[sub][rname] then return false, "KNOWN" end
+  -- Den noetigen Skill kennt der Client nur, wenn er das Item schon einmal gesehen hat.
+  -- Ohne diese Angabe gilt das Rezept trotzdem als anfragbar (die Bank kennt die Skills ohnehin nicht).
   local req = self:RecipeRequirement(id, sub)
-  if not req then return false, "NOREQ" end
-  if known.skill[sub] < req then return false, "SKILL", req end
+  if req and known.skill[sub] < req then return false, "SKILL", req end
   return true
 end
 
@@ -146,26 +147,28 @@ end
 -- ------------------------------------------------------------
 -- Korb: Gildencrafter-Haken je Rezept
 -- ------------------------------------------------------------
+-- Standard: jedes berechtigte Rezept im Korb wird automatisch beansprucht.
+-- claims[id] == false heisst: der Spieler hat den Anspruch bewusst abgewaehlt.
 function BB:ToggleClaim(id)
   local db = BananaBankDB
   db.claims = db.claims or {}
-  if db.claims[id] then
-    db.claims[id] = nil
-  else
-    local ok = self:CraftEligible(id)
-    if ok then db.claims[id] = true end
-  end
+  if not self:CraftEligible(id) then return end
+  if db.claims[id] == false then db.claims[id] = nil else db.claims[id] = false end
 end
 
--- gueltige Claims fuer den Korb (nur Items, die noch im Korb liegen und noch berechtigt sind)
+function BB:ClaimOn(id)
+  local db = BananaBankDB
+  return self:CraftEligible(id) and not (db.claims and db.claims[id] == false)
+end
+
+-- gueltige Claims fuer den Korb (nur Items im Korb, die berechtigt und nicht abgewaehlt sind)
 function BB:ValidClaims(items)
   local out = {}
-  for id in pairs(BananaBankDB.claims or {}) do
-    if items[id] and self:CraftEligible(id) then out[id] = 1 end
+  for id in pairs(items) do
+    if self:ClaimOn(id) then out[id] = 1 end
   end
   return out
 end
-
 
 -- Rezepte dieser Anfrage, die die Bank selbst als Gildencrafter-Anspruch bestaetigen koennte
 -- (Keyword, Beruf des Rezepts, noch nicht erhalten). Hilft, wenn der Client des Spielers keinen Anspruch mitsendet.
