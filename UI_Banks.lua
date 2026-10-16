@@ -11,8 +11,8 @@ local WHITE, FONT, FONT_TITLE = UI.WHITE, UI.FONT, UI.FONT_TITLE
 UI.bankUIModule = true
 UI.bk = {}
 
-local ROW_H = 42
-local VISIBLE = 8
+local ROW_H = 58
+local VISIBLE = 6
 local MENU_ROW = 38
 local MENU_MAX = 9
 
@@ -204,26 +204,26 @@ function UI:BuildBanks(parent)
   local K = self.bk
 
   -- Kopfzeile: Summe ueber alle Banken auf einen Blick
-  local sum = self:Panel(p, 0, 38)
+  local sum = self:Panel(p, 0, 58)
   sum:SetPoint("TOPLEFT", p, "TOPLEFT", 0, 0)
   sum:SetPoint("TOPRIGHT", p, "TOPRIGHT", 0, 0)
   K.tiles = {}
   local tdefs = { { "BK_T_BANKS", 18 }, { "BK_T_ITEMS", 230 }, { "BK_T_GOLD", 440 } }
   for i = 1, getn(tdefs) do
-    local lbl = self:Font(sum, 10, C.goldDim)
-    lbl:SetPoint("TOPLEFT", sum, "TOPLEFT", tdefs[i][2], -4)
+    local lbl = self:Font(sum, 11, C.goldDim)
+    lbl:SetPoint("TOPLEFT", sum, "TOPLEFT", tdefs[i][2], -8)
     self:Loc(lbl, tdefs[i][1])
-    local val = self:Font(sum, 14, C.gold, FONT_TITLE)
-    val:SetPoint("TOPLEFT", sum, "TOPLEFT", tdefs[i][2], -18)
-    val:SetWidth(200)
-    val:SetHeight(16)
+    local val = self:Font(sum, 24, C.gold, FONT_TITLE)
+    val:SetPoint("TOPLEFT", sum, "TOPLEFT", tdefs[i][2], -22)
+    val:SetWidth(230)
+    val:SetHeight(28)
     K.tiles[i] = val
   end
-  K.editBtn = self:Button(sum, 180, 22, "BK_EDIT", function() UI:OpenBankEditor() end, "primary")
+  K.editBtn = self:Button(sum, 180, 26, "BK_EDIT", function() UI:OpenBankEditor() end, "primary")
   K.editBtn:SetPoint("RIGHT", sum, "RIGHT", -12, 0)
 
   local lp = CreateFrame("Frame", nil, p)
-  lp:SetPoint("TOPLEFT", p, "TOPLEFT", 0, -44)
+  lp:SetPoint("TOPLEFT", p, "TOPLEFT", 0, -64)
   lp:SetPoint("BOTTOMRIGHT", p, "BOTTOMRIGHT", 0, 0)
   K.lp = lp
   local sf = CreateFrame("ScrollFrame", "BananaBankBanksScroll", lp, "FauxScrollFrameTemplate")
@@ -241,7 +241,7 @@ function UI:BuildBanks(parent)
 
   K.rows = {}
   for i = 1, VISIBLE do
-    local card = self:Panel(lp, 0, ROW_H - 4)
+    local card = self:Panel(lp, 0, ROW_H - 6)
     card:SetPoint("TOPLEFT", lp, "TOPLEFT", 0, -(i - 1) * ROW_H)
     card:SetPoint("TOPRIGHT", lp, "TOPRIGHT", -24, -(i - 1) * ROW_H)
     card:EnableMouse(true)
@@ -253,30 +253,30 @@ function UI:BuildBanks(parent)
     card.dot:SetTexture(WHITE)
     card.dot:SetWidth(8)
     card.dot:SetHeight(8)
-    card.dot:SetPoint("TOPLEFT", card, "TOPLEFT", 10, -9)
+    card.dot:SetPoint("TOPLEFT", card, "TOPLEFT", 10, -11)
     card.name = self:Font(card, 13, C.gold)
-    card.name:SetPoint("TOPLEFT", card, "TOPLEFT", 26, -6)
+    card.name:SetPoint("TOPLEFT", card, "TOPLEFT", 26, -8)
     card.name:SetWidth(170)
     card.name:SetHeight(16)
     card.role = self:Font(card, 11, C.text)
-    card.role:SetPoint("TOPLEFT", card, "TOPLEFT", 200, -7)
+    card.role:SetPoint("TOPLEFT", card, "TOPLEFT", 200, -9)
     card.role:SetWidth(250)
     card.role:SetHeight(14)
     card.s1 = self:Font(card, 11, C.gold)
-    card.s1:SetPoint("TOPRIGHT", card, "TOPRIGHT", -112, -7)
+    card.s1:SetPoint("TOPRIGHT", card, "TOPRIGHT", -112, -9)
     card.s1:SetJustifyH("RIGHT")
     card.s1:SetWidth(330)
     card.s1:SetHeight(14)
     card.tags = self:Font(card, 10, C.goldDim)
-    card.tags:SetPoint("TOPLEFT", card, "TOPLEFT", 26, -23)
-    card.tags:SetWidth(215)
+    card.tags:SetPoint("TOPLEFT", card, "TOPLEFT", 26, -27)
+    card.tags:SetWidth(380)
     card.tags:SetHeight(12)
     card.warn = self:Font(card, 10, C.orange)
-    card.warn:SetPoint("TOPLEFT", card, "TOPLEFT", 245, -23)
-    card.warn:SetWidth(200)
+    card.warn:SetPoint("TOPLEFT", card, "TOPLEFT", 26, -40)
+    card.warn:SetWidth(520)
     card.warn:SetHeight(12)
     card.s3 = self:Font(card, 10, C.muted)
-    card.s3:SetPoint("TOPRIGHT", card, "TOPRIGHT", -112, -23)
+    card.s3:SetPoint("TOPRIGHT", card, "TOPRIGHT", -112, -27)
     card.s3:SetJustifyH("RIGHT")
     card.s3:SetWidth(330)
     card.s3:SetHeight(12)
@@ -302,10 +302,24 @@ local lastRoster = 0
 
 function UI:BankCardTooltip(card)
   local info = card.info
-  if not card.bank or not info or not info.desc or info.desc == "" then return end
+  if not card.bank then return end
+  local st = BB:BankStats(card.bank)
+  local hasDesc = info and info.desc and info.desc ~= ""
+  local hasWrong = st and st.wrong > 0
+  if not hasDesc and not hasWrong then return end
   GameTooltip:SetOwner(card, "ANCHOR_BOTTOMRIGHT")
   GameTooltip:AddLine(card.bank, C.gold[1], C.gold[2], C.gold[3])
-  GameTooltip:AddLine(info.desc, 1, 1, 1, 1)
+  if hasDesc then GameTooltip:AddLine(info.desc, 1, 1, 1, 1) end
+  if hasWrong then
+    GameTooltip:AddLine(" ")
+    GameTooltip:AddLine(T("BK_WRONG_TT"), 1, 0.62, 0.17, 1)
+    for i = 1, getn(st.wrongList) do
+      GameTooltip:AddDoubleLine(st.wrongList[i].n, st.wrongList[i].c .. "x", 1, 1, 1, 0.9, 0.9, 0.9)
+    end
+    if st.wrongKinds > getn(st.wrongList) then
+      GameTooltip:AddLine("... +" .. (st.wrongKinds - getn(st.wrongList)), 0.7, 0.7, 0.7)
+    end
+  end
   GameTooltip:Show()
 end
 

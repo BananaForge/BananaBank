@@ -291,7 +291,7 @@ function BB:BankStats(name)
   local snap = BananaBankDB.snaps[name]
   if not snap then return nil end
   local info = BananaBankDB.binfo[name]
-  local st = { items = 0, kinds = 0, gold = snap.gold or 0, ts = snap.ts or 0, wrong = 0, wrongKinds = 0 }
+  local st = { items = 0, kinds = 0, gold = snap.gold or 0, ts = snap.ts or 0, wrong = 0, wrongKinds = 0, wrongList = {} }
   local tagged = info and BB.Count(info.tags) > 0
   for id, it in pairs(snap.items) do
     st.items = st.items + it.c
@@ -299,6 +299,7 @@ function BB:BankStats(name)
     if tagged and it.k and not info.tags[it.k] then
       st.wrong = st.wrong + it.c
       st.wrongKinds = st.wrongKinds + 1
+      if getn(st.wrongList) < 12 then table.insert(st.wrongList, { n = it.n or ("#" .. id), c = it.c }) end
     end
   end
   return st
