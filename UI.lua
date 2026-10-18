@@ -591,6 +591,7 @@ end
 function UI:Refresh()
   if not self.frame then return end
   self:RefreshMailHelper()
+  if self.RefreshLotse then self:RefreshLotse() end
   if self.RefreshQuestTracker then self:RefreshQuestTracker() end
   if self.RefreshSummaryWindows then self:RefreshSummaryWindows() end
   if self.RefreshMainBank then self:RefreshMainBank() end

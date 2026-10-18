@@ -239,6 +239,8 @@ function UI:OnRequestAction(row)
   if not r then return end
   if row.actionKind == "open" then
     self.bank.current = r
+    -- Bank-Lotse: oeffnet sich mit der ersten Anfrage, das grosse Fenster macht Platz
+    if self.LotseOpen and self:LotseOpen(r) then return end
     self:ShowPage("bank")
   elseif row.actionKind == "cancel" then
     BB:SetStatus(r, "cancelled")
@@ -979,7 +981,7 @@ end
 function UI:RefreshMailHelper()
   local m = self.mail
   if not m then return end
-  if not BB:BankActive() or not BB.mailOpen then
+  if not BB:BankActive() or not BB.mailOpen or (self.lotse and self.L and self.L.open and self.lotse:IsVisible()) then
     m:Hide()
     return
   end
