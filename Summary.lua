@@ -27,7 +27,7 @@ function BB:LedgerStacks(mode, who)
   local want = (mode == "out") and "out" or "in"
   local groups, list = {}, {}
   for _, e in pairs(BananaBankDB.ledger) do
-    if e.k == want and (not who or e.p == who) then
+    if e.k == want and (not who or e.p == who) and not (want == "in" and self:IsSystemSender(e.p)) then
       local g = e.g
       local s = (g and g ~= "") and groups[g] or nil
       if s then
@@ -152,7 +152,7 @@ function BB:GuildTotals(mode)
     players[s.p] = true
   end
   for _, e in pairs(BananaBankDB.ledger) do
-    if mode == "in" and e.k == "gold" then g.gold = g.gold + (e.m or 0) end
+    if mode == "in" and e.k == "gold" and not self:IsSystemSender(e.p) then g.gold = g.gold + (e.m or 0) end
     if mode == "out" and e.k == "gout" then g.gold = g.gold + (e.m or 0) end
     if mode == "out" and e.k == "back" and map[e.n] then
       local it = map[e.n]

@@ -10,7 +10,7 @@
 BananaBank = {}
 local BB = BananaBank
 
-BB.VERSION = "3.2.1"
+BB.VERSION = "3.2.2"
 BB.PREFIX = "BBNK"
 BB.DONATE_NAME = "Lumihunt"
 -- Einziger erlaubter Bank-Rang, deutsch und englisch. Fest eingebaut, es gibt
@@ -694,6 +694,18 @@ function BB:LedgerSorted()
   return list
 end
 
+-- NPCs und System-Absender (Auktionshaus, Postmeister ...): keine Spender:innen, zaehlen nirgends in der Wertung
+function BB:IsSystemSender(name)
+  if not name or name == "" then return false end
+  if BB.SYSTEM_SENDERS and BB.SYSTEM_SENDERS[name] then return true end
+  local low = string.lower(name)
+  local pats = { "auction", "auktion", "postmaster", "postmeister", "game master", "spielleit", "blizzard" }
+  for i = 1, table.getn(pats) do
+    if string.find(low, pats[i], 1, true) then return true end
+  end
+  return false
+end
+
 -- Summen je Spieler:in: kind "out" oder "in" (in enthaelt Gold)
 function BB:LedgerTotals(kind)
   local tot = {}
@@ -701,6 +713,7 @@ function BB:LedgerTotals(kind)
     local k = e.k
     local match = (kind == "out" and (k == "out" or k == "gout")) or (kind == "in" and (k == "in" or k == "gold"))
     if kind == "cod" then match = (k == "cod") end
+    if match and kind == "in" and self:IsSystemSender(e.p) then match = false end
     if match then
       local t = tot[e.p]
       if not t then

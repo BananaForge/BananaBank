@@ -116,7 +116,9 @@ function BB:QuestStats()
   local out = {}
   for id in pairs(db.quests) do out[id] = { got = {}, eff = {}, by = {}, gg = {}, geff = {}, gby = {}, done = 0, need = 0 } end
   for _, e in pairs(db.ledger) do
-    if (e.k == "in" or e.k == "qfix") and e.code ~= "" then
+    if BB:IsSystemSender(e.p) then
+      -- NPC-Buchungen (z. B. Auktionshaus) zaehlen nie fuer Quests
+    elseif (e.k == "in" or e.k == "qfix") and e.code ~= "" then
       local s = out[e.code]
       local q = s and db.quests[e.code]
       if q and q.items[e.i] then
@@ -204,7 +206,9 @@ function BB:QuestRanking(since)
   for id, q in pairs(db.quests) do need[id] = self:QuestNeed(q) end
   local per = {}
   for _, e in pairs(db.ledger) do
-    if (e.k == "in" or e.k == "qfix") and e.code ~= "" and (not since or e.t >= since) then
+    if BB:IsSystemSender(e.p) then
+      -- NPC-Buchungen (z. B. Auktionshaus) zaehlen nie fuer das Ranking
+    elseif (e.k == "in" or e.k == "qfix") and e.code ~= "" and (not since or e.t >= since) then
       local q = db.quests[e.code]
       if q and q.s ~= "cancelled" and q.items[e.i] and need[q.id] > 0 then
         local r = per[e.p]

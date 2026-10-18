@@ -968,7 +968,7 @@ function BB:OnTakeInbox(i, isItem, j)
     return
   end
   -- Uebergaben zwischen Bank-Chars sind keine Spenden
-  if BananaBankDB.banks[sender] or self:MayBeBank(sender) or BB.SYSTEM_SENDERS[sender] then
+  if BananaBankDB.banks[sender] or self:MayBeBank(sender) or self:IsSystemSender(sender) then
     self:MailLog(sender, isItem, nil, 0, money, "bank")
     return
   end
