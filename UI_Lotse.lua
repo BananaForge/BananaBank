@@ -238,10 +238,10 @@ function UI:BuildLotse()
   f.title:SetPoint("TOPLEFT", f, "TOPLEFT", 8, -6)
   f.title:SetText("BananaBank")
   f.count = self:Font(f, 10, C.muted)
-  f.count:SetPoint("TOPRIGHT", f, "TOPRIGHT", -62, -8)
+  f.count:SetPoint("TOPRIGHT", f, "TOPRIGHT", -80, -8)
   f.count:SetJustifyH("RIGHT")
-  f.modeBtn = self:Button(f, 38, 15, "", function() UI:LotseCycleMode() end, "flat")
-  f.modeBtn:SetPoint("TOPRIGHT", f, "TOPRIGHT", -22, -5)
+  f.modeBtn = self:Button(f, 54, 15, "", function() UI:LotseCycleMode() end, "flat")
+  f.modeBtn:SetPoint("TOPRIGHT", f, "TOPRIGHT", -24, -5)
   f.modeBtn:SetScript("OnEnter", function()
     GameTooltip:SetOwner(this, "ANCHOR_BOTTOM")
     GameTooltip:AddLine(T("LO_MODE_TIP"), 1, 1, 1)
@@ -317,9 +317,9 @@ function UI:BuildLotse()
 
   -- Kompakt (B): Punkt mit Schrittnummer, eine Zeile Text, Hauptknopf
   f.mini = self:Font(f, 11, { 1, 1, 1 })
-  f.mini:SetWidth(W - 100)
+  f.mini:SetWidth(W - 20 - 90 - 6)
   f.mini:SetHeight(14)
-  f.miniBtn = self:Button(f, 66, 20, "", function() UI:LotsePrimary() end, "primary")
+  f.miniBtn = self:Button(f, 90, 20, "", function() UI:LotsePrimary() end, "primary")
 
   -- Liste (C)
   f.qrows = {}
@@ -424,14 +424,14 @@ function UI:LotseLive()
   f.cv1:SetText(want > 0 and BB.Money(want) or T("LO_NONE"))
   if got == nil or p.sending then
     f.cv2:SetText("")
-    f.mini:SetText(string.format(T("LO_MINI3"), p.idx, getn(p.slots), p.r.p, want > 0 and BB.Money(want) or T("LO_NONE")))
+    f.mini:SetText(string.format(T("LO_MINI3"), p.idx, getn(p.slots), want > 0 and BB.Money(want) or T("LO_NONE")))
     return
   end
   local txt = got > 0 and BB.Money(got) or T("LO_NONE")
   local tail
   if got == want then tail = "  |cff60e070" .. T("LO_OK") .. "|r" else tail = "  |cffff5040" .. T("LO_BAD") .. "|r" end
   f.cv2:SetText(txt .. tail)
-  f.mini:SetText(string.format(T("LO_MINI3"), p.idx, getn(p.slots), p.r.p, want > 0 and BB.Money(want) or T("LO_NONE")) .. tail)
+  f.mini:SetText(string.format(T("LO_MINI3"), p.idx, getn(p.slots), want > 0 and BB.Money(want) or T("LO_NONE")) .. tail)
 end
 
 -- ------------------------------------------------------------
@@ -755,7 +755,7 @@ function UI:LotseFillMini(r, step, here)
   end
   if step == 1 then
     local now = BB:RequestCodTotals(r)
-    f.mini:SetText(r.id .. " " .. r.p .. " - " .. (now > 0 and BB.Money(now) or T("LO_NONE")))
+    f.mini:SetText(r.id .. " - " .. (now > 0 and BB.Money(now) or T("LO_NONE")))
     setBtnText(f.miniBtn, (r.cl and next(r.cl) ~= nil) and T("LO_MINI_ACCEPT") or T("BTN_CONFIRM"))
     f.miniBtn:SetOn(BB:ReqState(r) == "open")
   elseif step == 2 then
@@ -765,7 +765,7 @@ function UI:LotseFillMini(r, step, here)
   elseif step == 3 then
     local p = BB.prep
     f.mini:SetText("")
-    setBtnText(f.miniBtn, T("BTN_SEND"))
+    setBtnText(f.miniBtn, T("LO_SEND_SHORT"))
     f.miniBtn:SetOn(p ~= nil and p.slots[p.idx] ~= nil and not p.sending and BB.mailOpen and true or false)
     self:LotseLive()
   else

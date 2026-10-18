@@ -93,6 +93,7 @@ Pull requests welcome, tested in-game on a 1.12 client. Lua 5.0 rules: no `#`, `
 
 ## Changelog
 
+- **3.2.1:** bank pilot: texts fit their buttons (wider view button, wider main button in the small view, shorter one-line texts), header no longer overlaps.
 - **3.2.0:** **Bank pilot** (new file UI_Lotse.lua, restart WoW fully): a small window that guides a bank char through a request: 1 Check (accept as crafter / confirm / reject, COD shown), 2 Fetch (items from the bank, automatic once the bank window is open), 3 Send (letter n/m with the expected COD next to the value in the send window, live), 4 Done (next request). Opens when the first request is opened in the big window, which then steps aside. View switch in the header: Normal / Small (one line) / List of requests. Requests whose items sit on another bank char are queued last, and the pilot names the bank to switch to.
 - **3.1.13:** layout: stock tree is narrower so the result list is wider and the scrollbar no longer covers the prices; quest goal rows have a shorter bar and a wider status column so "done"/remaining text no longer overlaps.
 - **3.1.12:** ledger: hovering received donations (and gold entries) now shows a tooltip too; if the item id is not known yet it is looked up by name, otherwise a simple tooltip (name, amount, donor, date) is shown.
