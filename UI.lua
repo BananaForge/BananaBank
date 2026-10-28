@@ -674,6 +674,15 @@ function UI:BuildStock(parent)
   end)
   avail:SetPoint("TOPLEFT", p, "TOPLEFT", 8, -28)
   avail:SetWidth(112)
+  -- nur auf Bank-Chars: nur Trash zeigen (Haendlerwert unter der Grenze)
+  S.onlyTrash = false
+  S.trashChk = self:Check(p, "TRASH_ONLY", function() return S.onlyTrash end, function(v)
+    S.onlyTrash = v
+    S.page = 1
+    UI:RefreshStock()
+  end)
+  S.trashChk:SetPoint("TOPLEFT", p, "TOPLEFT", 456, -28)
+  S.trashChk:SetWidth(120)
   -- Bankwahl: Gesamtbestand oder Inhalt einer einzelnen Bank (Menue siehe UI_Banks.lua)
   S.bank = nil
   S.bankBtn = self:Button(p, 140, 18, "", function() UI:ToggleBankMenu() end, "flat")
@@ -783,7 +792,7 @@ function UI:StockList()
       -- eine Bank ohne Scan zeigt eine leere Liste mit Hinweis, springt nicht zurueck
       for id, it in pairs(snap and snap.items or {}) do
         if not BananaBankDB.hidden[id] then
-          one[id] = { c = it.c, q = it.q, t = it.t, n = it.n, k = it.k, s = it.s, per = { [S.bank] = it.c } }
+          one[id] = { c = it.c, q = it.q, t = it.t, n = it.n, k = it.k, s = it.s, cr = it.cr, per = { [S.bank] = it.c } }
         end
       end
       stock, res = one, {}
@@ -805,6 +814,7 @@ function UI:StockList()
     local ok = (e.q or 1) >= S.filter
     if ok and S.search ~= "" and not string.find(string.lower(e.n or ""), S.search, 1, true) then ok = false end
     if ok and S.onlyAvail and avail <= 0 then ok = false end
+    if ok and S.onlyTrash and not BB:IsTrash(id) then ok = false end
     local rk, rs
     if ok then rk, rs = BB:ResolveCategory(id, e) end
     if ok and typeSpec and not BB:MatchTypeFilter(typeSpec, { k = rk, s = rs }) then ok = false end
@@ -892,6 +902,18 @@ function UI:OnSlotClick(slot, button)
   end
   if button == "RightButton" then
     self:CartAdd(id, -1)
+  elseif IsControlKeyDown() and BB:IsBank() and BB.IsTrash then
+    -- Strg-Klick: Ausnahmeliste fuer den Trash-Verkauf ("nie verkaufen")
+    local db = BananaBankDB
+    db.trashKeep = db.trashKeep or {}
+    if db.trashKeep[id] then
+      db.trashKeep[id] = nil
+      BB:Print(string.format(T("TRASH_KEEP_OFF"), BB:ColoredName(id)))
+    else
+      db.trashKeep[id] = true
+      BB:Print(string.format(T("TRASH_KEEP_ON"), BB:ColoredName(id)))
+    end
+    self:RefreshStock()
   elseif IsAltKeyDown() and BB:IsBank() then
     BananaBankDB.hidden[id] = true
     BB:Print(string.format(T("MSG_HIDDEN"), BB:ColoredName(id)))
@@ -933,12 +955,23 @@ function UI:OnSlotEnter(slot)
   if u then
     local label = T("TT_PRICE")
     if src == "man" then label = label .. " " .. T("TT_PRICE_MAN") end
+    if src == "vendor" then label = label .. " " .. T("TT_PRICE_VENDOR") end
     table.insert(lines, { label, BB.Money(u), C.gold[1], C.gold[2], C.gold[3] })
   elseif BB:NeedsPrice(id) then
     table.insert(lines, { T("TT_PRICE"), T("TT_PRICE_NONE"), 0.8, 0.8, 0.8 })
   end
   local block = BB:ItemBlockText(BB:Me(), id)
   if block then table.insert(lines, { block, "", 1, 0.5, 0.25 }) end
+  if e and e.cr and e.cr ~= "" and BB.ClassLabels then
+    table.insert(lines, { string.format(T("TT_CLASS"), BB:ClassLabels(e.cr)), "", 0.8, 0.8, 0.5 })
+  end
+  if BB:IsTrash(id) then
+    local v = BB:VendorValue(id) or 0
+    table.insert(lines, { T("TRASH_TT"), BB.Money(v), 1, 0.42, 0.33 })
+    table.insert(lines, { T("TRASH_KEEP_HINT"), "", 0.6, 0.6, 0.6 })
+  elseif BananaBankDB.trashKeep and BananaBankDB.trashKeep[id] and BB:IsBank() then
+    table.insert(lines, { T("TRASH_KEEP_MARK"), "", 0.6, 0.8, 0.6 })
+  end
   table.insert(lines, { T("TT_HINT"), "", 0.5, 0.5, 0.5 })
   self:ItemTooltip(slot, id, lines)
 end

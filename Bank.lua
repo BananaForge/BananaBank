@@ -32,6 +32,11 @@ function BB:ScanContainers(bags)
           if not e then
             local k, s = self:ItemCategory(id, bind)
             e = { c = 0, q = q, t = BB.ShortTex(tex), n = name or ("#" .. id), k = k, s = s }
+            -- Klassenbeschraenkung ("Classes: Druid"); ein Fehler hier darf nie Items verschwinden lassen
+            if self.ClassOfItem then
+              local okc, cr = pcall(function() return self:ClassOfItem(id, bag, slot) end)
+              if okc and cr and cr ~= "" then e.cr = cr end
+            end
             items[id] = e
           end
           e.c = e.c + (count or 1)

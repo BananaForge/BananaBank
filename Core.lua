@@ -10,7 +10,7 @@
 BananaBank = {}
 local BB = BananaBank
 
-BB.VERSION = "3.2.2"
+BB.VERSION = "3.3.0"
 BB.PREFIX = "BBNK"
 BB.DONATE_NAME = "Lumihunt"
 -- Einziger erlaubter Bank-Rang, deutsch und englisch. Fest eingebaut, es gibt
@@ -251,14 +251,15 @@ function BB:ReadRoster()
   local canNotes = CanViewOfficerNote and CanViewOfficerNote() and true or false
   self.canSeeNotes = canNotes
   for i = 1, n do
-    local name, rank, rankIndex, _, _, _, _, onote, online = GetGuildRosterInfo(i)
+    local name, rank, rankIndex, _, cls, _, _, onote, online = GetGuildRosterInfo(i)
     if name and rank then
       local kw
       if canNotes and self.ParseNoteKeywords then
         local list = self:ParseNoteKeywords(onote)
         if getn(list) > 0 then kw = table.concat(list, ",") end
       end
-      db.ranks[name] = { r = rank, i = rankIndex or 99, online = online and true or false, kw = kw }
+      db.ranks[name] = { r = rank, i = rankIndex or 99, online = online and true or false, kw = kw,
+        cls = BB.ClassToken and BB.ClassToken(cls) or nil }
       if isBankRank(rank) then exists = true end
     end
   end
@@ -402,6 +403,7 @@ function BB:GetStock()
         end
         if it.k and not e.k then e.k = it.k end
         if it.s and not e.s then e.s = it.s end
+        if it.cr and it.cr ~= "" and not e.cr then e.cr = it.cr end
         e.c = e.c + it.c
         e.per[bank] = (e.per[bank] or 0) + it.c
       end
@@ -808,6 +810,10 @@ function BB:MergeBankInfo() return false end
 function BB:ParseBankInfo() return {} end
 function BB:BankHintLines() return nil end
 function BB:OtherBankCounts() return {} end
+-- Platzhalter fuer Trash.lua / VendorData.lua (veraltete TOC: dann gibt es nur keine Haendlerpreise)
+function BB:VendorValue() return nil end
+function BB:IsTrash() return false end
+function BB.ClassToken() return nil end
 function BB:BankList() return {} end
 
 -- Zeigt in ein paar Zeilen, warum kein Bestand da ist

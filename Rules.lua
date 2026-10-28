@@ -89,6 +89,13 @@ function BB:ItemBlockText(name, id)
   local t = self:BlockText(name, q)
   if t then return t end
   if self:MayBeBank(name) then return nil end
+  -- Klassen-Items nur fuer die passende Klasse
+  if self.ClassBlockText then
+    local ct = self:ClassBlockText(name, id)
+    if ct then return ct end
+  end
+  -- ohne Preis nicht anfragbar: Haendlerwert unbekannt (BOE, Rezepte und Taschen haben ihren AH-Preis)
+  if self.VendorPrice and not self:NeedsPrice(id) and not self:GetPrice(id) then return self.T("RB_NOPRICE") end
   -- Taschen nur mit dem Keyword fuer Taschen
   if self:ItemIsBag(id) and not self:HasProfKeyword(name, "bags") then return self.T("RB_BAG") end
   if self:InDepotOnly(id) then return self.T("RB_DEPOT") end

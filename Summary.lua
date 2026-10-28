@@ -194,7 +194,7 @@ end
 
 
 -- /bb ledger [N | Text | today]: letzte Buchungen im Chat, zum Gegenpruefen
-local KIND_NAME = { ["in"] = "KIND_IN", out = "KIND_OUT", gold = "KIND_GOLD", gout = "KIND_GOUT", back = "KIND_BACK", cod = "KIND_COD", qfix = "KIND_QFIX" }
+local KIND_NAME = { ["in"] = "KIND_IN", out = "KIND_OUT", gold = "KIND_GOLD", gout = "KIND_GOUT", back = "KIND_BACK", cod = "KIND_COD", qfix = "KIND_QFIX", trash = "KIND_TRASH" }
 
 function BB:PrintLedger(arg)
   arg = string.lower(arg or "")
@@ -225,7 +225,7 @@ function BB:PrintLedger(arg)
   for i = getn(out), 1, -1 do
     local e = out[i]
     local what
-    if e.k == "gold" or e.k == "gout" or e.k == "cod" then
+    if e.k == "gold" or e.k == "gout" or e.k == "cod" or e.k == "trash" then
       what = BB.Money(e.m)
     else
       what = (e.c or 0) .. "x " .. (e.n or "?")

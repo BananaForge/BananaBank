@@ -30,6 +30,15 @@ end
 function UI:RefreshBankButton()
   local S = self.stock
   if not S or not S.bankBtn then return end
+  if S.trashChk then
+    if BB:IsBank() then
+      S.trashChk:Show()
+      S.trashChk.Update()
+    else
+      S.trashChk:Hide()
+      S.onlyTrash = false
+    end
+  end
   -- Bankwahl nur auf Chars im Bank-Modus
   if not BB:IsBank() then
     S.bank = nil

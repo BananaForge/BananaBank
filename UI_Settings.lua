@@ -10,7 +10,7 @@ local WHITE = UI.WHITE
 UI.settingsModule = true
 UI.set = {}
 
-local GEN_H, GUILD_H, BANK_H = 168, 108, 236
+local GEN_H, GUILD_H, BANK_H = 168, 108, 264
 local RULES_H = 246
 local DEPOT_H = 436
 local KW_H = 404
@@ -243,6 +243,28 @@ function UI:BuildSettings()
   local ad = self:Font(g, 11, C.muted)
   ad:SetPoint("LEFT", S.age, "RIGHT", 6, 0)
   self:Loc(ad, "SET_AGE_DAYS")
+  -- Trash-Grenze: Haendlerwert pro Stueck unter diesem Betrag (in Silber) gilt als Trash
+  local tl = self:Font(g, 11, C.text)
+  tl:SetPoint("TOPLEFT", g, "TOPLEFT", 4, -236)
+  self:Loc(tl, "SET_TRASH")
+  S.trash = self:EditBox("BananaBankTrashMax", g, 44)
+  S.trash:SetPoint("TOPLEFT", g, "TOPLEFT", 290, -231)
+  S.trash:SetMaxLetters(3)
+  S.trash:SetNumeric(true)
+  local function saveTrash()
+    local n = tonumber(S.trash:GetText())
+    if n and n >= 1 and n <= 999 then BananaBankDB.trashMax = math.floor(n) * 100 end
+    S.trashFocus = false
+    S.trash:SetText(tostring(math.floor(BB:TrashMax() / 100)))
+    if UI.TrashRefreshMarks then UI:TrashRefreshMarks() end
+    UI:Refresh()
+  end
+  S.trash:SetScript("OnEditFocusGained", function() S.trashFocus = true end)
+  S.trash:SetScript("OnEditFocusLost", saveTrash)
+  S.trash:SetScript("OnEnterPressed", function() saveTrash() this:ClearFocus() end)
+  local td = self:Font(g, 11, C.muted)
+  td:SetPoint("LEFT", S.trash, "RIGHT", 6, 0)
+  self:Loc(td, "SET_TRASH_UNIT")
 
   -- Regeln (Rang und Qualitaet)
   g = group(f, "SET_SEC_RULES")
@@ -507,6 +529,7 @@ function UI:RefreshSettings()
   S.cDebug.Update()
   if S.cBank then S.cBank.Update() S.cCod.Update() S.cWhisper.Update() S.cAuto.Update() end
   if S.age and not S.ageFocus then S.age:SetText(tostring(BB:PriceMaxAgeDays())) end
+  if S.trash and not S.trashFocus then S.trash:SetText(tostring(math.floor(BB:TrashMax() / 100))) end
   if not S.mainFocus then S.main:SetText(BB:MainBank()) end
 end
 

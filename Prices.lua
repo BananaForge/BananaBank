@@ -88,6 +88,14 @@ function BB:GetPrice(id)
     if p.src ~= "man" and u < BB.PRICE_MIN then u = BB.PRICE_MIN end
     return u, p.src, p.ts, p.n
   end
+  -- alles ausser BOE, Rezepte und Taschen: Haendlerwert + 25 % (mit dem Mindestpreis); ohne bekannten Wert kein Preis
+  if self.VendorPrice and not self:NeedsPrice(id) then
+    local v = self:VendorPrice(id)
+    if v then
+      if v < BB.PRICE_MIN then v = BB.PRICE_MIN end
+      return v, "vendor", nil, nil
+    end
+  end
   return nil
 end
 

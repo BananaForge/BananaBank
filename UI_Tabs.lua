@@ -273,7 +273,7 @@ end
 -- ------------------------------------------------------------
 -- Reiter Buch
 -- ------------------------------------------------------------
-local TOP_ROWS, RECENT_ROWS = 12, 12
+local TOP_ROWS, RECENT_ROWS = 12, 11
 
 local function makeListPanel(ui, parent, w, key)
   local pnl = ui:Panel(parent, w, 0)
@@ -361,8 +361,8 @@ function UI:BuildLedger(parent)
   for i = 1, RECENT_ROWS do
     local row = CreateFrame("Frame", nil, rp)
     row:SetHeight(24)
-    row:SetPoint("TOPLEFT", rp, "TOPLEFT", 10, -36 - (i - 1) * 25)
-    row:SetPoint("TOPRIGHT", rp, "TOPRIGHT", -10, -36 - (i - 1) * 25)
+    row:SetPoint("TOPLEFT", rp, "TOPLEFT", 10, -62 - (i - 1) * 25)
+    row:SetPoint("TOPRIGHT", rp, "TOPRIGHT", -10, -62 - (i - 1) * 25)
     row:EnableMouse(true)
     row.tag = self:Font(row, 13, C.green, UI.FONT, "OUTLINE")
     row.tag:SetPoint("LEFT", row, "LEFT", 0, 0)
@@ -400,8 +400,24 @@ function UI:BuildLedger(parent)
     row:SetScript("OnLeave", function() GameTooltip:Hide() end)
     table.insert(rp.rows, row)
   end
+  -- Suche im Buch: Name des Spenders oder des Items, auch Teile davon
+  Lg.search = ""
+  local sbox = self:EditBox("BananaBankLedgerSearch", rp, 214)
+  sbox:SetPoint("TOPLEFT", rp, "TOPLEFT", 14, -32)
+  local sph = self:Font(sbox, 11, C.muted)
+  sph:SetPoint("LEFT", sbox, "LEFT", 2, 0)
+  self:Loc(sph, "LEDGER_SEARCH")
+  sbox:SetScript("OnTextChanged", function()
+    local txt = this:GetText() or ""
+    if txt == "" then sph:Show() else sph:Hide() end
+    Lg.search = string.lower(txt)
+    Lg.page = 1
+    UI:RefreshLedger()
+  end)
+  sbox:SetScript("OnEnterPressed", function() this:ClearFocus() end)
+  Lg.sbox = sbox
   rp.empty = self:Font(rp, 11, C.muted)
-  rp.empty:SetPoint("TOPLEFT", rp, "TOPLEFT", 14, -42)
+  rp.empty:SetPoint("TOPLEFT", rp, "TOPLEFT", 14, -68)
   rp.empty:SetWidth(230)
   self:Loc(rp.empty, "LEDGER_EMPTY")
   local nextBtn = self:Button(rp, 22, 18, ">", function()
@@ -444,7 +460,7 @@ local function fillTop(pnl, list)
   if list[1] then pnl.empty:Hide() else pnl.empty:Show() end
 end
 
-local KIND_TAG = { out = "-", gout = "-", ["in"] = "+", gold = "+", back = "<", cod = "$", qfix = "*" }
+local KIND_TAG = { out = "-", gout = "-", ["in"] = "+", gold = "+", back = "<", cod = "$", qfix = "*", trash = "$" }
 
 function UI:RefreshLedger()
   if not self.led then return end
@@ -467,6 +483,16 @@ function UI:RefreshLedger()
   Lg.totals:SetText(txt)
 
   local list = BB:LedgerSorted()
+  if Lg.search and Lg.search ~= "" then
+    local found = {}
+    for i = 1, getn(list) do
+      local e = list[i]
+      local qq = e.code ~= "" and BananaBankDB.quests[e.code]
+      local hay = string.lower((e.p or "") .. " " .. (e.n or "") .. " " .. (qq and qq.title or ""))
+      if string.find(hay, Lg.search, 1, true) then table.insert(found, e) end
+    end
+    list = found
+  end
   local pages = floor((getn(list) - 1) / RECENT_ROWS) + 1
   if pages < 1 then pages = 1 end
   if Lg.page > pages then Lg.page = pages end
@@ -483,7 +509,7 @@ function UI:RefreshLedger()
       if tag == "-" then col = C.orange elseif tag == "<" then col = C.muted end
       row.tag:SetTextColor(col[1], col[2], col[3])
       local what
-      if e.k == "gold" or e.k == "gout" or e.k == "cod" then
+      if e.k == "gold" or e.k == "gout" or e.k == "cod" or e.k == "trash" then
         what = BB.Money(e.m)
       else
         local qc = BB.QUALITY_COLOR[e.q or 1] or BB.QUALITY_COLOR[1]

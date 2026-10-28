@@ -98,6 +98,12 @@ end
 local function smallSlot(parent)
   local s = UI:Slot(parent, ICON)
   s.count:SetFont(FONT, 9, "OUTLINE")
+  s.coin = s:CreateTexture(nil, "OVERLAY")
+  s.coin:SetTexture("Interface\\Icons\\INV_Misc_Coin_01")
+  s.coin:SetWidth(11)
+  s.coin:SetHeight(11)
+  s.coin:SetPoint("TOPLEFT", s, "TOPLEFT", 0, 0)
+  s.coin:Hide()
   s.badge:SetFont(FONT, 8, "OUTLINE")
   s.res:SetFont(FONT, 8, "OUTLINE")
   s.glow:SetWidth(32)
@@ -222,6 +228,11 @@ function UI:BuildStockView(p)
     r.lbtn:SetScript("OnLeave", function() GameTooltip:Hide() end)
     r.lbtn:EnableMouseWheel(true)
     r.lbtn:SetScript("OnMouseWheel", wheel)
+    r.ltint = r:CreateTexture(nil, "BACKGROUND")
+    r.ltint:SetTexture(WHITE)
+    r.ltint:SetAllPoints(r)
+    r.ltint:SetVertexColor(1, 0.3, 0.2, 0.12)
+    r.ltint:Hide()
     local lhl = r.lbtn:CreateTexture(nil, "HIGHLIGHT")
     lhl:SetTexture(WHITE)
     lhl:SetAllPoints(r.lbtn)
@@ -295,6 +306,9 @@ local function fillSlot(s, entry, basket)
   elseif entry.avail > 0 then s.icon:SetVertexColor(1, 1, 1) else s.icon:SetVertexColor(0.35, 0.35, 0.35) end
   s.count:SetText(entry.avail > 1 and entry.avail or (entry.avail == 1 and "" or "0"))
   if entry.res > 0 then s.res:SetText(entry.res) else s.res:SetText("") end
+  if s.coin then
+    if BB:IsTrash(entry.id) then s.coin:Show() else s.coin:Hide() end
+  end
   if basket[entry.id] then s.badge:SetText("x" .. basket[entry.id]) else s.badge:SetText("") end
   s:Show()
 end
@@ -349,7 +363,7 @@ function UI:RefreshStockView(list)
   end
   self:RefreshTree()
   -- bei geaenderten Suchkriterien wieder nach oben
-  local sig = table.concat({ tostring(S.bank), tostring(S.type), S.filter, S.search, tostring(S.onlyAvail), S.view }, "|")
+  local sig = table.concat({ tostring(S.bank), tostring(S.type), S.filter, S.search, tostring(S.onlyAvail), tostring(S.onlyTrash), S.view }, "|")
   if S.sig ~= sig then
     S.sig = sig
     local sb = getglobal("BananaBankStockScrollScrollBar")
@@ -368,6 +382,7 @@ function UI:RefreshStockView(list)
     local d = rows[offset + i]
     r.hfs:Hide()
     r.hline:Hide()
+    r.ltint:Hide()
     r.lbtn:Hide()
     r.lname:SetText("")
     r.lcnt:SetText("")
@@ -388,7 +403,12 @@ function UI:RefreshStockView(list)
         r.lbtn.id = e.id
         r.lbtn:Show()
         local qc = BB.QUALITY_COLOR[e.e.q or 1] or BB.QUALITY_COLOR[1]
-        r.lname:SetText(e.e.n or "?")
+        local nm = e.e.n or "?"
+        if BB:IsTrash(e.id) then
+          nm = "|cffff6a55" .. T("TRASH_TAG") .. "|r " .. nm
+          r.ltint:Show()
+        end
+        r.lname:SetText(nm)
         r.lname:SetTextColor(qc[1], qc[2], qc[3])
         local txt = tostring(e.avail)
         if e.res > 0 then txt = txt .. " |cffff8000(" .. e.res .. ")|r" end
