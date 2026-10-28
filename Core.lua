@@ -10,7 +10,7 @@
 BananaBank = {}
 local BB = BananaBank
 
-BB.VERSION = "3.3.1"
+BB.VERSION = "3.3.2"
 BB.PREFIX = "BBNK"
 BB.DONATE_NAME = "Lumihunt"
 -- Einziger erlaubter Bank-Rang, deutsch und englisch. Fest eingebaut, es gibt
@@ -812,6 +812,7 @@ function BB:BankHintLines() return nil end
 function BB:OtherBankCounts() return {} end
 -- Platzhalter fuer Trash.lua / VendorData.lua (veraltete TOC: dann gibt es nur keine Haendlerpreise)
 function BB:VendorValue() return nil end
+function BB:TrashMax() return 200 end
 function BB:IsTrash() return false end
 function BB.ClassToken() return nil end
 function BB:BankList() return {} end
@@ -879,6 +880,10 @@ function BB:CheckModules()
   if not (self.UI and self.UI.summaryModule) then table.insert(missing, "UI_Summary.lua") end
   if not (self.UI and self.UI.questModule) then table.insert(missing, "UI_Quests.lua") end
   if not (self.UI and self.UI.priceModule) then table.insert(missing, "UI_Prices.lua") end
+  if not self.VendorDB then table.insert(missing, "VendorData.lua") end
+  if not self.vendorModule then table.insert(missing, "Vendor.lua") end
+  if not (self.UI and self.UI.lotseModule) then table.insert(missing, "UI_Lotse.lua") end
+  if not (self.UI and self.UI.trashModule) then table.insert(missing, "UI_Trash.lua") end
   if table.getn(missing) > 0 then
     self:Print("|cffff4040" .. string.format(self.T("ERR_FILES_MISSING"), table.concat(missing, ", ")) .. "|r")
     return false
