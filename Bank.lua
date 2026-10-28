@@ -50,7 +50,7 @@ end
 local function sameItems(a, b)
   for id, it in pairs(a or {}) do
     local o = b[id]
-    if not o or o.c ~= it.c then return false end
+    if not o or o.c ~= it.c or (o.cr or "") ~= (it.cr or "") then return false end
   end
   for id in pairs(b or {}) do
     if not a[id] then return false end
@@ -99,6 +99,7 @@ function BB:UpdateSnapshot(push, onlyIfChanged)
         e = { c = 0, q = it.q, t = it.t, n = it.n, k = k, s = s }
         items[id] = e
       end
+      if it.cr and it.cr ~= "" then e.cr = it.cr end
       e.c = e.c + it.c
     end
   end
