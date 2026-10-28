@@ -2,7 +2,8 @@
 --
 -- * Haendlerwert je Stueck kommt aus VendorData.lua (Daten aus ShaguTweaks, MIT-Lizenz).
 -- * Preis fuer alles ausser BOE, Rezepten und Taschen: Haendlerwert + 25 % (siehe Prices.lua, GetPrice).
--- * Trash: Items, deren Haendlerwert unter der Grenze liegt (Standard 10 Silber, einstellbar).
+-- * Trash: graue Items (Qualitaet "Schlecht") und Items, deren Haendlerwert unter der Grenze liegt
+--   (Standard 2 Silber, einstellbar).
 -- * Klassenbeschraenkung ("Classes: Druid") wird beim Bank-Scan aus dem Tooltip gelesen und mit dem Item
 --   synchronisiert; angefragt werden darf nur mit passender Klasse.
 
@@ -10,7 +11,7 @@ local BB = BananaBank
 local getn = table.getn
 
 BB.vendorModule = true
-BB.TRASH_DEFAULT = 1000        -- 10 Silber
+BB.TRASH_DEFAULT = 200         -- 2 Silber
 BB.VENDOR_MARKUP = 1.25
 
 -- ------------------------------------------------------------
@@ -45,18 +46,31 @@ local PROTECTED_TYPES = {
   ["projectile"] = true, ["geschoss"] = true,
 }
 
--- Trash? Nur auf Bank-Chars. BOE, Rezepte, Taschen, Quest-Items und Schluessel sind nie Trash.
+-- Qualitaet eines Items: erst der Client, sonst die Bestaende der Banken
+local function qualityOf(id)
+  local _, _, q = GetItemInfo(id)
+  if q then return q end
+  local e = BB.stockCache and BB.stockCache[id]
+  return e and e.q or nil
+end
+
+-- Trash? Nur auf Bank-Chars. Trash sind graue Items und Items unter der Wertgrenze.
+-- Quest-Items und Schluessel sind nie Trash; unter der Wertgrenze auch keine BOE, Rezepte und Taschen.
 function BB:IsTrash(id)
   if not id or not self:IsBank() then return false end
   local db = BananaBankDB
   if db.trashKeep and db.trashKeep[id] then return false end
   if BB.IGNORE_IDS and BB.IGNORE_IDS[id] then return false end
+  local _, _, _, _, itype = GetItemInfo(id)
+  local ltype = itype and string.lower(itype)
+  if ltype and (ltype == "quest" or ltype == "key" or ltype == "schlüssel" or ltype == "schluessel") then return false end
+  -- grau = Trash, egal was der Haendler zahlt
+  if qualityOf(id) == 0 then return true end
   local v = self:VendorValue(id)
   if not v or v >= self:TrashMax() then return false end
   if db.bind and db.bind[id] == "boe" then return false end
   if self:NeedsPrice(id) or (self.ItemIsBag and self:ItemIsBag(id)) then return false end
-  local _, _, _, _, itype = GetItemInfo(id)
-  if itype and PROTECTED_TYPES[string.lower(itype)] then return false end
+  if ltype and PROTECTED_TYPES[ltype] then return false end
   return true
 end
 

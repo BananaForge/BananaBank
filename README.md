@@ -93,6 +93,7 @@ Pull requests welcome, tested in-game on a 1.12 client. Lua 5.0 rules: no `#`, `
 
 ## Changelog
 
+- **3.3.1:** trash is now **grey items plus everything under 2 silver** vendor value (limit adjustable in the bank settings, default 2s). Grey items count as trash whatever the vendor pays; quest items and keys never do.
 - **3.3.0:** (new files VendorData.lua, Vendor.lua, UI_Trash.lua: restart WoW fully) **Vendor prices:** every item except BOEs, recipes and bags is priced at vendor value +25 % (min. 50 silver, vendor data from ShaguTweaks, MIT); items without a known value cannot be requested. **Trash** (bank chars only): items under 10 silver vendor value (setting) are marked in the stock list (tint, coin, filter "Trash only"), in bags/bank slots and in tooltips; at a vendor a window offers preview and "Sell trash" (reserved and quest items stay, Ctrl-click an item to never sell it); "Fetch trash" at the bank; income is booked as "Trash income". **Class items** ("Classes: Druid") can only be requested by those classes (read from the tooltip at the bank scan, synced). **Ledger search** by name.
 - **3.2.2:** NPC senders (every auction house, postmasters, game masters) are no longer donors: not booked from the mailbox, and existing entries are ignored in the top donors, summaries, quest progress and ranking.
 - **3.2.1:** bank pilot: texts fit their buttons (wider view button, wider main button in the small view, shorter one-line texts), header no longer overlaps.
