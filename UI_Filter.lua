@@ -120,24 +120,13 @@ function UI:BuildStockView(p)
   local S = self.stock
   S.treeOffset = 0
 
-  -- Ansichtswahl
+  -- nur die Listenansicht (Symbole entfernt)
   S.viewChips = {}
-  local vdefs = { { "SV_ICONS", "icons" }, { "SV_LIST", "list" } }
-  for i = 1, getn(vdefs) do
-    local key = vdefs[i][2]
-    local chip = self:Chip(p, 66, vdefs[i][1], function()
-      S.view = key
-      UI:RefreshStock()
-    end)
-    chip.key = key
-    -- rechtsbuendig mit der Ergebnisliste (die endet 238 vor dem rechten Rand)
-    chip:SetPoint("TOPRIGHT", p, "TOPRIGHT", -(244 + (getn(vdefs) - i) * 70), -2)
-    S.viewChips[i] = chip
-  end
+  S.view = "list"
 
   -- Kategorienbaum
   local tree = self:Panel(p, 124, 0)
-  tree:SetPoint("TOPLEFT", p, "TOPLEFT", 0, -52)
+  tree:SetPoint("TOPLEFT", p, "TOPLEFT", 0, -30)
   tree:SetPoint("BOTTOMLEFT", p, "BOTTOMLEFT", 0, 26)
   tree:EnableMouseWheel(true)
   tree:SetScript("OnMouseWheel", function()
@@ -179,7 +168,7 @@ function UI:BuildStockView(p)
 
   -- Ergebnisfeld
   local res = self:Panel(p, 0, 0)
-  res:SetPoint("TOPLEFT", p, "TOPLEFT", 130, -52)
+  res:SetPoint("TOPLEFT", p, "TOPLEFT", 130, -30)
   res:SetPoint("BOTTOMRIGHT", p, "BOTTOMRIGHT", -238, 26)
   S.resPanel = res
   local sf = CreateFrame("ScrollFrame", "BananaBankStockScroll", res, "FauxScrollFrameTemplate")

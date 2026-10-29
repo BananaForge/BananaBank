@@ -645,7 +645,7 @@ function UI:BuildStock(parent)
   self.stock = { page = 1, filter = 0, onlyAvail = false, search = "", type = "all", view = "list" }
   local S = self.stock
 
-  local search = self:EditBox("BananaBankSearch", p, 150)
+  local search = self:EditBox("BananaBankSearch", p, 110)
   search:SetPoint("TOPLEFT", p, "TOPLEFT", 8, -2)
   local ph = self:Font(search, 11, C.muted)
   ph:SetPoint("LEFT", search, "LEFT", 2, 0)
@@ -664,7 +664,7 @@ function UI:BuildStock(parent)
   local prev = search
   for i = 1, getn(chipDefs) do
     local q = chipDefs[i][2]
-    local chip = self:Chip(p, 46, chipDefs[i][1], function()
+    local chip = self:Chip(p, 42, chipDefs[i][1], function()
       S.filter = q
       S.page = 1
       UI:RefreshStock()
@@ -674,21 +674,21 @@ function UI:BuildStock(parent)
     table.insert(S.chips, chip)
     prev = chip
   end
-  -- zweite Zeile: Schalter im Stil der Qualitaetsknoepfe, alle auf einer Grundlinie
-  S.availChip = self:Chip(p, 104, "ONLY_AVAILABLE", function()
+  -- Schalter rechtsbuendig mit der Ergebnisliste (die endet 238 vor dem rechten Rand), gleiche Zeile wie die Qualitaetsknoepfe
+  S.availChip = self:Chip(p, 84, "ONLY_AVAILABLE", function()
     S.onlyAvail = not S.onlyAvail
     S.page = 1
     UI:RefreshStock()
   end)
-  S.availChip:SetPoint("TOPLEFT", p, "TOPLEFT", 8, -28)
+  S.availChip:SetPoint("TOPRIGHT", p, "TOPRIGHT", -(244 + 64 + 4), -2)
   -- nur auf Bank-Chars: nur Trash zeigen (Haendlerwert unter der Grenze)
   S.onlyTrash = false
-  S.trashChk = self:Chip(p, 84, "TRASH_ONLY", function()
+  S.trashChk = self:Chip(p, 64, "TRASH_ONLY", function()
     S.onlyTrash = not S.onlyTrash
     S.page = 1
     UI:RefreshStock()
   end)
-  S.trashChk:SetPoint("LEFT", S.availChip, "RIGHT", 4, 0)
+  S.trashChk:SetPoint("TOPRIGHT", p, "TOPRIGHT", -244, -2)
   S.bank = nil
   -- Einzelansicht einer Bank (aus Banken > Inhalt zeigen): Knopf zum Zuruecksetzen
   S.bankChip = self:Chip(p, 170, "", function()
@@ -696,7 +696,7 @@ function UI:BuildStock(parent)
     S.page = 1
     UI:RefreshStock()
   end)
-  S.bankChip:SetPoint("LEFT", S.trashChk, "RIGHT", 4, 0)
+  S.bankChip:SetPoint("BOTTOMRIGHT", p, "BOTTOMRIGHT", -244, 4)
   S.bankChip:Hide()
   -- altes Auswahlmenue bleibt als Code erhalten, der Knopf ist aber nie sichtbar
   S.bankBtn = self:Button(p, 140, 18, "", function() UI:ToggleBankMenu() end, "flat")
@@ -712,11 +712,11 @@ function UI:BuildStock(parent)
   self:BuildStockView(p)
   S.info = self:Font(p, 11, C.muted)
   S.info:SetPoint("BOTTOMLEFT", p, "BOTTOMLEFT", 8, 6)
-  S.info:SetWidth(500)
+  S.info:SetWidth(300)
 
   -- Warenkorb rechts
   local cart = self:Panel(p, 232, 0)
-  cart:SetPoint("TOPRIGHT", p, "TOPRIGHT", 0, -52)
+  cart:SetPoint("TOPRIGHT", p, "TOPRIGHT", 0, -30)
   cart:SetPoint("BOTTOMRIGHT", p, "BOTTOMRIGHT", 0, 0)
   local ct = self:Font(cart, 15, C.gold, FONT_TITLE)
   ct:SetPoint("TOPLEFT", cart, "TOPLEFT", 12, -10)
