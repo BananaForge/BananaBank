@@ -353,11 +353,9 @@ function UI:RefreshStockView(list)
   local S = self.stock
   if not S or not S.vrows then return end
   if list then S.lastList = list else list = S.lastList or {} end
-  -- Ansichtswahl: bei Mitgliedern ohne Bankwahl weiter links
+  -- Ansichtswahl: rechtsbuendig in der oberen Zeile (Position im Build)
   for i = 1, getn(S.viewChips) do
     S.viewChips[i]:SetActive(S.viewChips[i].key == S.view)
-    S.viewChips[i]:ClearAllPoints()
-    S.viewChips[i]:SetPoint("TOPLEFT", S.viewChips[i]:GetParent(), "TOPLEFT", (BB:IsBank() and 280 or 126) + (i - 1) * 78, -27)
   end
   if S.type ~= "all" and not BB:FindTypeFilter(S.type) then
     local depotId = string.sub(S.type, 1, 6) == "depot:" and string.sub(S.type, 7)

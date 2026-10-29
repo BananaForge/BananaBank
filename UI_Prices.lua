@@ -26,7 +26,7 @@ function UI:BuildPrices(parent)
   P.bar = bar
   P.info = self:Font(bar, 11, C.text)
   P.info:SetPoint("LEFT", bar, "LEFT", 268, 0)
-  P.info:SetWidth(250)
+  P.info:SetWidth(232)
   P.info:SetHeight(14)
 
   P.cod = self:Check(bar, "OPT_COD", function() return BananaBankDB.cod ~= false end, function(v)
@@ -74,10 +74,17 @@ function UI:BuildPrices(parent)
   end
   sf:EnableMouseWheel(true)
   sf:SetScript("OnMouseWheel", wheel)
-  local cols = { { "COL_ITEM", 14 }, { "COL_BIND", 300 }, { "COL_PRICE", 446 }, { "COL_SOURCE", 540 }, { "COL_DATE", 622 } }
+  -- Preis, Quelle, Datum: rechtsbuendig ueber den Werten (rechte Kante, Breite)
+  local cols = { { "COL_ITEM", 14 }, { "COL_BIND", 300 }, { "COL_PRICE", 486, 98 }, { "COL_SOURCE", 578, 74 }, { "COL_DATE", 658, 76 } }
   for i = 1, getn(cols) do
     local h = self:Font(list, 10, C.goldDim)
-    h:SetPoint("TOPLEFT", list, "TOPLEFT", cols[i][2], -9)
+    if cols[i][3] then
+      h:SetWidth(cols[i][3])
+      h:SetJustifyH("RIGHT")
+      h:SetPoint("TOPLEFT", list, "TOPLEFT", cols[i][2] - cols[i][3], -9)
+    else
+      h:SetPoint("TOPLEFT", list, "TOPLEFT", cols[i][2], -9)
+    end
     self:Loc(h, cols[i][1])
   end
   self:HLine(list, -24, 8, -8, C.brass, 0.8)
