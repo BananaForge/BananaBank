@@ -214,7 +214,7 @@ function UI:RefreshRequests()
       elseif r.p == me and st == "open" then
         row.actionKind = "cancel"
         row.action.fs:SetText(T("BTN_CANCEL"))
-      elseif r.p == me and (st == "open" or st == "confirmed" or st == "sent") then
+      elseif BB.USE_CODE and r.p == me and (st == "open" or st == "confirmed" or st == "sent") then
         row.actionKind = "code"
         row.action.fs:SetText(T("BTN_CODE"))
       end
@@ -612,11 +612,13 @@ function UI:BuildBank(parent)
   local ph = self:Font(codeBox, 11, C.muted)
   ph:SetPoint("LEFT", codeBox, "LEFT", 2, 0)
   self:Loc(ph, "BANK_CODE_PLACEHOLDER")
+  if not BB.USE_CODE then lt:Hide() codeBox:Hide() ph:Hide() end
   codeBox:SetScript("OnTextChanged", function()
     if (this:GetText() or "") == "" then ph:Show() else ph:Hide() end
   end)
   local check = self:Button(left, 100, 22, "BTN_CHECK", function() UI:CheckCode() end, "primary")
   check:SetPoint("LEFT", codeBox, "RIGHT", 8, 0)
+  if not BB.USE_CODE then check:Hide() end
 
   Bk.head = self:Font(left, 13, C.text)
   Bk.head:SetPoint("TOPLEFT", left, "TOPLEFT", 14, -64)

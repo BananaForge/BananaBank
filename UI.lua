@@ -1062,7 +1062,12 @@ function UI:RefreshCart()
   local lock = BB:BlockText(BB:Me(), nil)
   S.cartLock:SetText(lock or "")
   S.makeBtn:SetOn(positions > 0 and not lock)
-  S.lastCodeBtn:SetOn(self.lastReq ~= nil)
+  if BB.USE_CODE then
+    S.lastCodeBtn:Show()
+    S.lastCodeBtn:SetOn(self.lastReq ~= nil)
+  else
+    S.lastCodeBtn:Hide()
+  end
 end
 
 function UI:MakeCode()
@@ -1086,7 +1091,11 @@ function UI:MakeCode()
   BananaBankDB.basket = {}
   BananaBankDB.claims = {}
   self.lastReq = r
-  self:ShowExport(r)
+  if BB.USE_CODE then
+    self:ShowExport(r)
+  else
+    BB:Print(string.format(T("MSG_REQUEST_SENT"), r.id))
+  end
   self:Refresh()
 end
 
