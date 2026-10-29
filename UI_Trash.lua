@@ -74,9 +74,11 @@ end
 local function markButton(button, bag, slot)
   if not button then return end
   -- Mittelklick empfangen (Links- und Rechtsklick bleiben wie sie waren)
-  if not button.bbClicks and button.RegisterForClicks then
+  if not button.bbClicks and button.RegisterForClicks and BB:IsBank() then
     button.bbClicks = true
-    button:RegisterForClicks("AnyUp")
+    if not pcall(function() button:RegisterForClicks("LeftButtonUp", "RightButtonUp", "MiddleButtonUp") end) then
+      button:RegisterForClicks("LeftButtonUp", "RightButtonUp")
+    end
   end
   local show = false
   if BB:IsBank() then

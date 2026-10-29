@@ -109,7 +109,7 @@ local function smallSlot(parent)
   s.glow:SetWidth(32)
   s.glow:SetHeight(32)
   -- Mittelklick (Trash) braucht AnyUp; faellt das aus, bleiben Links- und Rechtsklick
-  if not pcall(function() s:RegisterForClicks("AnyUp") end) then s:RegisterForClicks("LeftButtonUp", "RightButtonUp") end
+  if not pcall(function() s:RegisterForClicks("LeftButtonUp", "RightButtonUp", "MiddleButtonUp") end) then s:RegisterForClicks("LeftButtonUp", "RightButtonUp") end
   s:SetScript("OnClick", function() UI:OnSlotClick(this, arg1) end)
   s:SetScript("OnEnter", function() UI:OnSlotEnter(this) end)
   s:SetScript("OnLeave", function() GameTooltip:Hide() end)
@@ -223,7 +223,7 @@ function UI:BuildStockView(p)
     -- Listenzeile: Klickflaeche ueber die ganze Zeile
     r.lbtn = CreateFrame("Button", nil, r)
     r.lbtn:SetAllPoints(r)
-    if not pcall(function() r.lbtn:RegisterForClicks("AnyUp") end) then r.lbtn:RegisterForClicks("LeftButtonUp", "RightButtonUp") end
+    if not pcall(function() r.lbtn:RegisterForClicks("LeftButtonUp", "RightButtonUp", "MiddleButtonUp") end) then r.lbtn:RegisterForClicks("LeftButtonUp", "RightButtonUp") end
     r.lbtn:SetScript("OnClick", function() UI:OnSlotClick(this, arg1) end)
     r.lbtn:SetScript("OnEnter", function() UI:OnSlotEnter(this) end)
     r.lbtn:SetScript("OnLeave", function() GameTooltip:Hide() end)
