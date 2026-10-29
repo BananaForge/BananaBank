@@ -11,8 +11,8 @@ local WHITE, FONT, FONT_TITLE = UI.WHITE, UI.FONT, UI.FONT_TITLE
 UI.bankUIModule = true
 UI.bk = {}
 
-local ROW_H = 50
-local VISIBLE = 7
+local ROW_H = 38
+local VISIBLE = 8
 local MENU_ROW = 38
 local MENU_MAX = 9
 
@@ -222,13 +222,25 @@ function UI:BuildBanks(parent)
   K.editBtn = self:Button(sum, 180, 26, "BK_EDIT", function() UI:OpenBankEditor() end, "primary")
   K.editBtn:SetPoint("RIGHT", sum, "RIGHT", -12, 0)
 
-  local lp = CreateFrame("Frame", nil, p)
-  lp:SetPoint("TOPLEFT", p, "TOPLEFT", 0, -64)
-  lp:SetPoint("BOTTOMRIGHT", p, "BOTTOMRIGHT", 0, 0)
-  K.lp = lp
-  local sf = CreateFrame("ScrollFrame", "BananaBankBanksScroll", lp, "FauxScrollFrameTemplate")
-  sf:SetPoint("TOPLEFT", lp, "TOPLEFT", 0, 0)
-  sf:SetPoint("BOTTOMRIGHT", lp, "BOTTOMRIGHT", -2, 0)
+  -- Tabelle: Spaltenkoepfe, eine Zeile je Bank (Name mit Beschreibung darunter), Zebra-Zeilen
+  local tbl = self:Panel(p)
+  tbl:SetPoint("TOPLEFT", p, "TOPLEFT", 0, -64)
+  tbl:SetPoint("BOTTOMRIGHT", p, "BOTTOMRIGHT", 0, 0)
+  K.lp = tbl
+  local lp = tbl
+  local heads = { { "BK_COL_BANK", 24, 184, "LEFT" }, { "BK_COL_ROLE", 212, 98, "LEFT" }, { "BK_COL_ITEMS", 314, 76, "RIGHT" },
+    { "BK_COL_GOLD", 394, 86, "RIGHT" }, { "BK_COL_SCAN", 484, 104, "RIGHT" } }
+  for i = 1, getn(heads) do
+    local h = self:Font(tbl, 10, C.goldDim)
+    h:SetPoint("TOPLEFT", tbl, "TOPLEFT", 8 + heads[i][2], -8)
+    h:SetWidth(heads[i][3])
+    h:SetJustifyH(heads[i][4])
+    self:Loc(h, heads[i][1])
+  end
+  self:HLine(tbl, -24, 8, -8, C.brass, 0.8)
+  local sf = CreateFrame("ScrollFrame", "BananaBankBanksScroll", tbl, "FauxScrollFrameTemplate")
+  sf:SetPoint("TOPLEFT", tbl, "TOPLEFT", 4, -28)
+  sf:SetPoint("BOTTOMRIGHT", tbl, "BOTTOMRIGHT", -30, 4)
   sf:SetScript("OnVerticalScroll", function() FauxScrollFrame_OnVerticalScroll(ROW_H, function() UI:RefreshBanks() end) end)
   sf.offset = 0
   K.sf = sf
@@ -241,46 +253,52 @@ function UI:BuildBanks(parent)
 
   K.rows = {}
   for i = 1, VISIBLE do
-    local card = self:Panel(lp, 0, ROW_H - 6)
-    card:SetPoint("TOPLEFT", lp, "TOPLEFT", 0, -(i - 1) * ROW_H)
-    card:SetPoint("TOPRIGHT", lp, "TOPRIGHT", -24, -(i - 1) * ROW_H)
+    local card = CreateFrame("Frame", nil, tbl)
+    card:SetHeight(ROW_H - 2)
+    card:SetPoint("TOPLEFT", tbl, "TOPLEFT", 6, -30 - (i - 1) * ROW_H)
+    card:SetPoint("TOPRIGHT", tbl, "TOPRIGHT", -30, -30 - (i - 1) * ROW_H)
     card:EnableMouse(true)
     card:EnableMouseWheel(true)
     card:SetScript("OnMouseWheel", wheel)
     card:SetScript("OnEnter", function() UI:BankCardTooltip(this) end)
     card:SetScript("OnLeave", function() GameTooltip:Hide() end)
+    card.zebra = card:CreateTexture(nil, "BACKGROUND")
+    card.zebra:SetTexture(WHITE)
+    card.zebra:SetAllPoints(card)
+    card.zebra:SetVertexColor(1, 1, 1, mod(i, 2) == 0 and 0.045 or 0)
     card.dot = card:CreateTexture(nil, "ARTWORK")
     card.dot:SetTexture(WHITE)
-    card.dot:SetWidth(8)
-    card.dot:SetHeight(8)
-    card.dot:SetPoint("TOPLEFT", card, "TOPLEFT", 10, -11)
+    card.dot:SetWidth(9)
+    card.dot:SetHeight(9)
+    card.dot:SetPoint("LEFT", card, "LEFT", 6, 0)
     card.name = self:Font(card, 13, C.gold)
-    card.name:SetPoint("TOPLEFT", card, "TOPLEFT", 26, -8)
-    card.name:SetWidth(170)
+    card.name:SetPoint("TOPLEFT", card, "TOPLEFT", 24, -5)
+    card.name:SetWidth(184)
     card.name:SetHeight(16)
-    card.role = self:Font(card, 11, C.text)
-    card.role:SetPoint("TOPLEFT", card, "TOPLEFT", 200, -9)
-    card.role:SetWidth(250)
-    card.role:SetHeight(14)
-    card.s1 = self:Font(card, 11, C.gold)
-    card.s1:SetPoint("TOPRIGHT", card, "TOPRIGHT", -112, -9)
-    card.s1:SetJustifyH("RIGHT")
-    card.s1:SetWidth(330)
-    card.s1:SetHeight(14)
-    card.tags = self:Font(card, 10, C.goldDim)
-    card.tags:SetPoint("TOPLEFT", card, "TOPLEFT", 26, -27)
-    card.tags:SetWidth(380)
+    card.tags = self:Font(card, 10, { 0.62, 0.64, 0.72 })
+    card.tags:SetPoint("TOPLEFT", card, "TOPLEFT", 24, -21)
+    card.tags:SetWidth(184)
     card.tags:SetHeight(12)
-    card.warn = self:Font(card, 10, C.orange)
-    card.warn:SetPoint("TOPLEFT", card, "TOPLEFT", 26, -40)
-    card.warn:SetWidth(520)
-    card.warn:SetHeight(12)
-    card.s3 = self:Font(card, 10, C.muted)
-    card.s3:SetPoint("TOPRIGHT", card, "TOPRIGHT", -112, -27)
-    card.s3:SetJustifyH("RIGHT")
-    card.s3:SetWidth(330)
-    card.s3:SetHeight(12)
-    card.show = self:Button(card, 96, 20, "BK_SHOW", function(b)
+    card.role = self:Font(card, 11, C.text)
+    card.role:SetPoint("LEFT", card, "LEFT", 212, 0)
+    card.role:SetWidth(98)
+    card.role:SetHeight(14)
+    card.items = self:Font(card, 12, C.gold)
+    card.items:SetPoint("LEFT", card, "LEFT", 314, 0)
+    card.items:SetWidth(76)
+    card.items:SetHeight(14)
+    card.items:SetJustifyH("RIGHT")
+    card.gold = self:Font(card, 12, C.gold)
+    card.gold:SetPoint("LEFT", card, "LEFT", 394, 0)
+    card.gold:SetWidth(86)
+    card.gold:SetHeight(14)
+    card.gold:SetJustifyH("RIGHT")
+    card.scan = self:Font(card, 11, C.muted)
+    card.scan:SetPoint("LEFT", card, "LEFT", 484, 0)
+    card.scan:SetWidth(104)
+    card.scan:SetHeight(14)
+    card.scan:SetJustifyH("RIGHT")
+    card.show = self:Button(card, 92, 20, "BK_SHOW", function(b)
       local name = b:GetParent().bank
       if not name then return end
       local S = UI.stock
@@ -288,11 +306,11 @@ function UI:BuildBanks(parent)
       S.page = 1
       UI:ShowPage("stock")
     end)
-    card.show:SetPoint("RIGHT", card, "RIGHT", -8, 0)
+    card.show:SetPoint("RIGHT", card, "RIGHT", -2, 0)
     table.insert(K.rows, card)
   end
   K.empty = self:Font(lp, 12, C.muted)
-  K.empty:SetPoint("TOPLEFT", lp, "TOPLEFT", 20, -30)
+  K.empty:SetPoint("TOPLEFT", lp, "TOPLEFT", 20, -40)
   K.empty:SetWidth(600)
   K.empty:SetJustifyV("TOP")
   self:Loc(K.empty, "BK_EMPTY")
@@ -370,21 +388,19 @@ function UI:RefreshBanks()
         card.role:SetTextColor(C.muted[1], C.muted[2], C.muted[3])
       end
       card.info = info
-      -- Zeile 2 links: die Beschreibung der Bank (kein Abgleich mit Kategorien, jede Bank lagert, was sie will)
+      -- Beschreibung klein unter dem Namen (jede Bank lagert, was sie will)
       local d = (info and info.desc) or ""
-      if string.len(d) > 60 then d = string.sub(d, 1, 57) .. "..." end
+      if string.len(d) > 38 then d = string.sub(d, 1, 35) .. "..." end
       card.tags:SetText(d)
       if st then
-        card.s1:SetText(string.format(T("BK_STATS"), st.items, st.kinds) .. "   " .. string.format(T("BK_GOLD"), BB.Money(st.gold)))
-        local line = string.format(T("BK_SCAN"), BB.Date(st.ts))
-        line = line .. "  -  " .. (BB:IsOnline(name) and T("BK_ONLINE") or T("BK_OFFLINE"))
-        card.s3:SetText(line)
-        card.warn:SetText("")
+        card.items:SetText(st.items .. " " .. T("UNIT_ITEMS"))
+        card.gold:SetText(BB.Money(st.gold))
+        card.scan:SetText(BB.Date(st.ts))
         card.show:SetOn(true)
       else
-        card.s1:SetText(T("SB_NOSCAN"))
-        card.s3:SetText(BB:IsOnline(name) and T("BK_ONLINE") or T("BK_OFFLINE"))
-        card.warn:SetText("")
+        card.items:SetText("-")
+        card.gold:SetText("")
+        card.scan:SetText(T("SB_NOSCAN"))
         card.show:SetOn(false)
       end
       card:Show()

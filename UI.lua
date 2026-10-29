@@ -118,6 +118,12 @@ function UI:Panel(parent, w, h)
   p:SetBackdrop(self.BACKDROP_PANEL)
   p:SetBackdropColor(C.panel[1], C.panel[2], C.panel[3], 0.92)
   p:SetBackdropBorderColor(C.brass[1], C.brass[2], C.brass[3], 0.9)
+  -- deckender Untergrund: sonst schimmern Namen und Texte aus der Spielwelt durch und stoeren das Lesen
+  local solid = p:CreateTexture(nil, "BACKGROUND")
+  solid:SetTexture(WHITE)
+  solid:SetPoint("TOPLEFT", p, "TOPLEFT", 3, -3)
+  solid:SetPoint("BOTTOMRIGHT", p, "BOTTOMRIGHT", -3, 3)
+  solid:SetVertexColor(C.panel[1], C.panel[2], C.panel[3], 0.985)
   return p
 end
 
@@ -362,6 +368,7 @@ function UI:Init()
     insets = { left = 11, right = 12, top = 12, bottom = 11 },
   })
   f:SetBackdropColor(C.bg[1], C.bg[2], C.bg[3], 0.97)
+  self:Solid(f, 12, 0.985)
   f:Hide()
   tinsert(UISpecialFrames, "BananaBankFrame")
   f:SetScript("OnShow", function() UI:Refresh() end)
