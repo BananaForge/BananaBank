@@ -54,12 +54,11 @@ local function qualityOf(id)
   return e and e.q or nil
 end
 
--- Trash? Nur auf Bank-Chars. Trash sind graue Items und Items unter der Wertgrenze.
+-- Automatik: graue Items und Items unter der Wertgrenze.
 -- Quest-Items und Schluessel sind nie Trash; unter der Wertgrenze auch keine BOE, Rezepte und Taschen.
-function BB:IsTrash(id)
-  if not id or not self:IsBank() then return false end
+function BB:TrashAuto(id)
+  if not id then return false end
   local db = BananaBankDB
-  if db.trashKeep and db.trashKeep[id] then return false end
   if BB.IGNORE_IDS and BB.IGNORE_IDS[id] then return false end
   local _, _, _, _, itype = GetItemInfo(id)
   local ltype = itype and string.lower(itype)
@@ -72,6 +71,127 @@ function BB:IsTrash(id)
   if self:NeedsPrice(id) or (self.ItemIsBag and self:ItemIsBag(id)) then return false end
   if ltype and PROTECTED_TYPES[ltype] then return false end
   return true
+end
+
+-- Trash? Nur auf Bank-Chars. Eine manuelle Entscheidung (Mittelklick) geht der Automatik vor.
+function BB:IsTrash(id)
+  if not id or not self:IsBank() then return false end
+  local o = BananaBankDB.trashOv and BananaBankDB.trashOv[id]
+  if o then
+    if o.s == "t" then return true end
+    if o.s == "n" then return false end
+  end
+  return self:TrashAuto(id)
+end
+
+-- ------------------------------------------------------------
+-- Manuelle Trash-Entscheidungen, unter den Bank-Chars geteilt
+-- trashOv[id] = { s = "t" (Trash) | "n" (kein Trash) | "a" (zurueck zur Automatik), ts =, by = }
+-- ------------------------------------------------------------
+function BB:TrashOverride(id)
+  local o = BananaBankDB.trashOv and BananaBankDB.trashOv[id]
+  if o and o.s ~= "a" then return o.s, o end
+  return nil
+end
+
+function BB:TrashOverrideCount()
+  local n = 0
+  for _, o in pairs(BananaBankDB.trashOv or {}) do
+    if o.s ~= "a" then n = n + 1 end
+  end
+  return n
+end
+
+function BB:SetTrashOverride(id, state)
+  if not id then return end
+  local db = BananaBankDB
+  db.trashOv = db.trashOv or {}
+  local ts = time()
+  local cur = db.trashOv[id]
+  if cur and cur.ts >= ts then ts = cur.ts + 1 end
+  db.trashOv[id] = { s = state, ts = ts, by = self:Me() }
+  self:ScheduleTrashPush()
+end
+
+-- Mittelklick: den angezeigten Zustand umkehren; entspricht das Ergebnis der Automatik, faellt die Entscheidung weg
+function BB:TrashToggle(id)
+  if not id or not self:IsBank() or not self:MayBeBank(self:Me()) then return nil end
+  local want = not self:IsTrash(id)
+  local state
+  if want == self:TrashAuto(id) then state = "a" else state = want and "t" or "n" end
+  self:SetTrashOverride(id, state)
+  return want, state
+end
+
+function BB:TrashResetAll()
+  for id, o in pairs(BananaBankDB.trashOv or {}) do
+    if o.s ~= "a" then self:SetTrashOverride(id, "a") end
+  end
+end
+
+-- Alte Ausnahmeliste (Strg-Klick, 3.3.0) in die neue Form uebernehmen
+function BB:TrashMigrate()
+  local db = BananaBankDB
+  if not db or not db.trashKeep then return end
+  for id in pairs(db.trashKeep) do
+    if not (db.trashOv and db.trashOv[id]) then self:SetTrashOverride(id, "n") end
+  end
+  db.trashKeep = nil
+end
+
+-- Sync: "id:s:ts:von" mit ";" getrennt
+function BB:SerializeTrash()
+  local recs = {}
+  for id, o in pairs(BananaBankDB.trashOv or {}) do
+    table.insert(recs, id .. ":" .. o.s .. ":" .. o.ts .. ":" .. BB.Clean(o.by or ""))
+  end
+  return table.concat(recs, ";")
+end
+
+function BB:ParseTrash(payload)
+  local out = {}
+  for _, rec in ipairs(BB.Split(payload or "", ";")) do
+    local f = BB.Split(rec, ":")
+    local id, ts = tonumber(f[1]), tonumber(f[3])
+    if id and ts and (f[2] == "t" or f[2] == "n" or f[2] == "a") and f[4] and f[4] ~= "" then
+      table.insert(out, { id = id, s = f[2], ts = ts, by = f[4] })
+    end
+  end
+  return out
+end
+
+-- nur von verifizierten Bank-Chars (Rang laut eigener Gildenliste), je Item gewinnt der neuere Eintrag
+function BB:MergeTrash(payload)
+  local db = BananaBankDB
+  db.trashOv = db.trashOv or {}
+  local changed = false
+  for _, r in ipairs(self:ParseTrash(payload)) do
+    local cur = db.trashOv[r.id]
+    if r.ts <= time() + 86400 and (not cur or r.ts > cur.ts) and self:MayBeBank(r.by) then
+      db.trashOv[r.id] = { s = r.s, ts = r.ts, by = r.by }
+      changed = true
+    end
+  end
+  if changed and self.UI then self.UI:Refresh() end
+  return changed
+end
+
+function BB:TrashDigest()
+  local n, sum = 0, 0
+  for id, o in pairs(BananaBankDB.trashOv or {}) do
+    n = n + 1
+    sum = mod(sum + BB.Hash(id .. o.s .. o.ts), 16777213)
+  end
+  return n, sum
+end
+
+function BB:PushTrash()
+  if BB.Count(BananaBankDB.trashOv or {}) == 0 then return end
+  self:SendTransfer("T", "one", self:SerializeTrash())
+end
+
+function BB:ScheduleTrashPush()
+  self:After(3, function() BB:PushTrash() end, "trashpush")
 end
 
 -- Menge je Item, die nicht verkauft werden darf: reservierte Anfragen und offene Quest-Mengen

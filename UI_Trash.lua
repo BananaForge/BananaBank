@@ -20,11 +20,20 @@ local COIN = "Interface\\Icons\\INV_Misc_Coin_01"
 -- Tooltip
 -- ------------------------------------------------------------
 local function addTrashLines(tt, id, count)
-  if not id or not BB:IsTrash(id) then return end
-  local v = BB:VendorValue(id) or 0
-  tt:AddLine(T("TRASH_TT"), 1, 0.42, 0.33)
-  tt:AddLine(string.format(T("TRASH_TT2"), BB.Money(v), BB.Money(v * (count or 1))), 0.85, 0.85, 0.85)
-  tt:Show()
+  if not id or not BB:IsBank() then return end
+  local ov, o = BB:TrashOverride(id)
+  if BB:IsTrash(id) then
+    local v = BB:VendorValue(id) or 0
+    tt:AddLine(T("TRASH_TT"), 1, 0.42, 0.33)
+    if v > 0 then tt:AddLine(string.format(T("TRASH_TT2"), BB.Money(v), BB.Money(v * (count or 1))), 0.85, 0.85, 0.85) end
+    if ov then tt:AddLine(string.format(T("TRASH_MANUAL"), T("TRASH_STATE_T"), o.by or "?"), 0.7, 0.85, 1) end
+    tt:AddLine(T("TRASH_MID_HINT"), 0.6, 0.6, 0.6)
+    tt:Show()
+  elseif ov then
+    tt:AddLine(string.format(T("TRASH_MANUAL"), T("TRASH_STATE_N"), o.by or "?"), 0.7, 0.85, 1)
+    tt:AddLine(T("TRASH_MID_HINT"), 0.6, 0.6, 0.6)
+    tt:Show()
+  end
 end
 
 local function hookTooltip()
@@ -64,6 +73,11 @@ end
 -- ------------------------------------------------------------
 local function markButton(button, bag, slot)
   if not button then return end
+  -- Mittelklick empfangen (Links- und Rechtsklick bleiben wie sie waren)
+  if not button.bbClicks and button.RegisterForClicks then
+    button.bbClicks = true
+    button:RegisterForClicks("AnyUp")
+  end
   local show = false
   if BB:IsBank() then
     local link = GetContainerItemLink(bag, slot)
@@ -85,9 +99,52 @@ local function markButton(button, bag, slot)
   end
 end
 
+-- Mittelklick auf ein Item: Trash umschalten (Bestandsliste, Taschen, Bankfaecher)
+function UI:TrashMiddle(id)
+  if not id or not BB:IsBank() then return end
+  local want, state = BB:TrashToggle(id)
+  if want == nil then
+    BB:Print("|cffff4040" .. string.format(T("ERR_NOT_BANK"), BB.BANK_RANK_LABEL or "") .. "|r")
+    return
+  end
+  local key = want and "TRASH_SET_T" or "TRASH_SET_N"
+  if state == "a" then key = "TRASH_SET_A" end
+  BB:Print(string.format(T(key), BB:ColoredName(id)))
+  self:TrashRefreshMarks()
+  self:Refresh()
+end
+
+local function slotItemId(bag, slot)
+  local link = GetContainerItemLink(bag, slot)
+  return link and BB.ParseLink(link) or nil
+end
+
 local function hookBags()
   if UI.trashBagHooked then return end
   UI.trashBagHooked = true
+  -- Taschenfelder: Mittelklick abfangen, alles andere wie gewohnt
+  if ContainerFrameItemButton_OnClick then
+    local origClick = ContainerFrameItemButton_OnClick
+    ContainerFrameItemButton_OnClick = function(button, ignoreShift)
+      if button == "MiddleButton" and BB:IsBank() then
+        local id = slotItemId(this:GetParent():GetID(), this:GetID())
+        if id then UI:TrashMiddle(id) end
+        return
+      end
+      return origClick(button, ignoreShift)
+    end
+  end
+  if BankFrameItemButtonGeneric_OnClick then
+    local origBankClick = BankFrameItemButtonGeneric_OnClick
+    BankFrameItemButtonGeneric_OnClick = function(button)
+      if button == "MiddleButton" and BB:IsBank() then
+        local id = slotItemId(-1, this:GetID())
+        if id then UI:TrashMiddle(id) end
+        return
+      end
+      return origBankClick(button)
+    end
+  end
   if ContainerFrame_Update then
     local orig = ContainerFrame_Update
     ContainerFrame_Update = function(frame)
@@ -213,24 +270,58 @@ end
 
 -- ------------------------------------------------------------
 -- Verkauf
+-- Der Erloes ist das, was der Haendler wirklich gezahlt hat (Geld vorher/nachher). Items, die nach dem Verkauf noch
+-- in der Tasche liegen, lassen sich nicht verkaufen und gelten ab dann als "kein Trash".
 -- ------------------------------------------------------------
 function UI:TrashSellStart()
   if self.TS.running or not self.TS.merchant or not BB:IsBank() then return end
   local plan = BB:TrashPlan()
   if getn(plan) == 0 then return end
-  self.TS.running = { list = plan, idx = 1, income = 0, stacks = 0, items = 0, tick = 0 }
+  self.TS.running = { list = plan, idx = 1, tried = {}, tick = 0, money0 = GetMoney() }
   self:RefreshTrashWindow()
 end
 
+-- nach dem Verkauf kurz warten, dann abrechnen
 function UI:TrashSellFinish(aborted)
   local run = self.TS.running
+  if not run or run.settling then return end
+  run.settling = true
+  run.aborted = aborted
+  BB:After(1.0, function() UI:TrashSellSettle() end, "trashsettle")
+  self:RefreshTrashWindow()
+end
+
+function UI:TrashSellSettle()
+  local run = self.TS.running
   self.TS.running = nil
-  if run and run.income > 0 then
-    -- als "Trash income" im Buch
-    BB:AddLedger({ k = "trash", p = "Trash income", m = run.income, n = BB:Me(), c = run.items })
-    BB:Print(string.format(T("TRASH_DONE"), run.stacks, run.items, BB.Money(run.income)))
+  if not run then return end
+  local failed, sold, items = {}, 0, 0
+  for i = 1, getn(run.tried) do
+    local p = run.tried[i]
+    local link = GetContainerItemLink(p.bag, p.slot)
+    local same = false
+    if link and BB.ParseLink(link) == p.id then
+      local _, count = GetContainerItemInfo(p.bag, p.slot)
+      if (count or 1) == p.c then same = true end
+    end
+    if same then
+      if not failed[p.id] then
+        failed[p.id] = true
+        BB:SetTrashOverride(p.id, "n")
+        BB:Print(string.format(T("TRASH_NOSELL"), BB:ColoredName(p.id)))
+      end
+    else
+      sold = sold + 1
+      items = items + p.c
+    end
+  end
+  local income = GetMoney() - (run.money0 or GetMoney())
+  if income > 0 and sold > 0 then
+    -- als "Trash income" im Buch, mit dem tatsaechlich gezahlten Betrag
+    BB:AddLedger({ k = "trash", p = "Trash income", m = income, n = BB:Me(), c = items })
+    BB:Print(string.format(T("TRASH_DONE"), sold, items, BB.Money(income)))
     BB:ScheduleSnapshot(3)
-  elseif aborted then
+  elseif run.aborted then
     BB:Print(T("TRASH_ABORT"))
   end
   self:TrashRefreshMarks()
@@ -241,7 +332,7 @@ end
 local sellFrame = CreateFrame("Frame")
 sellFrame:SetScript("OnUpdate", function()
   local run = UI.TS.running
-  if not run then return end
+  if not run or run.settling then return end
   run.tick = run.tick + (arg1 or 0)
   if run.tick < 0.12 then return end
   run.tick = 0
@@ -257,9 +348,7 @@ sellFrame:SetScript("OnUpdate", function()
   if not BB:IsTrash(id) then return end
   if CursorHasItem() then ClearCursor() end
   UseContainerItem(p.bag, p.slot)
-  run.income = run.income + p.v * p.c
-  run.stacks = run.stacks + 1
-  run.items = run.items + p.c
+  table.insert(run.tried, p)
 end)
 
 -- ------------------------------------------------------------
@@ -343,6 +432,134 @@ fetchFrame:SetScript("OnUpdate", function()
 end)
 
 -- ------------------------------------------------------------
+-- Liste der manuellen Entscheidungen
+-- ------------------------------------------------------------
+local LIST_ROWS = 12
+
+function UI:BuildTrashList()
+  if self.trashList then return end
+  local f = CreateFrame("Frame", "BananaBankTrashList", UIParent)
+  self.trashList = f
+  f:SetWidth(380)
+  f:SetHeight(86 + LIST_ROWS * 22 + 40)
+  f:SetPoint("CENTER", UIParent, "CENTER", 0, 20)
+  f:SetFrameStrata("DIALOG")
+  f:SetMovable(true)
+  f:EnableMouse(true)
+  f:RegisterForDrag("LeftButton")
+  f:SetScript("OnDragStart", function() this:StartMoving() end)
+  f:SetScript("OnDragStop", function() this:StopMovingOrSizing() end)
+  f:SetBackdrop({
+    bgFile = WHITE, edgeFile = "Interface\\DialogFrame\\UI-DialogBox-Border",
+    tile = true, tileSize = 16, edgeSize = 32,
+    insets = { left = 11, right = 12, top = 12, bottom = 11 },
+  })
+  f:SetBackdropColor(C.bg[1], C.bg[2], C.bg[3], 1)
+  f:Hide()
+  tinsert(UISpecialFrames, "BananaBankTrashList")
+  local h = self:Font(f, 18, C.gold, UI.FONT_TITLE)
+  h:SetPoint("TOPLEFT", f, "TOPLEFT", 26, -22)
+  self:Loc(h, "TRASH_LIST_TITLE")
+  local hint = self:Font(f, 10, { 0.70, 0.72, 0.80 })
+  hint:SetPoint("TOPLEFT", f, "TOPLEFT", 28, -46)
+  hint:SetWidth(324)
+  hint:SetHeight(24)
+  hint:SetJustifyV("TOP")
+  self:Loc(hint, "TRASH_LIST_HINT")
+  f.rows = {}
+  for i = 1, LIST_ROWS do
+    local r = CreateFrame("Frame", nil, f)
+    r:SetHeight(20)
+    r:SetPoint("TOPLEFT", f, "TOPLEFT", 28, -78 - (i - 1) * 22)
+    r:SetPoint("TOPRIGHT", f, "TOPRIGHT", -28, -78 - (i - 1) * 22)
+    r.name = self:Font(r, 11, C.text)
+    r.name:SetPoint("LEFT", r, "LEFT", 0, 0)
+    r.name:SetWidth(190)
+    r.name:SetHeight(13)
+    r.state = self:Font(r, 10, C.muted)
+    r.state:SetPoint("LEFT", r, "LEFT", 196, 0)
+    r.state:SetWidth(90)
+    local idx = i
+    r.del = self:Button(r, 22, 18, "x", function()
+      local e = UI.trashListRows and UI.trashListRows[idx]
+      if e then
+        BB:SetTrashOverride(e.id, "a")
+        UI:TrashRefreshMarks()
+        UI:Refresh()
+        UI:RefreshTrashList()
+      end
+    end, "danger")
+    r.del:SetPoint("RIGHT", r, "RIGHT", 0, 0)
+    f.rows[i] = r
+  end
+  f.empty = self:Font(f, 11, C.muted)
+  f.empty:SetPoint("TOPLEFT", f, "TOPLEFT", 28, -86)
+  self:Loc(f.empty, "TRASH_LIST_EMPTY")
+  f.page = 1
+  f.prev = self:Button(f, 26, 20, "<", function() f.page = f.page - 1 UI:RefreshTrashList() end, "flat")
+  f.prev:SetPoint("BOTTOMLEFT", f, "BOTTOMLEFT", 26, 22)
+  f.pageFs = self:Font(f, 11, C.text)
+  f.pageFs:SetPoint("LEFT", f.prev, "RIGHT", 4, 0)
+  f.pageFs:SetWidth(50)
+  f.pageFs:SetJustifyH("CENTER")
+  f.next = self:Button(f, 26, 20, ">", function() f.page = f.page + 1 UI:RefreshTrashList() end, "flat")
+  f.next:SetPoint("LEFT", f.prev, "RIGHT", 58, 0)
+  f.reset = self:Button(f, 130, 22, "TRASH_LIST_RESET", function()
+    BB:TrashResetAll()
+    UI:TrashRefreshMarks()
+    UI:Refresh()
+    UI:RefreshTrashList()
+  end, "danger")
+  f.reset:SetPoint("BOTTOMRIGHT", f, "BOTTOMRIGHT", -120, 22)
+  f.close = self:Button(f, 90, 22, "TRASH_LIST_CLOSE", function() f:Hide() end)
+  f.close:SetPoint("BOTTOMRIGHT", f, "BOTTOMRIGHT", -26, 22)
+end
+
+function UI:RefreshTrashList()
+  local f = self.trashList
+  if not f then return end
+  local list = {}
+  for id, o in pairs(BananaBankDB.trashOv or {}) do
+    if o.s ~= "a" then table.insert(list, { id = id, s = o.s, by = o.by }) end
+  end
+  table.sort(list, function(a, b) return (BB:ItemInfo(a.id) or "") < (BB:ItemInfo(b.id) or "") end)
+  local pages = math.floor((getn(list) - 1) / LIST_ROWS) + 1
+  if pages < 1 then pages = 1 end
+  if f.page > pages then f.page = pages end
+  if f.page < 1 then f.page = 1 end
+  UI.trashListRows = {}
+  for i = 1, LIST_ROWS do
+    local r = f.rows[i]
+    local e = list[(f.page - 1) * LIST_ROWS + i]
+    UI.trashListRows[i] = e
+    if e then
+      r.name:SetText(BB:ColoredName(e.id))
+      if e.s == "t" then
+        r.state:SetText(T("TRASH_STATE_T"))
+        r.state:SetTextColor(1, 0.42, 0.33)
+      else
+        r.state:SetText(T("TRASH_STATE_N"))
+        r.state:SetTextColor(0.5, 0.9, 0.5)
+      end
+      r:Show()
+    else
+      r:Hide()
+    end
+  end
+  if getn(list) == 0 then f.empty:Show() else f.empty:Hide() end
+  f.pageFs:SetText(f.page .. " / " .. pages)
+  f.prev:SetOn(f.page > 1)
+  f.next:SetOn(f.page < pages)
+  f.reset:SetOn(getn(list) > 0)
+end
+
+function UI:OpenTrashList()
+  self:BuildTrashList()
+  self.trashList:Show()
+  self:RefreshTrashList()
+end
+
+-- ------------------------------------------------------------
 -- Ereignisse
 -- ------------------------------------------------------------
 local ev = CreateFrame("Frame")
@@ -358,13 +575,14 @@ ev:SetScript("OnEvent", function()
   if event == "PLAYER_ENTERING_WORLD" then
     hookTooltip()
     hookBags()
+    BB:After(5, function() if BB.TrashMigrate and BB:IsBank() then BB:TrashMigrate() end end, "trashmigrate")
   elseif event == "MERCHANT_SHOW" then
     UI.TS.merchant = true
     UI:BuildTrashWindow()
     UI:RefreshTrashWindow()
   elseif event == "MERCHANT_CLOSED" then
     UI.TS.merchant = false
-    if UI.TS.running then UI:TrashSellFinish(true) end
+    if UI.TS.running and not UI.TS.running.settling then UI:TrashSellFinish(true) end
     UI:RefreshTrashWindow()
   elseif event == "MERCHANT_UPDATE" then
     UI:RefreshTrashWindow()

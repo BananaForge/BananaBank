@@ -10,7 +10,7 @@ local WHITE = UI.WHITE
 UI.settingsModule = true
 UI.set = {}
 
-local GEN_H, GUILD_H, BANK_H = 168, 108, 264
+local GEN_H, GUILD_H, BANK_H = 168, 108, 296
 local RULES_H = 246
 local DEPOT_H = 436
 local KW_H = 404
@@ -265,6 +265,7 @@ function UI:BuildSettings()
   local td = self:Font(g, 11, C.muted)
   td:SetPoint("LEFT", S.trash, "RIGHT", 6, 0)
   self:Loc(td, "SET_TRASH_UNIT")
+  S.trashList = btn(g, "", 4, -262, 300, function() if UI.OpenTrashList then UI:OpenTrashList() end end)
 
   -- Regeln (Rang und Qualitaet)
   g = group(f, "SET_SEC_RULES")
@@ -530,6 +531,7 @@ function UI:RefreshSettings()
   if S.cBank then S.cBank.Update() S.cCod.Update() S.cWhisper.Update() S.cAuto.Update() end
   if S.age and not S.ageFocus then S.age:SetText(tostring(BB:PriceMaxAgeDays())) end
   if S.trash and not S.trashFocus then S.trash:SetText(tostring(math.floor(BB:TrashMax() / 100))) end
+  if S.trashList and BB.TrashOverrideCount then S.trashList.fs:SetText(string.format(T("SET_TRASH_LIST"), BB:TrashOverrideCount())) end
   if not S.mainFocus then S.main:SetText(BB:MainBank()) end
 end
 

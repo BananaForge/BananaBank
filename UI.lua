@@ -900,20 +900,11 @@ function UI:OnSlotClick(slot, button)
     self:QuestAddItem(id)
     return
   end
-  if button == "RightButton" then
+  if button == "MiddleButton" then
+    -- Mausrad druecken: Trash umschalten (nur Bank-Chars)
+    if BB:IsBank() and self.TrashMiddle then self:TrashMiddle(id) end
+  elseif button == "RightButton" then
     self:CartAdd(id, -1)
-  elseif IsControlKeyDown() and BB:IsBank() and BB.IsTrash then
-    -- Strg-Klick: Ausnahmeliste fuer den Trash-Verkauf ("nie verkaufen")
-    local db = BananaBankDB
-    db.trashKeep = db.trashKeep or {}
-    if db.trashKeep[id] then
-      db.trashKeep[id] = nil
-      BB:Print(string.format(T("TRASH_KEEP_OFF"), BB:ColoredName(id)))
-    else
-      db.trashKeep[id] = true
-      BB:Print(string.format(T("TRASH_KEEP_ON"), BB:ColoredName(id)))
-    end
-    self:RefreshStock()
   elseif IsAltKeyDown() and BB:IsBank() then
     BananaBankDB.hidden[id] = true
     BB:Print(string.format(T("MSG_HIDDEN"), BB:ColoredName(id)))
@@ -965,12 +956,16 @@ function UI:OnSlotEnter(slot)
   if e and e.cr and e.cr ~= "" and BB.ClassLabels then
     table.insert(lines, { string.format(T("TT_CLASS"), BB:ClassLabels(e.cr)), "", 0.8, 0.8, 0.5 })
   end
-  if BB:IsTrash(id) then
-    local v = BB:VendorValue(id) or 0
-    table.insert(lines, { T("TRASH_TT"), BB.Money(v), 1, 0.42, 0.33 })
-    table.insert(lines, { T("TRASH_KEEP_HINT"), "", 0.6, 0.6, 0.6 })
-  elseif BananaBankDB.trashKeep and BananaBankDB.trashKeep[id] and BB:IsBank() then
-    table.insert(lines, { T("TRASH_KEEP_MARK"), "", 0.6, 0.8, 0.6 })
+  if BB:IsBank() then
+    local ov, o = BB:TrashOverride(id)
+    if BB:IsTrash(id) then
+      local v = BB:VendorValue(id) or 0
+      table.insert(lines, { T("TRASH_TT"), v > 0 and BB.Money(v) or "", 1, 0.42, 0.33 })
+    end
+    if ov then
+      table.insert(lines, { string.format(T("TRASH_MANUAL"), ov == "t" and T("TRASH_STATE_T") or T("TRASH_STATE_N"), o.by or "?"), "", 0.7, 0.85, 1 })
+    end
+    if BB:IsTrash(id) or ov then table.insert(lines, { T("TRASH_MID_HINT"), "", 0.6, 0.6, 0.6 }) end
   end
   table.insert(lines, { T("TT_HINT"), "", 0.5, 0.5, 0.5 })
   self:ItemTooltip(slot, id, lines)

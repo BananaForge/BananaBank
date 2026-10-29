@@ -278,7 +278,9 @@ function BB:SendHello()
   self:Send("H~" .. self.VERSION .. "~" .. qn .. "~" .. qs .. "~" .. table.concat(snaps, ";") ..
     "~" .. table.concat(seqs, ";") .. "~" .. (BananaBankDB.priceTs or 0) .. "~" .. qn2 .. "~" .. qs2 .. "~" .. bn2 .. "~" .. bs2 .. "~" .. (BananaBankDB.mainTs or 0) .. "~" .. ((BananaBankDB.rules and BananaBankDB.rules.ts) or 0))
   -- zweite, kurze Hallo-Nachricht: Staende von Hauptbank, Regeln und Rechte-Liste (die erste kann bei vielen Banken zu lang werden)
-  self:Send("X~" .. (BananaBankDB.mainTs or 0) .. "~" .. ((BananaBankDB.rules and BananaBankDB.rules.ts) or 0) .. "~" .. ((BananaBankDB.rights and BananaBankDB.rights.ts) or 0))
+  local tn, tsum = 0, 0
+  if self.TrashDigest then tn, tsum = self:TrashDigest() end
+  self:Send("X~" .. (BananaBankDB.mainTs or 0) .. "~" .. ((BananaBankDB.rules and BananaBankDB.rules.ts) or 0) .. "~" .. ((BananaBankDB.rights and BananaBankDB.rights.ts) or 0) .. "~" .. tn .. "~" .. tsum)
 end
 
 local function parseList(s)
@@ -434,6 +436,8 @@ function BB:OnTransfer(sender, kind, meta, payload)
       if self:MergeBankInfo(r) then n = n + 1 end
     end
     self:Debug(n .. " Bank-Rollen von " .. sender)
+  elseif kind == "T" then
+    if self.MergeTrash and self:MergeTrash(payload) then self:Debug("Trash-Entscheidungen von " .. sender) end
   elseif kind == "K" then
     if self:MergeRights(payload) then self:Debug("Rechte von " .. sender) end
   elseif kind == "R" then
@@ -472,8 +476,12 @@ function BB:OnTransfer(sender, kind, meta, payload)
 end
 
 -- X~: Staende von Hauptbank, Regeln und Rechte-Liste: der neuere Stand wird gepusht
-function BB:OnHello2(sender, mt, rt, kt)
+function BB:OnHello2(sender, mt, rt, kt, tn, tsum)
   local db = BananaBankDB
+  if self.TrashDigest then
+    local n, s = self:TrashDigest()
+    if n > 0 and (n ~= (tonumber(tn) or 0) or s ~= (tonumber(tsum) or 0)) then schedulePush("T", function() BB:PushTrash() end) end
+  end
   if (db.mainTs or 0) > (tonumber(mt) or 0) then schedulePush("N", function() BB:PushMainBank() end) end
   if ((db.rules and db.rules.ts) or 0) > (tonumber(rt) or 0) then schedulePush("R", function() BB:PushRules() end) end
   if ((db.rights and db.rights.ts) or 0) > (tonumber(kt) or 0) then schedulePush("K", function() BB:PushRights() end) end
@@ -526,10 +534,12 @@ function BB:OnAddonMessage(prefix, msg, channel, sender)
       pushes["R"] = nil
     elseif kind == "K" then
       pushes["K"] = nil
+    elseif kind == "T" then
+      pushes["T"] = nil
     end
   elseif t == "X~" then
     local f = BB.Split(msg, "~")
-    self:OnHello2(sender, f[2], f[3], f[4])
+    self:OnHello2(sender, f[2], f[3], f[4], f[5], f[6])
   elseif t == "H~" then
     local f = BB.Split(msg, "~")
     self:OnHello(sender, f[2], f[3], f[4], f[5], f[6], f[7], f[8], f[9], f[10], f[11], f[12], f[13])
