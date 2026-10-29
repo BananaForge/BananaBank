@@ -60,7 +60,7 @@ local BAR_BACKDROP = {
   insets = { left = 2, right = 2, top = 2, bottom = 2 },
 }
 
-function UI:QBar(parent, w, h)
+function UI:QBar(parent, w, h, left)
   local b = CreateFrame("Frame", nil, parent)
   b:SetWidth(w)
   b:SetHeight(h)
@@ -78,8 +78,14 @@ function UI:QBar(parent, w, h)
   shine:SetPoint("BOTTOMRIGHT", b, "RIGHT", -2, 0)
   shine:SetGradientAlpha("VERTICAL", 1, 1, 1, 0, 1, 1, 1, 0.20)
   b.fs = self:Font(b, h >= 14 and 10 or 9, { 1, 1, 1 }, FONT, "OUTLINE")
-  b.fs:SetPoint("CENTER", b, "CENTER", 0, 0)
-  b.fs:SetJustifyH("CENTER")
+  if left then
+    b.fs:SetPoint("LEFT", b, "LEFT", 7, 0)
+    b.fs:SetWidth(w - 12)
+    b.fs:SetJustifyH("LEFT")
+  else
+    b.fs:SetPoint("CENTER", b, "CENTER", 0, 0)
+    b.fs:SetJustifyH("CENTER")
+  end
   b.inner = w - 4
   -- p = 0..1, col = Farbe, label = Text im Balken
   b.SetValue = function(self2, p, col, label)
@@ -354,35 +360,35 @@ function UI:BuildQuests(parent)
   self:GlowLine(dc, -86, 14, -14)
 
   -- Aktionen unter der Trennlinie: in den Gildenchat posten, neu ausschreiben
-  Q.postBtn = self:Button(dc, 150, 18, "QB_POST", function()
+  Q.postBtn = self:Button(dc, 118, 18, "QB_POST", function()
     local q = BananaBankDB.quests[Q.sel]
     if q then BB:PostQuestToGuild(q) end
   end)
   Q.postBtn:SetPoint("TOPLEFT", dc, "TOPLEFT", 14, -90)
-  Q.repeatBtn = self:Button(dc, 110, 18, "QB_REPEAT", function()
+  Q.repeatBtn = self:Button(dc, 68, 18, "QB_REPEAT", function()
     local q = BananaBankDB.quests[Q.sel]
     if q then UI:OpenQuestCloseDialog(q, "repeat") end
   end)
   Q.repeatBtn:SetPoint("LEFT", Q.postBtn, "RIGHT", 6, 0)
 
   -- Verwalter-Knoepfe rechts auf der Meta-Zeile
-  Q.cancelBtn = self:Button(dc, 66, 18, "QB_CANCEL_QUEST", function(b) UI:QuestConfirm(b, "QB_CANCEL_QUEST", function()
+  Q.cancelBtn = self:Button(dc, 68, 18, "QB_CANCEL_QUEST", function(b) UI:QuestConfirm(b, "QB_CANCEL_QUEST", function()
     local q = BananaBankDB.quests[Q.sel]
     if q then BB:SetQuestStatus(q, "cancelled") end
   end) end, "danger")
-  Q.cancelBtn:SetPoint("TOPRIGHT", dc, "TOPRIGHT", -12, -33)
+  Q.cancelBtn:SetPoint("TOPRIGHT", dc, "TOPRIGHT", -12, -90)
   -- Abschliessen oeffnet den Dialog: nur abschliessen oder direkt neu ausschreiben
-  Q.closeBtn = self:Button(dc, 86, 18, "QB_CLOSE", function()
+  Q.closeBtn = self:Button(dc, 68, 18, "QB_CLOSE", function()
     local q = BananaBankDB.quests[Q.sel]
     if q then UI:OpenQuestCloseDialog(q, "close") end
   end, "ok")
   Q.closeBtn:SetPoint("RIGHT", Q.cancelBtn, "LEFT", -4, 0)
-  Q.editBtn = self:Button(dc, 66, 18, "QB_EDIT", function()
+  Q.editBtn = self:Button(dc, 68, 18, "QB_EDIT", function()
     local q = BananaBankDB.quests[Q.sel]
     if q then UI:OpenQuestEditor(q) end
   end)
   Q.editBtn:SetPoint("RIGHT", Q.closeBtn, "LEFT", -4, 0)
-  Q.payBtn = self:Button(dc, 90, 18, "QB_PAYOUT", function()
+  Q.payBtn = self:Button(dc, 68, 18, "QB_PAYOUT", function()
     local q = BananaBankDB.quests[Q.sel]
     if q then UI:OpenPayoutDialog(q) end
   end, "ok")
@@ -440,13 +446,13 @@ function UI:BuildQuests(parent)
     end)
     r.name = self:Font(r, 11, C.text)
     r.name:SetPoint("LEFT", r, "LEFT", 32, 0)
-    r.name:SetWidth(146)
+    r.name:SetWidth(120)
     r.name:SetHeight(13)
-    r.bar = self:QBar(r, 176, 15)
-    r.bar:SetPoint("LEFT", r, "LEFT", 182, 0)
+    r.bar = self:QBar(r, 216, 16, true)
+    r.bar:SetPoint("LEFT", r, "LEFT", 156, 0)
     r.rest = self:Font(r, 10, C.muted)
     r.rest:SetPoint("RIGHT", r, "RIGHT", 0, 0)
-    r.rest:SetWidth(96)
+    r.rest:SetWidth(64)
     r.rest:SetJustifyH("RIGHT")
     table.insert(Q.items, r)
   end
@@ -763,7 +769,19 @@ function UI:RefreshQuestDetail()
   -- Items
   local ids = sortedItemIds(q)
   local banks = sortedGoldBanks(q)
-  local total = getn(ids) + getn(banks)
+  -- offene Ziele zuerst, erledigte danach
+  local open, done = {}, {}
+  for i = 1, getn(ids) do
+    local e = { id = ids[i] }
+    if ((s and s.eff[ids[i]]) or 0) >= q.items[ids[i]] then table.insert(done, e) else table.insert(open, e) end
+  end
+  for i = 1, getn(banks) do
+    local e = { bank = banks[i] }
+    if ((s and s.geff[banks[i]]) or 0) >= q.gold[banks[i]] then table.insert(done, e) else table.insert(open, e) end
+  end
+  local ent = open
+  for i = 1, getn(done) do table.insert(ent, done[i]) end
+  local total = getn(ent)
   local offset = 0
   if Q.itemSF and FauxScrollFrame_Update then
     FauxScrollFrame_Update(Q.itemSF, total, ITEM_ROWS, 26)
@@ -773,8 +791,8 @@ function UI:RefreshQuestDetail()
   for i = 1, ITEM_ROWS do
     local r = Q.items[i]
     local idx = offset + i
-    local id = ids[idx]
-    local gbank = (not id) and banks[idx - getn(ids)] or nil
+    local id = ent[idx] and ent[idx].id
+    local gbank = ent[idx] and ent[idx].bank
     r.goldBank, r.slot.goldBank = gbank, gbank
     if gbank then
       local goal = q.gold[gbank]
