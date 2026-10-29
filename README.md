@@ -93,6 +93,7 @@ Pull requests welcome, tested in-game on a 1.12 client. Lua 5.0 rules: no `#`, `
 
 ## Changelog
 
+- **3.6.10:** stock tab: the request panel ends on the same line as the tree and the list (4 rows).
 - **3.6.9:** Totals window: searching a donor name (start of the name) lists every item that person donated with their own amounts, not the guild totals; the last column shows the donor.
 - **3.6.8:** ledger: the Totals button sits at the bottom of the recent-entries panel, the ledger search box is gone; the Totals window searches items and donor names.
 - **3.6.7:** stock tab: icon view removed (list only), the "only available" and "Trash only" chips sit in the top row right-aligned with the list, the second toolbar row is gone so tree, list and request panel start higher.

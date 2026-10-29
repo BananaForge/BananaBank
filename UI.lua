@@ -717,7 +717,7 @@ function UI:BuildStock(parent)
   -- Warenkorb rechts
   local cart = self:Panel(p, 232, 0)
   cart:SetPoint("TOPRIGHT", p, "TOPRIGHT", 0, -30)
-  cart:SetPoint("BOTTOMRIGHT", p, "BOTTOMRIGHT", 0, 0)
+  cart:SetPoint("BOTTOMRIGHT", p, "BOTTOMRIGHT", 0, 26)
   local ct = self:Font(cart, 15, C.gold, FONT_TITLE)
   ct:SetPoint("TOPLEFT", cart, "TOPLEFT", 12, -10)
   self:Loc(ct, "CART_TITLE")
@@ -725,7 +725,7 @@ function UI:BuildStock(parent)
   -- ohne Code-Knopf unten ist unten mehr Platz
   local bo = BB.USE_CODE and 0 or 24
   S.cartRows = {}
-  for i = 1, 5 do
+  for i = 1, 4 do
     local row = CreateFrame("Frame", nil, cart)
     row:SetWidth(212)
     row:SetHeight(28)
