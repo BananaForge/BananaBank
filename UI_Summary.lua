@@ -385,7 +385,7 @@ function UI:MemberTip(row)
     local it = r.it
     local extra = {
       { T("MW_TT_TOTAL"), it.net, 1, 1, 1 },
-      { T("MW_COL_STACKS"), it.stacks },
+      { T("MW_COL_STACKS"), it.stacks or "" },
       { T("MW_TT_LAST"), BB.Date(it.last) },
     }
     if it.back > 0 then table.insert(extra, { T("MW_BACK"), it.back, 1, 0.6, 0.2 }) end
@@ -496,16 +496,32 @@ function UI:RefreshTotals()
   local g = BB:GuildTotals(W.mode)
   f.sub:SetText(string.format(T("TW_SUB"), getn(g.items), g.nstacks, g.nitems, g.nplayers))
   local list = {}
+  -- Spendername (Anfang des Namens): alle Items dieser Person, einzeln aufgefuehrt statt zusammengefasst
+  local donorMode = false
+  if W.filter ~= "" then
+    for i = 1, getn(g.items) do
+      for who, c in pairs(g.items[i].who) do
+        if c > 0 and string.find(string.lower(who), W.filter, 1, true) == 1 then donorMode = true break end
+      end
+      if donorMode then break end
+    end
+  end
   for i = 1, getn(g.items) do
     local it = g.items[i]
-    local hit = W.filter == "" or string.find(string.lower(it.n), W.filter, 1, true)
-    -- auch nach dem Namen eines Spenders suchen
-    if not hit then
+    if donorMode then
+      local sum, names = 0, nil
       for who, c in pairs(it.who) do
-        if c > 0 and string.find(string.lower(who), W.filter, 1, true) then hit = true break end
+        if c > 0 and string.find(string.lower(who), W.filter, 1, true) == 1 then
+          sum = sum + c
+          names = names and (names .. ", " .. who) or who
+        end
       end
+      if sum > 0 then
+        table.insert(list, { i = it.i, n = it.n, q = it.q, net = sum, last = it.last, who = it.who, donor = names })
+      end
+    elseif W.filter == "" or string.find(string.lower(it.n), W.filter, 1, true) then
+      table.insert(list, it)
     end
-    if hit then table.insert(list, it) end
   end
   if W.sort == "name" then
     table.sort(list, function(a, b) return a.n < b.n end)
@@ -527,11 +543,16 @@ function UI:RefreshTotals()
       row.name:SetTextColor(qc[1], qc[2], qc[3])
       row.c2:SetText(tostring(it.net))
       row.c2:SetTextColor(mc[1], mc[2], mc[3])
-      row.c3:SetText(stackWord(it.stacks))
       row.c3:SetTextColor(C.muted[1], C.muted[2], C.muted[3])
-      local who = 0
-      for _ in pairs(it.who) do who = who + 1 end
-      row.c4:SetText(string.format(T("TW_WHO"), who))
+      if it.donor then
+        row.c3:SetText("")
+        row.c4:SetText(it.donor)
+      else
+        row.c3:SetText(stackWord(it.stacks))
+        local who = 0
+        for _ in pairs(it.who) do who = who + 1 end
+        row.c4:SetText(string.format(T("TW_WHO"), who))
+      end
       row:Show()
     else
       row:Hide()
@@ -546,7 +567,7 @@ function UI:TotalsTip(row)
   if not it then return end
   local extra = {
     { T("TW_TT_TOTAL"), it.net, 1, 1, 1 },
-    { T("MW_COL_STACKS"), it.stacks },
+    { T("MW_COL_STACKS"), it.stacks or "" },
     { T("MW_TT_LAST"), BB.Date(it.last) },
     { " ", "" },
     { T("TW_TT_TOP"), "", C.gold[1], C.gold[2], C.gold[3] },
