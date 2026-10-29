@@ -93,6 +93,7 @@ Pull requests welcome, tested in-game on a 1.12 client. Lua 5.0 rules: no `#`, `
 
 ## Changelog
 
+- **3.6.6:** stock tab: the request panel starts level with the list (5 rows, buttons moved down now that the code button is gone). Ledger: recent entries panel starts level with the two top lists, the tile strip spans the full width again.
 - **3.6.5:** layout fixes: ledger tiles no longer run under the recent-entries panel (Totals button moved next to the search), price tab info/legend shortened and column heads right-aligned over the values, stock view chips stay in the top row.
 - **3.6.4:** request code switched off (flag `BB.USE_CODE` in Core.lua, easy to re-enable): the cart button is now "Send request", no export window, no "last code", no redeem box in the bank view, no Code button in the request list; help texts updated.
 - **3.6.3:** Guild quests tab: progress text sits inside the bar (left), wider bars with a fixed "left/done" column, finished goals are sorted below open ones, the four action buttons are equally sized (Edit neutral, Close green, Cancel red) on the action row.

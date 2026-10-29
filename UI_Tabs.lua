@@ -273,7 +273,7 @@ end
 -- ------------------------------------------------------------
 -- Reiter Buch
 -- ------------------------------------------------------------
-local TOP_ROWS, RECENT_ROWS = 12, 11
+local TOP_ROWS, RECENT_ROWS = 12, 9
 
 local function makeListPanel(ui, parent, w, key)
   local pnl = ui:Panel(parent, w, 0)
@@ -296,9 +296,9 @@ function UI:BuildLedger(parent)
   -- Kennzahlen als Kacheln: grosse Zahl, kleine Beschriftung
   local strip = self:Panel(p, 0, 50)
   strip:SetPoint("TOPLEFT", p, "TOPLEFT", 0, 0)
-  strip:SetPoint("TOPRIGHT", p, "TOPLEFT", 474, 0)
+  strip:SetPoint("TOPRIGHT", p, "TOPRIGHT", 0, 0)
   Lg.tiles = {}
-  local tdefs = { { "LG_T_IN", 14, 120 }, { "LG_T_OUT", 136, 100 }, { "LG_T_COD", 240, 150 }, { "LG_T_N", 400, 70 } }
+  local tdefs = { { "LG_T_IN", 14, 170 }, { "LG_T_OUT", 190, 130 }, { "LG_T_COD", 330, 200 }, { "LG_T_N", 560, 90 } }
   for i = 1, getn(tdefs) do
     local lbl = self:Font(strip, 10, C.goldDim)
     lbl:SetPoint("TOPLEFT", strip, "TOPLEFT", tdefs[i][2], -7)
@@ -309,6 +309,9 @@ function UI:BuildLedger(parent)
     val:SetHeight(20)
     Lg.tiles[i] = val
   end
+
+  Lg.sumBtn = self:Button(strip, 120, 22, "MW_BTN_TOTALS", function() UI:OpenTotalsWindow("in") end, "primary")
+  Lg.sumBtn:SetPoint("RIGHT", strip, "RIGHT", -10, 0)
 
   local function topPanel(key, x, w, color, mode)
     local pnl = makeListPanel(self, p, w, key)
@@ -373,7 +376,7 @@ function UI:BuildLedger(parent)
   Lg.outPanel = topPanel("LEDGER_TOP_OUT", 240, 234, C.orange, "out")
 
   local rp = makeListPanel(self, p, 0, "LEDGER_RECENT")
-  rp:SetPoint("TOPLEFT", p, "TOPLEFT", 480, -24)
+  rp:SetPoint("TOPLEFT", p, "TOPLEFT", 480, -58)
   rp:SetPoint("BOTTOMRIGHT", p, "BOTTOMRIGHT", 0, 0)
   for i = 1, RECENT_ROWS do
     local row = CreateFrame("Frame", nil, rp)
@@ -425,7 +428,7 @@ function UI:BuildLedger(parent)
   end
   -- Suche im Buch: Name des Spenders oder des Items, auch Teile davon
   Lg.search = ""
-  local sbox = self:EditBox("BananaBankLedgerSearch", rp, 150)
+  local sbox = self:EditBox("BananaBankLedgerSearch", rp, 214)
   sbox:SetPoint("TOPLEFT", rp, "TOPLEFT", 14, -32)
   local sph = self:Font(sbox, 11, C.muted)
   sph:SetPoint("LEFT", sbox, "LEFT", 2, 0)
@@ -439,8 +442,6 @@ function UI:BuildLedger(parent)
   end)
   sbox:SetScript("OnEnterPressed", function() this:ClearFocus() end)
   Lg.sbox = sbox
-  Lg.sumBtn = self:Button(rp, 92, 22, "MW_BTN_TOTALS", function() UI:OpenTotalsWindow("in") end, "primary")
-  Lg.sumBtn:SetPoint("TOPRIGHT", rp, "TOPRIGHT", -8, -32)
   rp.empty = self:Font(rp, 11, C.muted)
   rp.empty:SetPoint("TOPLEFT", rp, "TOPLEFT", 14, -68)
   rp.empty:SetWidth(230)
