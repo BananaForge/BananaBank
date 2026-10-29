@@ -377,3 +377,46 @@ function BB:ClassBlockText(name, id)
   if string.find("," .. cr .. ",", "," .. tok .. ",", 1, true) then return nil end
   return string.format(self.T("RB_CLASS"), self:ClassLabels(cr))
 end
+
+-- /bb why [Text]: warum laesst sich ein Item nicht anfragen? Zeigt Rang, Regeln, Preis, Klasse und Verfuegbarkeit.
+function BB:PrintWhy(text)
+  text = string.lower(text or "")
+  local me = self:Me()
+  local e = BananaBankDB.ranks[me]
+  local rules = BananaBankDB.rules
+  self:Print("|cff9a9cb3--- Anfrage-Diagnose v" .. self.VERSION .. " ---|r")
+  self:Print("Char " .. me .. ", Rang: " .. (e and (e.r .. " (Pos. " .. e.i .. ")") or "unbekannt")
+    .. ", Bank-Char: " .. (self:IsBank() and "ja" or "nein"))
+  if rules and rules.req then
+    local function rn(spec) local i, n = self:RuleRank(spec) return (n or spec.n or "?") .. " (Pos. " .. tostring(i) .. ")" end
+    self:Print("Regeln: Anfragen ab " .. rn(rules.req) .. ", Grün ab " .. rn(rules.q2) .. ", Blau ab " .. rn(rules.q3) .. ", Episch ab " .. rn(rules.q4))
+  else
+    self:Print("|cffff4040Regeln: keine gespeichert, alle Anfragen gesperrt.|r")
+  end
+  local ok, why, rank = self:CanRequest(me, nil)
+  self:Print("Rang-Prüfung: " .. (ok and "|cff60e070erlaubt|r" or ("|cffff5040gesperrt (" .. tostring(why) .. " " .. tostring(rank or "") .. ")|r")))
+  local n = 0
+  if self.VendorDB then for _ in pairs(self.VendorDB) do n = n + 1 end end
+  self:Print("Händlerpreise geladen: " .. n .. " Einträge" .. (self.vendorModule and "" or " |cffff4040(Vendor.lua fehlt!)|r"))
+  local stock = self:GetStock()
+  local shown = 0
+  for id, it in pairs(stock) do
+    if text == "" or string.find(string.lower(it.n or ""), text, 1, true) then
+      shown = shown + 1
+      if shown <= 4 then
+        local avail, c, res = self:GetAvailable(id)
+        local _, q = self:ItemInfo(id)
+        local u, src = self:GetPrice(id)
+        local block = self:ItemBlockText(me, id)
+        self:Print(" " .. self:ColoredName(id) .. " (" .. id .. "): Bestand " .. c .. ", reserviert " .. res .. ", verfügbar " .. avail)
+        self:Print("   Preis: " .. (u and (BB.Money(u) .. " (" .. tostring(src) .. ")") or "|cffff9a2ekeiner|r")
+          .. ", Händlerwert: " .. (self:VendorValue(id) and BB.Money(self:VendorValue(id)) or "unbekannt")
+          .. ", braucht AH-Preis: " .. (self:NeedsPrice(id) and "ja" or "nein"))
+        self:Print("   Klasse: " .. ((it.cr and it.cr ~= "") and it.cr or "frei")
+          .. ", Sperre: " .. (block and ("|cffff5040" .. block .. "|r") or "|cff60e070keine|r"))
+      end
+    end
+  end
+  if shown == 0 then self:Print("Kein Item im Bestand mit diesem Namen.") end
+  if shown > 4 then self:Print("... und " .. (shown - 4) .. " weitere. Mit /bb why <genauerer Name> eingrenzen.") end
+end

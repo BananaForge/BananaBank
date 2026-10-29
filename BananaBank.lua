@@ -202,6 +202,8 @@ SlashCmdList["BANANABANK"] = function(msg)
     BB:PrintRights(rest)
   elseif cmd == "craft" then
     BB:PrintCraft(rest)
+  elseif cmd == "why" or cmd == "warum" then
+    BB:PrintWhy(rest)
   elseif cmd == "maildebug" then
     local info = BB:MailDebugInfo()
     for i = 1, table.getn(info) do BB:Print(info[i]) end
