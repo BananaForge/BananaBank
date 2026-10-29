@@ -635,7 +635,7 @@ function UI:BuildStock(parent)
   local p = CreateFrame("Frame", nil, parent)
   p:SetAllPoints(parent)
   self.pages.stock = p
-  self.stock = { page = 1, filter = 0, onlyAvail = false, search = "", type = "all", view = "icons" }
+  self.stock = { page = 1, filter = 0, onlyAvail = false, search = "", type = "all", view = "list" }
   local S = self.stock
 
   local search = self:EditBox("BananaBankSearch", p, 150)
@@ -657,7 +657,7 @@ function UI:BuildStock(parent)
   local prev = search
   for i = 1, getn(chipDefs) do
     local q = chipDefs[i][2]
-    local chip = self:Chip(p, 52, chipDefs[i][1], function()
+    local chip = self:Chip(p, 46, chipDefs[i][1], function()
       S.filter = q
       S.page = 1
       UI:RefreshStock()
@@ -667,26 +667,34 @@ function UI:BuildStock(parent)
     table.insert(S.chips, chip)
     prev = chip
   end
-  local avail = self:Check(p, "ONLY_AVAILABLE", function() return S.onlyAvail end, function(v)
-    S.onlyAvail = v
+  -- zweite Zeile: Schalter im Stil der Qualitaetsknoepfe, alle auf einer Grundlinie
+  S.availChip = self:Chip(p, 104, "ONLY_AVAILABLE", function()
+    S.onlyAvail = not S.onlyAvail
     S.page = 1
     UI:RefreshStock()
   end)
-  avail:SetPoint("TOPLEFT", p, "TOPLEFT", 8, -28)
-  avail:SetWidth(112)
+  S.availChip:SetPoint("TOPLEFT", p, "TOPLEFT", 8, -28)
   -- nur auf Bank-Chars: nur Trash zeigen (Haendlerwert unter der Grenze)
   S.onlyTrash = false
-  S.trashChk = self:Check(p, "TRASH_ONLY", function() return S.onlyTrash end, function(v)
-    S.onlyTrash = v
+  S.trashChk = self:Chip(p, 84, "TRASH_ONLY", function()
+    S.onlyTrash = not S.onlyTrash
     S.page = 1
     UI:RefreshStock()
   end)
-  S.trashChk:SetPoint("TOPLEFT", p, "TOPLEFT", 456, -28)
-  S.trashChk:SetWidth(120)
-  -- Bankwahl: Gesamtbestand oder Inhalt einer einzelnen Bank (Menue siehe UI_Banks.lua)
+  S.trashChk:SetPoint("LEFT", S.availChip, "RIGHT", 4, 0)
   S.bank = nil
+  -- Einzelansicht einer Bank (aus Banken > Inhalt zeigen): Knopf zum Zuruecksetzen
+  S.bankChip = self:Chip(p, 170, "", function()
+    S.bank = nil
+    S.page = 1
+    UI:RefreshStock()
+  end)
+  S.bankChip:SetPoint("LEFT", S.trashChk, "RIGHT", 4, 0)
+  S.bankChip:Hide()
+  -- altes Auswahlmenue bleibt als Code erhalten, der Knopf ist aber nie sichtbar
   S.bankBtn = self:Button(p, 140, 18, "", function() UI:ToggleBankMenu() end, "flat")
   S.bankBtn:SetPoint("TOPLEFT", p, "TOPLEFT", 126, -27)
+  S.bankBtn:Hide()
   S.role = self:Font(p, 10, C.goldDim)
   S.role:SetPoint("LEFT", S.bankBtn, "RIGHT", 8, 0)
   S.role:SetWidth(180)
@@ -833,6 +841,8 @@ function UI:RefreshStock()
   if self.RefreshBankButton then self:RefreshBankButton() end
   if self.RefreshTypeButton then self:RefreshTypeButton() end
   for i = 1, getn(S.chips) do S.chips[i]:SetActive(S.chips[i].q == S.filter) end
+  if S.availChip then S.availChip:SetActive(S.onlyAvail) end
+  if S.trashChk then S.trashChk:SetActive(S.onlyTrash) end
   local list, stock, res = self:StockList()
   self:RefreshStockView(list)
   if getn(list) == 0 then

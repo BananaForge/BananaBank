@@ -93,6 +93,7 @@ Pull requests welcome, tested in-game on a 1.12 client. Lua 5.0 rules: no `#`, `
 
 ## Changelog
 
+- **3.5.1:** stock tab: list view is the default; "only available" and "Trash only" are chips on one baseline (like the quality chips), view chips sit flush right with the list, the bank selector menu is gone (single bank: Banks > Show content, then a "Bank: X x" chip resets it).
 - **3.5.0:** at the very first opening of BananaBank (once per account) the addon asks the server for all stock items the client does not know yet (throttled, 4 per second, progress bar with cancel), so names, colors and tooltips are complete. Only item ids from verified bank chars and in a sane range are queried. `/bb items` repeats it by hand.
 - **3.4.2:** hotfix: the stock slots (and the bag/bank slots on bank chars) registered for clicks with "AnyUp", which the 1.12 client does not know, so left clicks did nothing. Now registered explicitly for left, right and middle button.
 - **3.4.1:** new `/bb why [item name]` request diagnosis (rank, rules, price, class, availability); click registration of the stock slots falls back to left/right click if needed.

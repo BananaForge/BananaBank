@@ -30,36 +30,27 @@ end
 function UI:RefreshBankButton()
   local S = self.stock
   if not S or not S.bankBtn then return end
-  if S.trashChk then
-    if BB:IsBank() then
-      S.trashChk:Show()
-      S.trashChk.Update()
-    else
-      S.trashChk:Hide()
-      S.onlyTrash = false
-    end
-  end
-  -- Bankwahl nur auf Chars im Bank-Modus
+  -- Die Bankauswahl als Menue entfaellt: einen einzelnen Bank-Char zeigt Banken > "Inhalt zeigen".
+  -- Dann steht in der Werkzeugleiste ein Knopf "Bank: X x", der zurueck auf alle Banken schaltet.
+  S.bankBtn:Hide()
+  S.role:SetText("")
+  self:CloseBankMenu()
   if not BB:IsBank() then
     S.bank = nil
-    S.bankBtn:Hide()
-    S.role:SetText("")
-    self:CloseBankMenu()
+    S.onlyTrash = false
+    if S.trashChk then S.trashChk:Hide() end
+    if S.bankChip then S.bankChip:Hide() end
     return
   end
-  S.bankBtn:Show()
-  if S.bank then
-    S.bankBtn.fs:SetText(string.format(T("SB_BTN"), S.bank))
-    -- eine gewaehlte Bank sieht man dem Knopf an
-    S.bankBtn.fs:SetTextColor(1, 0.95, 0.7)
-    S.bankBtn:SetBackdropColor(0.42, 0.30, 0.05, 0.98)
-    local info = BB:GetBankInfo(S.bank)
-    S.role:SetText((info and info.role) or "")
-  else
-    S.bankBtn.fs:SetText(string.format(T("SB_BTN"), T("SB_ALL_SHORT")))
-    S.bankBtn.fs:SetTextColor(C.gold[1], C.gold[2], C.gold[3])
-    S.bankBtn:SetBackdropColor(0.05, 0.07, 0.14, 0.95)
-    S.role:SetText("")
+  if S.trashChk then S.trashChk:Show() end
+  if S.bankChip then
+    if S.bank then
+      S.bankChip.fs:SetText(string.format(T("SB_CHIP"), S.bank))
+      S.bankChip:SetActive(true)
+      S.bankChip:Show()
+    else
+      S.bankChip:Hide()
+    end
   end
 end
 

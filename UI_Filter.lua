@@ -125,12 +125,13 @@ function UI:BuildStockView(p)
   local vdefs = { { "SV_ICONS", "icons" }, { "SV_LIST", "list" } }
   for i = 1, getn(vdefs) do
     local key = vdefs[i][2]
-    local chip = self:Chip(p, 74, vdefs[i][1], function()
+    local chip = self:Chip(p, 66, vdefs[i][1], function()
       S.view = key
       UI:RefreshStock()
     end)
     chip.key = key
-    chip:SetPoint("TOPLEFT", p, "TOPLEFT", 280 + (i - 1) * 78, -27)
+    -- rechtsbuendig mit der Ergebnisliste (die endet 238 vor dem rechten Rand)
+    chip:SetPoint("TOPRIGHT", p, "TOPRIGHT", -(244 + (getn(vdefs) - i) * 70), -2)
     S.viewChips[i] = chip
   end
 
