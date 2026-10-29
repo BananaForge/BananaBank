@@ -293,15 +293,28 @@ function UI:BuildLedger(parent)
   self.led = { page = 1 }
   local Lg = self.led
 
-  Lg.totals = self:Font(p, 11, C.text)
-  Lg.totals:SetPoint("TOPLEFT", p, "TOPLEFT", 8, -4)
-  Lg.totals:SetWidth(600)
-  Lg.sumBtn = self:Button(p, 120, 18, "MW_BTN_TOTALS", function() UI:OpenTotalsWindow("in") end, "primary")
-  Lg.sumBtn:SetPoint("TOPRIGHT", p, "TOPRIGHT", 0, -2)
+  -- Kennzahlen als Kacheln: grosse Zahl, kleine Beschriftung
+  local strip = self:Panel(p, 0, 50)
+  strip:SetPoint("TOPLEFT", p, "TOPLEFT", 0, 0)
+  strip:SetPoint("TOPRIGHT", p, "TOPRIGHT", 0, 0)
+  Lg.tiles = {}
+  local tdefs = { { "LG_T_IN", 14, 170 }, { "LG_T_OUT", 190, 130 }, { "LG_T_COD", 330, 170 }, { "LG_T_N", 510, 90 } }
+  for i = 1, getn(tdefs) do
+    local lbl = self:Font(strip, 10, C.goldDim)
+    lbl:SetPoint("TOPLEFT", strip, "TOPLEFT", tdefs[i][2], -7)
+    self:Loc(lbl, tdefs[i][1])
+    local val = self:Font(strip, 17, C.gold, UI.FONT_TITLE)
+    val:SetPoint("TOPLEFT", strip, "TOPLEFT", tdefs[i][2], -21)
+    val:SetWidth(tdefs[i][3])
+    val:SetHeight(20)
+    Lg.tiles[i] = val
+  end
+  Lg.sumBtn = self:Button(strip, 120, 22, "MW_BTN_TOTALS", function() UI:OpenTotalsWindow("in") end, "primary")
+  Lg.sumBtn:SetPoint("RIGHT", strip, "RIGHT", -10, 0)
 
   local function topPanel(key, x, w, color, mode)
     local pnl = makeListPanel(self, p, w, key)
-    pnl:SetPoint("TOPLEFT", p, "TOPLEFT", x, -24)
+    pnl:SetPoint("TOPLEFT", p, "TOPLEFT", x, -58)
     pnl:SetPoint("BOTTOMLEFT", p, "BOTTOMLEFT", x, 0)
     for i = 1, TOP_ROWS do
       local row = CreateFrame("Button", nil, pnl)
@@ -333,11 +346,17 @@ function UI:BuildLedger(parent)
       row.rank:SetWidth(22)
       row.name = self:Font(row, 11, C.text)
       row.name:SetPoint("LEFT", row, "LEFT", 24, 0)
-      row.name:SetWidth(96)
+      row.name:SetWidth(84)
       row.name:SetHeight(13)
+      -- zwei feste Spalten: Items (Farbe der Liste) und Gold
       row.val = self:Font(row, 11, color)
-      row.val:SetPoint("RIGHT", row, "RIGHT", 0, 0)
+      row.val:SetPoint("RIGHT", row, "RIGHT", -74, 0)
+      row.val:SetWidth(46)
       row.val:SetJustifyH("RIGHT")
+      row.mon = self:Font(row, 11, C.gold)
+      row.mon:SetPoint("RIGHT", row, "RIGHT", 0, 0)
+      row.mon:SetWidth(70)
+      row.mon:SetJustifyH("RIGHT")
       local bar = row:CreateTexture(nil, "BACKGROUND")
       bar:SetTexture(UI.WHITE)
       bar:SetPoint("BOTTOMLEFT", row, "BOTTOMLEFT", 24, 1)
@@ -369,7 +388,13 @@ function UI:BuildLedger(parent)
     row.tag:SetWidth(12)
     row.txt = self:Font(row, 10, C.text)
     row.txt:SetPoint("LEFT", row, "LEFT", 14, 5)
-    row.txt:SetWidth(222)
+    row.txt:SetWidth(150)
+    row.txt:SetHeight(12)
+    -- Datum rechts, klein: die zweite Zeile bleibt fuer Art und Quest
+    row.date = self:Font(row, 9, C.muted)
+    row.date:SetPoint("TOPRIGHT", row, "TOPRIGHT", 0, -2)
+    row.date:SetWidth(76)
+    row.date:SetJustifyH("RIGHT")
     row.txt:SetHeight(12)
     row.sub = self:Font(row, 9, C.muted)
     row.sub:SetPoint("LEFT", row, "LEFT", 14, -6)
@@ -447,9 +472,8 @@ local function fillTop(pnl, list)
       row.rank:SetText(i .. ".")
       row.who = t.p
       row.name:SetText(t.p)
-      local v = t.c .. " " .. T("UNIT_ITEMS")
-      if t.m > 0 then v = v .. "  " .. BB.Money(t.m) end
-      row.val:SetText(v)
+      row.val:SetText(t.c)
+      row.mon:SetText(t.m > 0 and (BB.GoldText and BB.GoldText(t.m) or BB.Money(t.m)) or "")
       row.bar:SetWidth(math.max(2, 180 * t.c / maxC))
       row:Show()
     else
@@ -476,11 +500,10 @@ function UI:RefreshLedger()
   end
   for i = 1, getn(outs) do to = to + outs[i].c end
   local paid, openCod = BB:CodTotal()
-  local txt = string.format(T("LEDGER_TOTALS"), ti, BB.Money(tm), to, BB.Count(BananaBankDB.ledger))
-  if paid > 0 or openCod > 0 then
-    txt = txt .. "      " .. string.format(T("LEDGER_COD"), BB.Money(paid), BB.Money(openCod))
-  end
-  Lg.totals:SetText(txt)
+  Lg.tiles[1]:SetText(ti .. " " .. T("UNIT_ITEMS"))
+  Lg.tiles[2]:SetText(to .. " " .. T("UNIT_ITEMS"))
+  Lg.tiles[3]:SetText(BB.GoldText and (BB.GoldText(paid) .. " / " .. BB.GoldText(openCod)) or (BB.Money(paid) .. " / " .. BB.Money(openCod)))
+  Lg.tiles[4]:SetText(BB.Count(BananaBankDB.ledger))
 
   local list = BB:LedgerSorted()
   if Lg.search and Lg.search ~= "" then
@@ -506,7 +529,7 @@ function UI:RefreshLedger()
       local tag = KIND_TAG[e.k] or "?"
       row.tag:SetText(tag)
       local col = C.green
-      if tag == "-" then col = C.orange elseif tag == "<" then col = C.muted end
+      if tag == "-" then col = C.orange elseif tag == "<" then col = C.muted elseif tag == "$" then col = C.gold elseif tag == "*" then col = { 0.5, 0.7, 1 } end
       row.tag:SetTextColor(col[1], col[2], col[3])
       local what
       if e.k == "gold" or e.k == "gout" or e.k == "cod" or e.k == "trash" then
@@ -522,7 +545,8 @@ function UI:RefreshLedger()
       -- Gold-Spende an einen bestimmten Bank-Char (Gold-Ziel einer Quest)
       if e.k == "gold" and e.n ~= "" then what = what .. "  >  " .. e.n end
       row.txt:SetText(who .. ": " .. what)
-      local sub = BB.Date(e.t) .. "  " .. T("KIND_" .. string.upper(e.k))
+      row.date:SetText(BB.Date(e.t))
+      local sub = T("KIND_" .. string.upper(e.k))
       local qq = e.code ~= "" and BananaBankDB.quests[e.code]
       if qq then
         -- Titel kuerzen, sonst bricht die Zeile um
