@@ -19,44 +19,48 @@ function UI:BuildPrices(parent)
   self.price = { filter = "all", page = 1 }
   local P = self.price
 
-  P.info = self:Font(p, 11, C.text)
-  P.info:SetPoint("TOPLEFT", p, "TOPLEFT", 8, -2)
-  P.info:SetWidth(430)
-  P.info:SetHeight(28)
-  P.info:SetJustifyV("TOP")
+  -- eine Werkzeugleiste: Filter links, Scan-Stand in der Mitte, Scan und Nachnahme rechts
+  local bar = self:Panel(p, 0, 34)
+  bar:SetPoint("TOPLEFT", p, "TOPLEFT", 0, 0)
+  bar:SetPoint("TOPRIGHT", p, "TOPRIGHT", 0, 0)
+  P.bar = bar
+  P.info = self:Font(bar, 11, C.text)
+  P.info:SetPoint("LEFT", bar, "LEFT", 268, 0)
+  P.info:SetWidth(250)
+  P.info:SetHeight(14)
 
-  P.scanBtn = self:Button(p, 130, 22, "BTN_AH_SCAN", function()
-    if BB.scan then BB:StopAHScan() else BB:StartAHScan() end
-    UI:RefreshPrices()
-  end, "primary")
-  P.scanBtn:SetPoint("TOPRIGHT", p, "TOPRIGHT", -140, -2)
-  P.cod = self:Check(p, "OPT_COD", function() return BananaBankDB.cod ~= false end, function(v)
+  P.cod = self:Check(bar, "OPT_COD", function() return BananaBankDB.cod ~= false end, function(v)
     BananaBankDB.cod = v
     UI:Refresh()
   end)
-  P.cod:SetPoint("TOPRIGHT", p, "TOPRIGHT", -2, -6)
+  P.cod:SetPoint("RIGHT", bar, "RIGHT", -8, 0)
   P.cod:SetWidth(132)
+  P.scanBtn = self:Button(bar, 100, 22, "BTN_AH_SCAN", function()
+    if BB.scan then BB:StopAHScan() else BB:StartAHScan() end
+    UI:RefreshPrices()
+  end, "primary")
+  P.scanBtn:SetPoint("RIGHT", bar, "RIGHT", -146, 0)
 
   P.chips = {}
   local defs = { { "FILTER_ALL", "all" }, { "PRICE_WITH", "with" }, { "PRICE_WITHOUT", "without" } }
   local prev
   for i = 1, getn(defs) do
     local key = defs[i][2]
-    local chip = self:Chip(p, 92, defs[i][1], function()
+    local chip = self:Chip(p, 80, defs[i][1], function()
       P.filter = key
       local sb = getglobal("BananaBankPriceScrollScrollBar")
       if sb then sb:SetValue(0) end
       UI:RefreshPrices()
     end)
     chip.key = key
-    if prev then chip:SetPoint("LEFT", prev, "RIGHT", 4, 0) else chip:SetPoint("TOPLEFT", p, "TOPLEFT", 8, -32) end
+    if prev then chip:SetPoint("LEFT", prev, "RIGHT", 4, 0) else chip:SetPoint("TOPLEFT", p, "TOPLEFT", 8, -8) end
     table.insert(P.chips, chip)
     prev = chip
   end
 
   local list = self:Panel(p)
-  list:SetPoint("TOPLEFT", p, "TOPLEFT", 0, -56)
-  list:SetPoint("BOTTOMRIGHT", p, "BOTTOMRIGHT", 0, 30)
+  list:SetPoint("TOPLEFT", p, "TOPLEFT", 0, -42)
+  list:SetPoint("BOTTOMRIGHT", p, "BOTTOMRIGHT", 0, 22)
   P.list = list
   local sf = CreateFrame("ScrollFrame", "BananaBankPriceScroll", list, "FauxScrollFrameTemplate")
   sf:SetPoint("TOPLEFT", list, "TOPLEFT", 0, -28)
@@ -70,7 +74,7 @@ function UI:BuildPrices(parent)
   end
   sf:EnableMouseWheel(true)
   sf:SetScript("OnMouseWheel", wheel)
-  local cols = { { "COL_ITEM", 14 }, { "COL_BIND", 300 }, { "COL_PRICE", 400 }, { "COL_SOURCE", 504 }, { "COL_DATE", 596 } }
+  local cols = { { "COL_ITEM", 14 }, { "COL_BIND", 300 }, { "COL_PRICE", 446 }, { "COL_SOURCE", 540 }, { "COL_DATE", 622 } }
   for i = 1, getn(cols) do
     local h = self:Font(list, 10, C.goldDim)
     h:SetPoint("TOPLEFT", list, "TOPLEFT", cols[i][2], -9)
@@ -100,15 +104,18 @@ function UI:BuildPrices(parent)
     row.bind = self:Font(row, 10, C.muted)
     row.bind:SetPoint("LEFT", row, "LEFT", 292, 0)
     row.bind:SetWidth(100)
-    row.price = self:Font(row, 11, C.gold)
-    row.price:SetPoint("LEFT", row, "LEFT", 392, 0)
+    row.price = self:Font(row, 11, C.gold, UI.FONT, "OUTLINE")
+    row.price:SetPoint("LEFT", row, "LEFT", 380, 0)
     row.price:SetWidth(98)
+    row.price:SetJustifyH("RIGHT")
     row.src = self:Font(row, 10, C.muted)
     row.src:SetPoint("LEFT", row, "LEFT", 496, 0)
-    row.src:SetWidth(90)
+    row.src:SetWidth(74)
+    row.src:SetJustifyH("RIGHT")
     row.date = self:Font(row, 10, C.muted)
-    row.date:SetPoint("LEFT", row, "LEFT", 588, 0)
+    row.date:SetPoint("LEFT", row, "LEFT", 574, 0)
     row.date:SetWidth(76)
+    row.date:SetJustifyH("RIGHT")
     row.edit = self:Button(row, 52, 20, "BTN_PRICE_SET", function(b) UI:ShowPriceDialog(b.row.id) end, "flat")
     row.edit:SetPoint("RIGHT", row, "RIGHT", 0, 0)
     row.edit.row = row
@@ -120,10 +127,9 @@ function UI:BuildPrices(parent)
   P.empty:SetWidth(420)
 
   local legend = self:Font(p, 10, C.muted)
-  legend:SetPoint("BOTTOMLEFT", p, "BOTTOMLEFT", 8, 6)
-  legend:SetWidth(790)
-  legend:SetHeight(22)
-  legend:SetJustifyV("TOP")
+  legend:SetPoint("BOTTOMLEFT", p, "BOTTOMLEFT", 8, 4)
+  legend:SetWidth(730)
+  legend:SetHeight(12)
   self:Loc(legend, "PRICE_LEGEND")
 
   self:BuildPriceDialog()
@@ -134,8 +140,10 @@ function UI:PriceList()
   local stock = BB:GetStock()
   local list = {}
   for id, e in pairs(stock) do
-    local u = BB:GetPrice(id)
+    local u, src = BB:GetPrice(id)
     local boe = BB:NeedsPrice(id)
+    -- Haendlerpreise (+25 %) stehen nicht hier, nur AH- und Handpreise
+    if src == "vendor" then u = nil end
     local take = boe or u
     if take then
       if P.filter == "with" then take = u ~= nil end
@@ -170,7 +178,7 @@ function UI:RefreshPrices()
     if (scan.ts or 0) > 0 then
       local days = floor((time() - scan.ts) / 86400)
       P.info:SetText(string.format(T("PRICE_INFO"), BB.Date(scan.ts), days,
-        scan.items or 0, BB.Count(db.prices)))
+        BB.Count(db.prices)))
     else
       P.info:SetText(T("PRICE_INFO_NONE"))
     end

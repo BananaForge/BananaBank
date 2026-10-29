@@ -93,6 +93,7 @@ Pull requests welcome, tested in-game on a 1.12 client. Lua 5.0 rules: no `#`, `
 
 ## Changelog
 
+- **3.6.2:** Prices tab: one toolbar (filters, scan info, scan button, COD checkbox), right-aligned price/source/date columns with the price in bold, "Edit" button, single-line legend; vendor-priced items are no longer listed.
 - **3.6.1:** Ledger tab: figures as tiles (donations, withdrawals, COD paid/open, entries), top lists with separate columns for items and gold, entries with the date on the right and a coloured kind mark.
 - **3.6.0:** readability: panels and the main window are opaque now (no world text shining through). Banks tab is a real table (column heads Bank / Role / Items / Gold / Last scan, zebra rows, description under the name).
 - **3.5.1:** stock tab: list view is the default; "only available" and "Trash only" are chips on one baseline (like the quality chips), view chips sit flush right with the list, the bank selector menu is gone (single bank: Banks > Show content, then a "Bank: X x" chip resets it).
