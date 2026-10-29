@@ -12,7 +12,7 @@ local BB = BananaBank
 
 -- Anfrage-Code (Discord-Code erzeugen/einloesen): aus, Anfragen laufen ueber den Gildenabgleich
 BB.USE_CODE = false
-BB.VERSION = "3.6.7"
+BB.VERSION = "3.6.8"
 BB.PREFIX = "BBNK"
 BB.DONATE_NAME = "Lumihunt"
 -- Einziger erlaubter Bank-Rang, deutsch und englisch. Fest eingebaut, es gibt

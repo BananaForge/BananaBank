@@ -93,6 +93,7 @@ Pull requests welcome, tested in-game on a 1.12 client. Lua 5.0 rules: no `#`, `
 
 ## Changelog
 
+- **3.6.8:** ledger: the Totals button sits at the bottom of the recent-entries panel, the ledger search box is gone; the Totals window searches items and donor names.
 - **3.6.7:** stock tab: icon view removed (list only), the "only available" and "Trash only" chips sit in the top row right-aligned with the list, the second toolbar row is gone so tree, list and request panel start higher.
 - **3.6.6:** stock tab: the request panel starts level with the list (5 rows, buttons moved down now that the code button is gone). Ledger: recent entries panel starts level with the two top lists, the tile strip spans the full width again.
 - **3.6.5:** layout fixes: ledger tiles no longer run under the recent-entries panel (Totals button moved next to the search), price tab info/legend shortened and column heads right-aligned over the values, stock view chips stay in the top row.

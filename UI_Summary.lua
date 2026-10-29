@@ -427,7 +427,7 @@ function UI:BuildTotalsWindow()
   sl:SetPoint("TOPLEFT", f, "TOPLEFT", 28, -108)
   self:Loc(sl, "TW_SEARCH")
   W.search = self:EditBox("BananaBankTotalsSearch", f, 250)
-  W.search:SetPoint("TOPLEFT", f, "TOPLEFT", 78, -102)
+  W.search:SetPoint("TOPLEFT", f, "TOPLEFT", 128, -102)
   W.search:SetMaxLetters(40)
   W.search:SetScript("OnTextChanged", function()
     W.filter = string.lower(this:GetText() or "")
@@ -498,7 +498,14 @@ function UI:RefreshTotals()
   local list = {}
   for i = 1, getn(g.items) do
     local it = g.items[i]
-    if W.filter == "" or string.find(string.lower(it.n), W.filter, 1, true) then table.insert(list, it) end
+    local hit = W.filter == "" or string.find(string.lower(it.n), W.filter, 1, true)
+    -- auch nach dem Namen eines Spenders suchen
+    if not hit then
+      for who, c in pairs(it.who) do
+        if c > 0 and string.find(string.lower(who), W.filter, 1, true) then hit = true break end
+      end
+    end
+    if hit then table.insert(list, it) end
   end
   if W.sort == "name" then
     table.sort(list, function(a, b) return a.n < b.n end)
