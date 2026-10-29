@@ -608,3 +608,120 @@ ev:SetScript("OnUpdate", function()
     end
   end
 end)
+
+-- ------------------------------------------------------------
+-- Items beim allerersten Oeffnen vom Server abfragen (Namen, Tooltips, Rezept-Anforderungen)
+-- Nur einmal je Account; danach nur noch von Hand mit /bb items. Gedrosselt, mit Abbrechen.
+-- ------------------------------------------------------------
+UI.PL = { run = nil }
+
+local function plTip()
+  if not UI.plTip then
+    UI.plTip = CreateFrame("GameTooltip", "BananaBankLoadTip", UIParent, "GameTooltipTemplate")
+    UI.plTip:SetOwner(UIParent, "ANCHOR_NONE")
+  end
+  return UI.plTip
+end
+
+local function plFrame()
+  if UI.plFrame then return UI.plFrame end
+  local f = CreateFrame("Frame", "BananaBankLoadFrame", UIParent)
+  UI.plFrame = f
+  f:SetWidth(260)
+  f:SetHeight(64)
+  f:SetPoint("TOP", UIParent, "TOP", 0, -120)
+  f:SetFrameStrata("DIALOG")
+  f:SetBackdrop({
+    bgFile = WHITE, edgeFile = "Interface\\Tooltips\\UI-Tooltip-Border",
+    tile = true, tileSize = 16, edgeSize = 14,
+    insets = { left = 3, right = 3, top = 3, bottom = 3 },
+  })
+  f:SetBackdropColor(0.03, 0.045, 0.11, 0.97)
+  f:SetBackdropBorderColor(C.brass[1], C.brass[2], C.brass[3], 1)
+  f:Hide()
+  f.title = UI:Font(f, 12, C.gold, UI.FONT_TITLE)
+  f.title:SetPoint("TOPLEFT", f, "TOPLEFT", 10, -9)
+  f.title:SetText("BananaBank")
+  f.txt = UI:Font(f, 11, C.text)
+  f.txt:SetPoint("TOPLEFT", f, "TOPLEFT", 10, -26)
+  f.txt:SetWidth(240)
+  f.txt:SetHeight(14)
+  f.bar = UI:QBar(f, 170, 12)
+  f.bar:SetPoint("BOTTOMLEFT", f, "BOTTOMLEFT", 10, 9)
+  f.cancel = UI:Button(f, 66, 16, "", function() UI:PreloadStop(true) end, "danger")
+  f.cancel:SetPoint("BOTTOMRIGHT", f, "BOTTOMRIGHT", -10, 8)
+  f.cancel.fs:SetText(T("PRELOAD_CANCEL"))
+  return f
+end
+
+-- IDs, die dieser Client nicht kennt. Nur Werte aus den Bestaenden verifizierter Bank-Chars, in sinnvollem Bereich.
+function UI:PreloadList()
+  local list = {}
+  local stock = BB:GetStock()
+  for id in pairs(stock) do
+    if type(id) == "number" and id > 0 and id < 100000 and not GetItemInfo(id) then table.insert(list, id) end
+  end
+  table.sort(list)
+  return list
+end
+
+function UI:PreloadStart(manual)
+  if self.PL.run then return end
+  local list = self:PreloadList()
+  if getn(list) == 0 then
+    if manual then BB:Print(T("PRELOAD_NONE")) end
+    return false
+  end
+  self.PL.run = { list = list, idx = 1, tick = 0, total = getn(list), manual = manual }
+  local f = plFrame()
+  f:Show()
+  self:PreloadShow()
+  return true
+end
+
+function UI:PreloadShow()
+  local run = self.PL.run
+  local f = self.plFrame
+  if not run or not f then return end
+  local n = run.idx - 1
+  f.txt:SetText(string.format(T("PRELOAD_TITLE"), n, run.total))
+  f.bar:Set(n, run.total, "open")
+end
+
+function UI:PreloadStop(cancelled)
+  local run = self.PL.run
+  self.PL.run = nil
+  if self.plFrame then self.plFrame:Hide() end
+  BananaBankDB.itemsPreloaded = time()
+  if run then
+    BB:Print(string.format(T(cancelled and "PRELOAD_CANCELLED" or "PRELOAD_DONE"), run.idx - 1))
+  end
+  self:Refresh()
+end
+
+local plAcc, plWatch = 0, 0
+local plEv = CreateFrame("Frame")
+plEv:SetScript("OnUpdate", function()
+  local dt = arg1 or 0
+  local run = UI.PL.run
+  if run then
+    run.tick = run.tick + dt
+    if run.tick >= 0.25 then
+      run.tick = 0
+      local id = run.list[run.idx]
+      if not id then return UI:PreloadStop(false) end
+      run.idx = run.idx + 1
+      if not GetItemInfo(id) then pcall(function() plTip():SetHyperlink("item:" .. id .. ":0:0:0") end) end
+      UI:PreloadShow()
+    end
+    return
+  end
+  -- erstes Oeffnen von BananaBank: einmal anstossen, sobald es einen Bestand gibt
+  plWatch = plWatch + dt
+  if plWatch < 1 then return end
+  plWatch = 0
+  local db = BananaBankDB
+  if not db or db.itemsPreloaded or not UI.frame or not UI.frame:IsVisible() or not BB:Ready() then return end
+  if BB.Count(BB:GetStock()) == 0 then return end   -- noch kein Bestand angekommen: spaeter
+  if UI:PreloadStart(false) == false then db.itemsPreloaded = time() end
+end)

@@ -10,7 +10,7 @@
 BananaBank = {}
 local BB = BananaBank
 
-BB.VERSION = "3.4.2"
+BB.VERSION = "3.5.0"
 BB.PREFIX = "BBNK"
 BB.DONATE_NAME = "Lumihunt"
 -- Einziger erlaubter Bank-Rang, deutsch und englisch. Fest eingebaut, es gibt

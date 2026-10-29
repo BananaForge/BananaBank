@@ -93,6 +93,7 @@ Pull requests welcome, tested in-game on a 1.12 client. Lua 5.0 rules: no `#`, `
 
 ## Changelog
 
+- **3.5.0:** at the very first opening of BananaBank (once per account) the addon asks the server for all stock items the client does not know yet (throttled, 4 per second, progress bar with cancel), so names, colors and tooltips are complete. Only item ids from verified bank chars and in a sane range are queried. `/bb items` repeats it by hand.
 - **3.4.2:** hotfix: the stock slots (and the bag/bank slots on bank chars) registered for clicks with "AnyUp", which the 1.12 client does not know, so left clicks did nothing. Now registered explicitly for left, right and middle button.
 - **3.4.1:** new `/bb why [item name]` request diagnosis (rank, rules, price, class, availability); click registration of the stock slots falls back to left/right click if needed.
 - **3.4.0:** **Trash manually**: press the mouse wheel on an item (stock list, bags, bank slots) to flip trash / not trash; flipping back to the automatic result drops the exception. Manual decisions are shared between all bank chars (guild channel, newer entry wins, only from verified bank chars) and listed under Settings > Trash exceptions with "Reset all". Items that cannot be sold are set to "not trash" automatically. The ledger books what the vendor really paid ("Trash income"). **Price fix:** the 50 silver minimum applies only to BOE, recipes and bags; all other items cost vendor value +25 % exactly.
