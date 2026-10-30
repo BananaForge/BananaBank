@@ -12,7 +12,7 @@ local BB = BananaBank
 
 -- Anfrage-Code (Discord-Code erzeugen/einloesen): aus, Anfragen laufen ueber den Gildenabgleich
 BB.USE_CODE = false
-BB.VERSION = "3.6.10"
+BB.VERSION = "3.7.0"
 BB.PREFIX = "BBNK"
 BB.DONATE_NAME = "Lumihunt"
 -- Einziger erlaubter Bank-Rang, deutsch und englisch. Fest eingebaut, es gibt
@@ -270,6 +270,7 @@ function BB:ReadRoster()
   self.rosterReady = true
   self.rankListCache = nil
   self:BankModeNudge()
+  if self.LevelScan then self:LevelScan() end
 end
 
 -- Char mit dem Bank-Rang, aber ohne Bank-Modus: einmal pro Sitzung darauf hinweisen. Sonst
@@ -886,6 +887,7 @@ function BB:CheckModules()
   if not self.vendorModule then table.insert(missing, "Vendor.lua") end
   if not (self.UI and self.UI.lotseModule) then table.insert(missing, "UI_Lotse.lua") end
   if not (self.UI and self.UI.trashModule) then table.insert(missing, "UI_Trash.lua") end
+  if not (self.UI and self.UI.levelModule) then table.insert(missing, "UI_Levelup.lua") end
   if table.getn(missing) > 0 then
     self:Print("|cffff4040" .. string.format(self.T("ERR_FILES_MISSING"), table.concat(missing, ", ")) .. "|r")
     return false

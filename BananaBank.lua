@@ -255,6 +255,16 @@ SlashCmdList["BANANABANK"] = function(msg)
   elseif cmd == "debug" then
     BananaBankDB.debug = not BananaBankDB.debug
     BB:Print("Debug: " .. (BananaBankDB.debug and "an/on" or "aus/off"))
+  elseif cmd == "gz" then
+    if restLower == "test" or restLower == "test60" then
+      if BB.UI.LevelTest then BB.UI:LevelTest(restLower == "test60") end
+    elseif restLower == "status" then
+      local held = BB.GuildHoldsGz and BB:GuildHoldsGz()
+      if held then BB:Print(string.format(BB.T("LV_BLOCKED"), held))
+      else BB:Print(BB.T(BB:GzOn() and "LV_STATUS_ON" or "LV_STATUS_OFF")) end
+    elseif BB.SendGZ then
+      BB:SendGZ(rest ~= "" and rest or nil)
+    end
   elseif cmd == "support" or cmd == "spenden" then
     BB.UI:ShowThanks()
   else

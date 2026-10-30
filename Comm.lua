@@ -537,6 +537,8 @@ function BB:OnAddonMessage(prefix, msg, channel, sender)
     elseif kind == "T" then
       pushes["T"] = nil
     end
+  elseif t == "V~" then
+    if self.OnLevelMessage then self:OnLevelMessage(sender, msg) end
   elseif t == "X~" then
     local f = BB.Split(msg, "~")
     self:OnHello2(sender, f[2], f[3], f[4], f[5], f[6])

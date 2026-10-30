@@ -10,7 +10,7 @@ local WHITE = UI.WHITE
 UI.settingsModule = true
 UI.set = {}
 
-local GEN_H, GUILD_H, BANK_H = 168, 108, 296
+local GEN_H, GUILD_H, BANK_H = 262, 108, 296
 local RULES_H = 246
 local DEPOT_H = 436
 local KW_H = 404
@@ -167,6 +167,29 @@ function UI:BuildSettings()
   end)
   btn(g, "SET_STATUS", 220, -104, 140, function() BB:Status() end)
   btn(g, "SET_SUPPORT", 4, -132, 210, function() UI:ShowThanks() end)
+  -- GZ bei Levelups
+  S.cGz = check(g, "SET_GZ", 4, -164, function() return BB:GzOn() end, function(v)
+    BananaBankDB.gz = BananaBankDB.gz or {}
+    BananaBankDB.gz.on = v
+  end, 300)
+  S.gzChips = {}
+  local gdefs = { { "SET_GZ_ALL", "all" }, { "SET_GZ_5", "fives" }, { "SET_GZ_10", "tens" } }
+  for i = 1, getn(gdefs) do
+    local code = gdefs[i][2]
+    local chip = self:Chip(g, 100, gdefs[i][1], function()
+      BananaBankDB.gz = BananaBankDB.gz or {}
+      BananaBankDB.gz.mode = code
+      UI:RefreshSettings()
+    end)
+    chip.code = code
+    chip:SetPoint("TOPLEFT", g, "TOPLEFT", 24 + (i - 1) * 104, -188)
+    S.gzChips[i] = chip
+  end
+  S.cGz60 = check(g, "SET_GZ_60", 4, -214, function() return BB:GzSplash() end, function(v)
+    BananaBankDB.gz = BananaBankDB.gz or {}
+    BananaBankDB.gz.splash = v
+  end, 300)
+  btn(g, "SET_GZ_TEXTS", 4, -238, 210, function() UI:OpenGzTexts() end)
 
   -- Gilde (Verwalter)
   g = group(f, "SET_SEC_GUILD")
@@ -528,6 +551,12 @@ function UI:RefreshSettings()
   S.cMini.Update()
   S.cTrack.Update()
   S.cDebug.Update()
+  if S.cGz then
+    S.cGz.Update()
+    S.cGz60.Update()
+    local gm = BB:GzMode()
+    for i = 1, getn(S.gzChips) do S.gzChips[i]:SetActive(S.gzChips[i].code == gm) end
+  end
   if S.cBank then S.cBank.Update() S.cCod.Update() S.cWhisper.Update() S.cAuto.Update() end
   if S.age and not S.ageFocus then S.age:SetText(tostring(BB:PriceMaxAgeDays())) end
   if S.trash and not S.trashFocus then S.trash:SetText(tostring(math.floor(BB:TrashMax() / 100))) end
