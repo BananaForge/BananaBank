@@ -30,7 +30,7 @@ local function G()
 end
 
 function BB:GzOn() return G().on ~= false end
-function BB:GzMode() return G().mode or "all" end
+function BB:GzMode() return G().mode or "tens" end
 function BB:GzSplash() return G().splash ~= false end
 
 -- Version von BananaGuild als Text, wenn das Addon geladen ist, sonst nil
@@ -223,7 +223,8 @@ local function buildToast()
   toast:SetWidth(390)
   toast:SetHeight(84)
   toast:SetPoint("TOP", UIParent, "TOP", 0, -170)
-  toast:SetFrameStrata("DIALOG")
+  toast:SetFrameStrata("FULLSCREEN_DIALOG")
+  toast:SetToplevel(true)
   toast:EnableMouse(true)
   toast:SetMovable(true)
   toast:RegisterForDrag("LeftButton")
@@ -348,7 +349,9 @@ function UI:BuildGzTexts()
   f:SetWidth(520)
   f:SetHeight(120 + ROWS * ROW_H + 40)
   f:SetPoint("CENTER", UIParent, "CENTER", 0, 20)
-  f:SetFrameStrata("FULLSCREEN_DIALOG")
+  -- ueber dem Einstellungsfenster (gleiche Ebene wuerde dessen Inhalt durchscheinen lassen)
+  f:SetFrameStrata("TOOLTIP")
+  f:SetToplevel(true)
   f:SetMovable(true)
   f:EnableMouse(true)
   f:RegisterForDrag("LeftButton")
@@ -360,6 +363,7 @@ function UI:BuildGzTexts()
     insets = { left = 11, right = 12, top = 12, bottom = 11 },
   })
   f:SetBackdropColor(0.015, 0.025, 0.06, 1)
+  self:Solid(f, 12, 1)
   f:Hide()
   tinsert(UISpecialFrames, "BananaBankGzTexts")
   local close = CreateFrame("Button", nil, f, "UIPanelCloseButton")
@@ -377,7 +381,7 @@ function UI:BuildGzTexts()
 
   local sf = CreateFrame("ScrollFrame", "BananaBankGzScroll", f, "FauxScrollFrameTemplate")
   sf:SetPoint("TOPLEFT", f, "TOPLEFT", 20, -92)
-  sf:SetPoint("BOTTOMRIGHT", f, "TOPRIGHT", -44, -92 - ROWS * ROW_H)
+  sf:SetPoint("BOTTOMRIGHT", f, "TOPRIGHT", -50, -92 - ROWS * ROW_H)
   sf:SetScript("OnVerticalScroll", function()
     FauxScrollFrame_OnVerticalScroll(ROW_H, function() UI:RefreshGzTexts() end)
   end)
@@ -392,12 +396,12 @@ function UI:BuildGzTexts()
     local row = CreateFrame("Frame", nil, f)
     row:SetHeight(ROW_H - 4)
     row:SetPoint("TOPLEFT", f, "TOPLEFT", 26, -92 - (i - 1) * ROW_H)
-    row:SetPoint("TOPRIGHT", f, "TOPRIGHT", -52, -92 - (i - 1) * ROW_H)
+    row:SetPoint("TOPRIGHT", f, "TOPRIGHT", -64, -92 - (i - 1) * ROW_H)
     row.num = self:Font(row, 11, C.goldDim)
     row.num:SetPoint("LEFT", row, "LEFT", 0, 0)
     row.num:SetWidth(24)
     row.num:SetJustifyH("RIGHT")
-    row.box = self:EditBox("BananaBankGzEdit" .. i, row, 380)
+    row.box = self:EditBox("BananaBankGzEdit" .. i, row, 330)
     row.box:SetMaxLetters(TEXT_MAX)
     row.box:SetPoint("LEFT", row, "LEFT", 34, 0)
     row.box:SetScript("OnTextChanged", function()
@@ -406,7 +410,7 @@ function UI:BuildGzTexts()
       local idx = this.idx
       if txt == BB:GzDefault(idx) then G().texts[idx] = nil else G().texts[idx] = txt end
     end)
-    row.reset = self:Button(row, 40, 20, "GZ_ROW_RESET", function()
+    row.reset = self:Button(row, 46, 20, "GZ_ROW_RESET", function()
       if this:GetParent().box.idx then
         G().texts[this:GetParent().box.idx] = nil
         UI:RefreshGzTexts()
