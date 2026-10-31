@@ -93,6 +93,7 @@ Pull requests welcome, tested in-game on a 1.12 client. Lua 5.0 rules: no `#`, `
 
 ## Changelog
 
+- **3.7.2:** GZ: someone who leaves the guild and comes back (or is invited) at a higher level no longer triggers a level-up popup; only a real level gained while in the guild counts.
 - **3.7.1:** GZ: default is now every 10th level; the GZ text dialog sits above the settings window with an opaque background (no more see-through), its rows and scrollbar no longer overlap; the popup is raised above the main window.
 - **3.7.0:** GZ for level ups (moved over from BananaGuild): popup with "Send GZ", "Close" and "GZ off", big level-60 splash, 20 editable GZ texts (Settings > General), modes every level / steps of 5 / steps of 10, `/bb gz [name]`, `/bb gz test`, `/bb gz status`. Level ups come from an own message (V~) of other BananaBank users and from comparing the guild list every 30 s, each level is shown once. On by default. Pauses itself while an older BananaGuild (before 1.17.0) is loaded. New file UI_Levelup.lua: restart WoW completely.
 - **3.6.10:** stock tab: the request panel ends on the same line as the tree and the list (4 rows).

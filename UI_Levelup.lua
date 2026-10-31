@@ -150,9 +150,11 @@ function BB:LevelScan()
   local n = GetNumGuildMembers(1) or 0
   if n <= 0 then return end
   local first = not lv.seeded
+  local seen = {}
   for i = 1, n do
     local name, _, _, level = GetGuildRosterInfo(i)
     if name and level and level > 0 then
+      seen[name] = true
       local old = lv.last[name]
       if old and level > old and not first then
         lv.last[name] = level
@@ -161,6 +163,11 @@ function BB:LevelScan()
         lv.last[name] = level
       end
     end
+  end
+  -- wer nicht mehr in der Gilde ist, verliert seinen Stand: ein neu Eingeladener (oder jemand, der zurueckkommt)
+  -- ist ein neues Mitglied mit seiner Stufe, kein Aufstieg
+  for name in pairs(lv.last) do
+    if not seen[name] then lv.last[name] = nil end
   end
   lv.seeded = true
 end
