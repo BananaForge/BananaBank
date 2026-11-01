@@ -10,7 +10,7 @@ local floor = math.floor
 BB.priceModule = true
 BB.PRICE_FACTOR = 0.5   -- Haelfte des Marktpreises
 BB.PRICE_SHARE = 0.30   -- Schnitt ueber die guenstigsten 30 Prozent
-BB.PRICE_MIN = 5000     -- Mindestpreis 50 Silber (gilt fuer den errechneten Gildenpreis)
+BB.PRICE_MIN_OLD = 5000 -- der frueher eingebaute Mindestpreis (50 Silber): solche Preise werden neu gescannt
 BB.AH_PAGE = 50
 BB.AH_MAX_PAGES = 5     -- kurze Namen treffen viel; mehr als das brauchen wir nicht
 
@@ -83,10 +83,7 @@ end
 function BB:GetPrice(id)
   local p = BananaBankDB.prices[id]
   if p and p.u and p.u > 0 then
-    local u = p.u
-    -- aus dem AH errechnete Preise haben einen Mindestwert; von Hand gesetzte bleiben, wie sie sind
-    if p.src ~= "man" and u < BB.PRICE_MIN then u = BB.PRICE_MIN end
-    return u, p.src, p.ts, p.n
+    return p.u, p.src, p.ts, p.n
   end
   -- ohne AH-Preis (und ohne Handpreis) gibt es keinen Preis
   return nil
@@ -150,8 +147,9 @@ local function fromSamples(list)
   local sum = 0
   for i = 1, take do sum = sum + list[i] end
   local p = floor(sum / take * BB.PRICE_FACTOR)
-  p = floor(p / 100) * 100
-  if p < BB.PRICE_MIN then p = BB.PRICE_MIN end
+  -- ab 1 Silber auf ganze Silber abrunden, darunter in Kupfer lassen; nie 0 (0 heisst "kein Preis")
+  if p >= 100 then p = floor(p / 100) * 100 end
+  if p < 1 then p = 1 end
   return p, n
 end
 BB.PriceFromSamples = fromSamples
@@ -196,6 +194,8 @@ function BB:PriceTargets()
       if name and name ~= "" and not string.find(name, "^#%d") then
         -- nie gescannt oder zurueckgesetzt: sofort; gescannt (Preis gefunden oder nicht im AH): erst nach den eingestellten Tagen
         local scanned = cur and ((cur.src == "ah" and (cur.u or 0) > 0) or cur.src == "none")
+        -- ein Preis von genau 50 Silber stammt aus der alten Mindestpreis-Regel: neu holen
+        if scanned and cur.src == "ah" and cur.u == BB.PRICE_MIN_OLD then scanned = false end
         if not scanned then
           table.insert(fresh, id)
         elseif now - (cur.ts or 0) >= limit then
