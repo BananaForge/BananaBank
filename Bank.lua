@@ -395,6 +395,35 @@ local function findStack(bags, id, used)
   return bestBag, bestSlot, bestCount
 end
 
+-- Teilstapel desselben Items in den Taschen zu vollen Stapeln zusammenlegen (ein Zug je Aufruf).
+-- true = es wurde gezogen oder ein Fach ist noch gesperrt, kurz warten und nochmal pruefen
+local function consolidate(id, used)
+  local _, _, _, _, _, _, stack = GetItemInfo(id)
+  if not stack or stack <= 1 then return false end
+  local parts = {}
+  for _, bag in ipairs(BB.BAG_LIST) do
+    for slot = 1, (GetContainerNumSlots(bag) or 0) do
+      if not used[slotKey(bag, slot)] then
+        local link = GetContainerItemLink(bag, slot)
+        if link and BB.ParseLink(link) == id then
+          local _, count, locked = GetContainerItemInfo(bag, slot)
+          if locked then return true end
+          if (count or 1) < stack then table.insert(parts, { bag = bag, slot = slot, c = count or 1 }) end
+        end
+      end
+    end
+  end
+  if getn(parts) < 2 then return false end
+  table.sort(parts, function(a, b) return a.c > b.c end)
+  local target, src = parts[1], parts[getn(parts)]
+  if CursorHasItem() then ClearCursor() end
+  PickupContainerItem(src.bag, src.slot)
+  PickupContainerItem(target.bag, target.slot)
+  if CursorHasItem() then ClearCursor() end
+  return true
+end
+BB.Consolidate = consolidate
+
 function BB:StartPrepare(r)
   if not self:BankActive() then
     self:Print("|cffff4040" .. string.format(self.T("ERR_RANK_LOST"), BB.BANK_RANK_LABEL) .. "|r")
@@ -421,6 +450,7 @@ end
 
 function BB:PrepareFail(key)
   self.job = nil
+  self.reprep = nil
   self:Print("|cffff4040" .. self.T(key) .. "|r")
   if self.UI then self.UI:Refresh() end
 end
@@ -461,6 +491,14 @@ function BB:PrepareStep()
     end
   end
   if not id then return self:PrepareDone() end
+
+  -- Teilstapel in den Taschen erst zu vollen Stapeln zusammenlegen: weniger Briefe, stabile Faecher
+  job.cons = job.cons or {}
+  if (job.cons[id] or 0) < 12 and consolidate(id, used) then
+    job.cons[id] = (job.cons[id] or 0) + 1
+    self:After(0.5, function() BB:PrepareStep() end, "prep")
+    return
+  end
 
   -- 1. Taschen des Bank-Chars
   local bag, slot, count = findStack(BB.BAG_LIST, id, used)
@@ -559,6 +597,11 @@ function BB:PrepareDone()
   end
   self.prep = { r = job.r, slots = job.slots, idx = 1, missing = job.missing, short = next(short) and short or nil }
   self:Print(string.format(self.T("MSG_PREPARED"), getn(job.slots), job.r.p))
+  -- nach einer automatischen Neuvorbereitung (Faecher hatten sich veraendert) gleich weiter senden
+  if self.reprep then
+    self.reprep = nil
+    if self.mailOpen then self:After(0.8, function() BB:SendNextMail() end, "reprepsend") end
+  end
   if self.UI then self.UI:Refresh() end
 end
 
@@ -723,8 +766,18 @@ function BB:SendNextMail()
   local lid = BB.ParseLink(GetContainerItemLink(e.bag, e.slot))
   local _, count = GetContainerItemInfo(e.bag, e.slot)
   if lid ~= e.id or count ~= e.c then
+    local r = p.r
     self.prep = nil
-    self:Print("|cffff4040" .. self.T("ERR_SLOT_CHANGED") .. "|r")
+    -- Taschen veraendert (z. B. Stapel zusammengelegt): den Rest automatisch neu vorbereiten, hoechstens 3 Mal
+    if (self.repCount or 0) < 3 and r and r.s == "confirmed" and self:BankActive() then
+      self.repCount = (self.repCount or 0) + 1
+      self.reprep = true
+      self:Print(self.T("MSG_REPREP"))
+      self:StartPrepare(r)
+      if not self.job then self.reprep = nil end
+    else
+      self:Print("|cffff4040" .. self.T("ERR_SLOT_CHANGED") .. "|r")
+    end
     if self.UI then self.UI:Refresh() end
     return
   end
@@ -859,10 +912,102 @@ function BB:SendMailFinish()
   SendMail(p.r.p, p.subject, body)
 end
 
+-- Von Hand verschickte Post an den Anfragenden zaehlt auf die bestaetigte Anfrage: beim Absenden die Anhaenge merken,
+-- beim Erfolg buchen. Briefe des Addons selbst laufen ueber den eigenen Ablauf.
+function BB:HookSend()
+  if self.sendHooked or not SendMail then return end
+  self.sendHooked = true
+  local orig = SendMail
+  SendMail = function(to, subject, body)
+    if BB:IsBank() and not (BB.prep and BB.prep.sending) then BB:CaptureManualMail(to) end
+    return orig(to, subject, body)
+  end
+end
+
+function BB:CaptureManualMail(to)
+  self.manualMail = nil
+  if not GetSendMailItem or not to or to == "" then return end
+  local items = {}
+  local n = self:MailSlots()
+  for i = 1, n do
+    local ok, name, _, count
+    if n > 1 then ok, name, _, count = pcall(GetSendMailItem, i) else ok, name, _, count = pcall(GetSendMailItem) end
+    if ok and name and name ~= "" then
+      local id = self:IdByName(name)
+      if id and id ~= 0 then items[id] = (items[id] or 0) + (count or 1) end
+    end
+  end
+  if next(items) then self.manualMail = { to = to, items = items, t = GetTime() } end
+end
+
+-- Buchen: Menge auf bestaetigte Anfragen dieses Spielers verteilen, Buch-Eintrag, bei Vollstaendigkeit "versendet"
+function BB:CreditManualMail(to, items)
+  local credited = {}
+  local lower = string.lower(to)
+  for id, count in pairs(items) do
+    for _, r in pairs(BananaBankDB.reqs) do
+      if count > 0 and r.s == "confirmed" and string.lower(r.p or "") == lower and r.items[id] then
+        local open = self:ReqLeft(r, id)
+        if open > 0 then
+          local amt = math.min(open, count)
+          r.sent = r.sent or {}
+          r.sent[id] = (r.sent[id] or 0) + amt
+          count = count - amt
+          local name, q = self:ItemInfo(id)
+          self:AddLedger({ k = "out", p = r.p, i = id, n = name, c = amt, q = q, m = 0, code = r.id })
+          credited[r] = true
+        end
+      end
+    end
+  end
+  for r in pairs(credited) do
+    r.u = time()
+    if self:RequestComplete(r) then
+      self:SetStatus(r, "sent")
+      self:Print(string.format(self.T("MSG_REQUEST_DONE"), r.id, r.p))
+      self:Notify(r, "WHISPER_SENT")
+    else
+      self:PushRequests({ r })
+      self:Print(string.format(self.T("MSG_MANUAL_CREDIT"), r.id, r.p))
+    end
+  end
+  if next(credited) then
+    self:ScheduleSnapshot(2)
+    if self.UI then self.UI:Refresh() end
+  end
+end
+
+function BB:OnManualMailSent()
+  local mm = self.manualMail
+  self.manualMail = nil
+  if mm and GetTime() - mm.t < 60 then self:CreditManualMail(mm.to, mm.items) end
+end
+
+-- Notfall: alles, was an dieser Anfrage noch offen ist, als versendet buchen (z. B. von Hand verschickt)
+function BB:MarkSent(r)
+  if not r or not (r.s == "confirmed") then return end
+  r.sent = r.sent or {}
+  local n = 0
+  for id in pairs(r.items) do
+    local left = self:ReqLeft(r, id)
+    if left > 0 then
+      r.sent[id] = (r.sent[id] or 0) + left
+      n = n + left
+      local name, q = self:ItemInfo(id)
+      self:AddLedger({ k = "out", p = r.p, i = id, n = name, c = left, q = q, m = 0, code = r.id })
+    end
+  end
+  if self.prep and self.prep.r == r then self.prep = nil end
+  self:SetStatus(r, "sent")
+  self:Print(string.format(self.T("MSG_MARKED_SENT"), r.id, r.p, n))
+  self:Notify(r, "WHISPER_SENT")
+end
+
 function BB:OnMailSent()
   local p = self.prep
-  if not p or not p.sending then return end
+  if not p or not p.sending then return self:OnManualMailSent() end
   p.sending = false
+  self.repCount = 0
   local r = p.r
   r.sent = r.sent or {}
   local batch = p.batch or { p.idx }
@@ -913,6 +1058,7 @@ end
 function BB:MailDone()
   local p = self.prep
   self.prep = nil
+  self.repCount = 0
   if not p then return end
   local r = p.r
   -- Unterlieferung: die Differenz abschreiben, damit die Reservierung nicht stehen bleibt
@@ -1096,6 +1242,7 @@ end
 function BB:HookMail()
   if self.mailHooked then return end
   self.mailHooked = true
+  self:HookSend()
   local origItem = TakeInboxItem
   TakeInboxItem = function(i, j)
     BB:OnTakeInbox(i, true, j)

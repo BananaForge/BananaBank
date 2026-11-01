@@ -678,6 +678,22 @@ function UI:BuildBank(parent)
     UI:Refresh()
   end, "primary")
   Bk.send:SetPoint("LEFT", Bk.fetch, "RIGHT", 6, 0)
+  -- Notfall: offenen Rest als versendet buchen (zwei Klicks)
+  Bk.mark = self:Button(left, 150, 24, "BTN_MARK_SENT", function()
+    local b = Bk.mark
+    if b.armed then
+      b.armed = false
+      b.fs:SetText(T("BTN_MARK_SENT"))
+      BB:Cancel("markarm")
+      BB:MarkSent(Bk.current)
+      UI:Refresh()
+    else
+      b.armed = true
+      b.fs:SetText(T("BTN_MARK_SENT_SURE"))
+      BB:After(6, function() b.armed = false b.fs:SetText(T("BTN_MARK_SENT")) end, "markarm")
+    end
+  end, "flat")
+  Bk.mark:SetPoint("LEFT", Bk.send, "RIGHT", 6, 0)
   -- Gildencrafter-Anfrage: eigene Zeile mit dem Knopf zum Akzeptieren
   Bk.craftInfo = self:Font(left, 10, { 1, 0.82, 0.3 })
   Bk.craftInfo:SetPoint("TOPLEFT", left, "TOPLEFT", 14, -230)
@@ -796,6 +812,7 @@ function UI:RefreshBank()
     Bk.reject:SetOn(false)
     Bk.fetch:SetOn(false)
     Bk.send:SetOn(false)
+    Bk.mark:SetOn(false)
     Bk.send.fs:SetText(T("BTN_SEND"))
     Bk.status:SetText("")
     Bk.craft:Hide()
@@ -915,6 +932,7 @@ function UI:RefreshBank()
   end
   Bk.reject:SetOn(st == "open" or st == "confirmed" or st == "expired")
   Bk.fetch:SetOn(st == "confirmed" and not BB.job)
+  Bk.mark:SetOn(st == "confirmed")
   Bk.send:SetOn(prepHere and BB.mailOpen and not p.sending)
   if prepHere then
     Bk.send.fs:SetText(string.format(T("BTN_SEND_N"), p.idx, getn(p.slots)))
