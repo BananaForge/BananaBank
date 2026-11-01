@@ -403,7 +403,7 @@ function BB:StartPrepare(r)
   end
   local need = {}
   for id, n in pairs(r.items) do
-    local left = n - ((r.sent and r.sent[id]) or 0)
+    local left = self:ReqLeft(r, id)
     if left > 0 then need[id] = left end
   end
   if BB.Count(need) == 0 then
@@ -505,6 +505,35 @@ function BB:PrepareStep()
   self:After(0.05, function() BB:PrepareStep() end, "prep")
 end
 
+-- Liegt dieses Item (noch) auf einer anderen Bank?
+function BB:OtherBankHas(id)
+  local me = self:Me()
+  local depots = (self.DepotChars and self:DepotChars()) or {}
+  for bank, snap in pairs(BananaBankDB.snaps) do
+    if bank ~= me and self:MayBeBank(bank) and not depots[bank] then
+      local it = snap.items and snap.items[id]
+      if it and (it.c or 0) > 0 then return true end
+    end
+  end
+  return false
+end
+
+-- "36x Mageweave Cloth, 2x ..." fuer Meldung und Brief
+function BB:ShortList(short)
+  local parts = {}
+  for id, n in pairs(short) do table.insert(parts, n .. "x " .. (self:ItemInfo(id) or "?")) end
+  table.sort(parts)
+  local text = table.concat(parts, ", ")
+  if string.len(text) > 90 then text = string.sub(text, 1, 87) .. "..." end
+  return text
+end
+
+-- Hinweis im letzten Brief einer Unterlieferung, deutsch und englisch (die Sprache des Empfaengers ist unbekannt)
+function BB:ShortNote(short)
+  local list = self:ShortList(short)
+  return string.format(BB.L.deDE.MAIL_SHORT, list) .. "\n\n" .. string.format(BB.L.enUS.MAIL_SHORT, list)
+end
+
 function BB:PrepareDone()
   local job = self.job
   self.job = nil
@@ -520,7 +549,12 @@ function BB:PrepareDone()
     if self.UI then self.UI:Refresh() end
     return
   end
-  self.prep = { r = job.r, slots = job.slots, idx = 1, missing = job.missing }
+  -- was auf keiner anderen Bank liegt, kann nicht mehr kommen (Bestandsdifferenz): wird mit dem letzten Brief abgeschrieben
+  local short = {}
+  for id, n in pairs(job.missing) do
+    if n > 0 and not self:OtherBankHas(id) then short[id] = n end
+  end
+  self.prep = { r = job.r, slots = job.slots, idx = 1, missing = job.missing, short = next(short) and short or nil }
   self:Print(string.format(self.T("MSG_PREPARED"), getn(job.slots), job.r.p))
   if self.UI then self.UI:Refresh() end
 end
@@ -794,6 +828,10 @@ function BB:SendMailFinish()
   p.cod = cod
   p.subject = "BananaBank " .. p.r.id .. " (" .. p.idx .. "/" .. table.getn(p.slots) .. ")"
   local body = string.format(self.T("MAIL_BODY"), p.r.id)
+  -- letzter Brief einer Unterlieferung: Hinweis zur Bestandsdifferenz anhaengen
+  if p.short and batch[table.getn(batch)] >= table.getn(p.slots) then
+    body = string.sub(body .. "\n\n" .. self:ShortNote(p.short), 1, 500)
+  end
   if SendMailNameEditBox then
     -- TurtleMail ueberschreibt SetText und ignoriert es, solange es sich einen Empfaenger gemerkt hat
     if SendMailNameEditBox._SetText then SendMailNameEditBox:_SetText(p.r.p) else SendMailNameEditBox:SetText(p.r.p) end
@@ -874,6 +912,17 @@ function BB:MailDone()
   self.prep = nil
   if not p then return end
   local r = p.r
+  -- Unterlieferung: die Differenz abschreiben, damit die Reservierung nicht stehen bleibt
+  if p.short then
+    r.sh = r.sh or {}
+    r.sent = r.sent or {}
+    for id, n in pairs(p.short) do
+      local left = (r.items[id] or 0) - (r.sent[id] or 0) - (r.sh[id] or 0)
+      if left > 0 then r.sh[id] = (r.sh[id] or 0) + math.min(n, left) end
+    end
+    r.u = time()
+    self:Print("|cffff9a2e" .. string.format(self.T("MSG_REQUEST_SHORT"), r.id, self:ShortList(p.short)) .. "|r")
+  end
   if self:RequestComplete(r) then
     self:SetStatus(r, "sent")
     self:Print(string.format(self.T("MSG_REQUEST_DONE"), r.id, r.p))
@@ -1093,7 +1142,7 @@ function BB:TradeCredit(player, id, count)
   for _, r in pairs(BananaBankDB.reqs) do
     if r.p == player and r.s == "confirmed" and r.items[id] then
       r.sent = r.sent or {}
-      local open = r.items[id] - (r.sent[id] or 0)
+      local open = self:ReqLeft(r, id)
       if open > 0 then
         r.sent[id] = (r.sent[id] or 0) + math.min(open, count)
         return r

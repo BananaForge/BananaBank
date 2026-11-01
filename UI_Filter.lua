@@ -400,7 +400,10 @@ function UI:RefreshStockView(list)
         r.lname:SetText(nm)
         r.lname:SetTextColor(qc[1], qc[2], qc[3])
         local txt = tostring(e.avail)
-        if e.res > 0 then txt = txt .. " |cffff8000(" .. e.res .. ")|r" end
+        if e.res > 0 then
+          -- mehr reserviert als im Bestand: rot
+          txt = txt .. (e.res > (e.e.c or 0) and " |cffff4040(" or " |cffff8000(") .. e.res .. ")|r"
+        end
         r.lcnt:SetText(txt)
         local u = BB:GetPrice(e.id)
         if u then r.lprice:SetText(BB.Money(u)) end

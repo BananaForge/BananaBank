@@ -12,7 +12,7 @@ local BB = BananaBank
 
 -- Anfrage-Code (Discord-Code erzeugen/einloesen): aus, Anfragen laufen ueber den Gildenabgleich
 BB.USE_CODE = false
-BB.VERSION = "3.7.4"
+BB.VERSION = "3.8.0"
 BB.PREFIX = "BBNK"
 BB.DONATE_NAME = "Lumihunt"
 -- Einziger erlaubter Bank-Rang, deutsch und englisch. Fest eingebaut, es gibt
@@ -427,13 +427,20 @@ function BB:IsActive(r)
   return s == "open" or s == "confirmed"
 end
 
+-- Was von diesem Item noch offen ist: bestellt, abzueglich Versandtem und abgeschriebener Differenz (r.sh)
+function BB:ReqLeft(r, id)
+  local left = (r.items[id] or 0) - ((r.sent and r.sent[id]) or 0) - ((r.sh and r.sh[id]) or 0)
+  if left < 0 then left = 0 end
+  return left
+end
+
 -- reservierte Menge je Item (offene und bestaetigte Anfragen, abzueglich Versandtem)
 function BB:GetReserved(exceptCode)
   local res = {}
   for code, r in pairs(BananaBankDB.reqs) do
     if code ~= exceptCode and self:IsActive(r) then
       for id, n in pairs(r.items) do
-        local left = n - ((r.sent and r.sent[id]) or 0)
+        local left = self:ReqLeft(r, id)
         if left > 0 then res[id] = (res[id] or 0) + left end
       end
     end
@@ -587,6 +594,8 @@ function BB:MergeRequest(r)
   local cur = db.reqs[r.id]
   -- "frei" (Preis 0) darf nur eine Bank gesetzt haben, sonst koennte sich jeder Gratis-Items zuschreiben
   if r.fr and next(r.fr) and not self:MayBeBank(r.by) then r.fr = nil end
+  if r.sh and next(r.sh) == nil then r.sh = nil end
+  if r.sh and not self:MayBeBank(r.by) then r.sh = nil end
   if r.cl and next(r.cl) == nil then r.cl = nil end
   if not cur then
     db.reqs[r.id] = r
@@ -605,6 +614,16 @@ function BB:MergeRequest(r)
       self:Print(string.format(self.T("MSG_STATUS_CHANGED"), cur.id, self.T("STATUS_" .. string.upper(cur.s))))
     end
   end
+  -- abgeschriebene Differenz (Unterlieferung): nur von einer Bank, es zaehlt der groessere Wert
+  if r.sh and next(r.sh) and self:MayBeBank(r.by) then
+    cur.sh = cur.sh or {}
+    for id, n in pairs(r.sh) do
+      if n > (cur.sh[id] or 0) then
+        cur.sh[id] = n
+        changed = true
+      end
+    end
+  end
   cur.sent = cur.sent or {}
   for id, n in pairs(r.sent or {}) do
     if n > (cur.sent[id] or 0) then
@@ -616,8 +635,8 @@ function BB:MergeRequest(r)
 end
 
 function BB:RequestComplete(r)
-  for id, n in pairs(r.items) do
-    if ((r.sent and r.sent[id]) or 0) < n then return false end
+  for id in pairs(r.items) do
+    if self:ReqLeft(r, id) > 0 then return false end
   end
   return true
 end
@@ -639,6 +658,7 @@ function BB:RequestDigest()
   for code, r in pairs(BananaBankDB.reqs) do
     local sent = 0
     for _, v in pairs(r.sent or {}) do sent = sent + v end
+    for _, v in pairs(r.sh or {}) do sent = sent + v end
     n = n + 1
     sum = mod(sum + BB.Hash(code .. r.s .. sent), 16777213)
   end

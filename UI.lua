@@ -828,6 +828,7 @@ function UI:StockList()
   end
   for id, e in pairs(stock) do
     local avail = e.c - (res[id] or 0)
+    if avail < 0 then avail = 0 end
     local ok = (e.q or 1) >= S.filter
     if ok and S.search ~= "" and not string.find(string.lower(e.n or ""), S.search, 1, true) then ok = false end
     if ok and S.onlyAvail and avail <= 0 then ok = false end

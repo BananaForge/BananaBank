@@ -444,7 +444,7 @@ function BB:PrintReserved(text)
     local from = 0
     for code, r in pairs(BananaBankDB.reqs) do
       if r.items[id] then
-        local left = r.items[id] - ((r.sent and r.sent[id]) or 0)
+        local left = self:ReqLeft(r, id)
         local active = self:IsActive(r)
         if active then from = from + left end
         self:Print(string.format("  Anfrage %s von %s: Status %s%s, bestellt %d, versendet %d, offen %d%s", code, r.p or "?", tostring(r.s),

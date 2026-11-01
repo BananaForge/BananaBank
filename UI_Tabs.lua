@@ -263,6 +263,7 @@ function UI:RequestTooltip(row)
     local sent = (r.sent and r.sent[id]) or 0
     local right = r.items[id] .. "x"
     if sent > 0 then right = sent .. "/" .. r.items[id] .. " " .. T("TT_SENT") end
+    if r.sh and r.sh[id] then right = right .. " |cffff9a2e(-" .. r.sh[id] .. ")|r" end
     GameTooltip:AddDoubleLine(BB:ColoredName(id), right, 1, 1, 1, 0.9, 0.9, 0.9)
   end
   GameTooltip:AddLine(" ")
@@ -823,7 +824,7 @@ function UI:RefreshBank()
       row.want:SetText(want)
       row.sent:SetText(sent)
       row.here:SetText(here)
-      if here < want - sent then
+      if here < BB:ReqLeft(r, id) then
         row.here:SetTextColor(C.red[1], C.red[2], C.red[3])
         shortage = true
       else
@@ -842,7 +843,7 @@ function UI:RefreshBank()
     if shown > BANK_ROWS then shown = BANK_ROWS end
     for i = 1, shown do
       local id = ids[i]
-      local missing = r.items[id] - ((r.sent and r.sent[id]) or 0) - BB:LocalCount(id)
+      local missing = BB:ReqLeft(r, id) - BB:LocalCount(id)
       if missing > 0 then
         local others = BB:OtherBankCounts(id)
         if getn(others) > 0 then

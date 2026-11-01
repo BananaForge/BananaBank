@@ -23,8 +23,8 @@ local QROWS = 6
 -- ------------------------------------------------------------
 local function remaining(r)
   local rem = {}
-  for id, n in pairs(r.items) do
-    local left = n - ((r.sent and r.sent[id]) or 0)
+  for id in pairs(r.items) do
+    local left = BB:ReqLeft(r, id)
     if left > 0 then rem[id] = left end
   end
   return rem
