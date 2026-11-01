@@ -204,6 +204,20 @@ SlashCmdList["BANANABANK"] = function(msg)
     BB:PrintCraft(rest)
   elseif cmd == "items" or cmd == "load" then
     if BB.UI.PreloadStart then BB.UI:PreloadStart(true) end
+  elseif cmd == "sent" or cmd == "versendet" then
+    -- /bb sent <Code> [Anzahl]: Anfrage als versendet buchen; mit Anzahl (nur bei einem Item) gilt der Rest als nicht lieferbar
+    local _, _, code, num = string.find(rest, "^(%S+)%s*(%d*)$")
+    local r
+    if code then
+      for c, req in pairs(BananaBankDB.reqs) do
+        if string.lower(c) == string.lower(code) then r = req end
+      end
+    end
+    if not r then BB:Print("/bb sent <Code> [Anzahl]") return end
+    if r.s ~= "confirmed" then BB:Print(string.format(BB.T("MSG_SENT_NEED_CONFIRMED"), r.id)) return end
+    local amount = tonumber(num)
+    if amount and BB.Count(r.items) ~= 1 then BB:Print(BB.T("MSG_SENT_ONE_ITEM")) return end
+    BB:MarkSent(r, amount)
   elseif cmd == "reserved" or cmd == "reserviert" then
     BB:PrintReserved(rest)
   elseif cmd == "why" or cmd == "warum" then

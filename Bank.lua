@@ -983,14 +983,21 @@ function BB:OnManualMailSent()
   if mm and GetTime() - mm.t < 60 then self:CreditManualMail(mm.to, mm.items) end
 end
 
--- Notfall: alles, was an dieser Anfrage noch offen ist, als versendet buchen (z. B. von Hand verschickt)
-function BB:MarkSent(r)
+-- Notfall: alles, was an dieser Anfrage noch offen ist, als versendet buchen (z. B. von Hand verschickt).
+-- amount (nur bei einer Anfrage mit einem Item): so viele wurden wirklich verschickt, der Rest wird als
+-- Bestandsdifferenz abgeschrieben.
+function BB:MarkSent(r, amount)
   if not r or not (r.s == "confirmed") then return end
   r.sent = r.sent or {}
   local n = 0
   for id in pairs(r.items) do
     local left = self:ReqLeft(r, id)
     if left > 0 then
+      if amount and amount < left then
+        r.sh = r.sh or {}
+        r.sh[id] = (r.sh[id] or 0) + (left - amount)
+        left = amount
+      end
       r.sent[id] = (r.sent[id] or 0) + left
       n = n + left
       local name, q = self:ItemInfo(id)

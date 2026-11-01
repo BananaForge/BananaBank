@@ -93,6 +93,7 @@ Pull requests welcome, tested in-game on a 1.12 client. Lua 5.0 rules: no `#`, `
 
 ## Changelog
 
+- **3.10.1:** `/bb sent <code> [amount]` books a confirmed request as sent; with an amount (single-item requests) only that many count as delivered and the rest is written off as a stock difference.
 - **3.10.0:** mailing is robust against changed bags: if a prepared stack changed (e.g. stacks merged by hand) the rest is prepared again automatically and sending continues (max 3 times); partial stacks of the same item in the bags are merged into full stacks before sending; items mailed by hand to the requester are booked on their confirmed request automatically; new button "Mark as sent" (two clicks) in the bank view books everything still open of a request.
 - **3.9.2:** one-time full price recalculation: the next AH scan fetches every non-hand price again (also "not on the AH" results); an aborted scan continues where it stopped, and the flag is cleared once nothing old is left.
 - **3.9.1:** the 50 silver minimum price is gone: the guild price is the calculated AH price (average of the cheapest 30 % ÷ 2; from 1 silver rounded down to whole silver, below that in copper). Old prices of exactly 50 silver come from the minimum rule and are looked up again at the next AH scan.
