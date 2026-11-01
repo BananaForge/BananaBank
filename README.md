@@ -93,6 +93,7 @@ Pull requests welcome, tested in-game on a 1.12 client. Lua 5.0 rules: no `#`, `
 
 ## Changelog
 
+- **3.7.4:** new diagnostic `/bb reserved <item>`: lists stock, reserved amount and every request / quest that counts for it.
 - **3.7.3:** GZ popup and level-60 splash use the BananaGuild logo (new file Media/GZLogo.tga, restart WoW once).
 - **3.7.2:** GZ: someone who leaves the guild and comes back (or is invited) at a higher level no longer triggers a level-up popup; only a real level gained while in the guild counts.
 - **3.7.1:** GZ: default is now every 10th level; the GZ text dialog sits above the settings window with an opaque background (no more see-through), its rows and scrollbar no longer overlap; the popup is raised above the main window.

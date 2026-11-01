@@ -420,3 +420,41 @@ function BB:PrintWhy(text)
   if shown == 0 then self:Print("Kein Item im Bestand mit diesem Namen.") end
   if shown > 4 then self:Print("... und " .. (shown - 4) .. " weitere. Mit /bb why <genauerer Name> eingrenzen.") end
 end
+
+-- /bb reserved <Text>: woher kommt die Reservierung eines Items? Listet jede Anfrage und Quest, die dazu zaehlt.
+function BB:PrintReserved(text)
+  text = string.lower(text or "")
+  if text == "" then self:Print("/bb reserved <Itemname>") return end
+  self:GetStock()
+  local ids = {}
+  for id, e in pairs(self.stockCache or {}) do
+    if string.find(string.lower(e.n or ""), text, 1, true) then ids[id] = e.n end
+  end
+  for _, r in pairs(BananaBankDB.reqs) do
+    for id in pairs(r.items) do
+      local nm = self:ItemInfo(id)
+      if nm and string.find(string.lower(nm), text, 1, true) then ids[id] = nm end
+    end
+  end
+  local n = 0
+  for id, name in pairs(ids) do
+    n = n + 1
+    local a, c, res = self:GetAvailable(id)
+    self:Print(string.format("%s (%d): Bestand %d, reserviert %d, frei %d", name, id, c, res, a))
+    local from = 0
+    for code, r in pairs(BananaBankDB.reqs) do
+      if r.items[id] then
+        local left = r.items[id] - ((r.sent and r.sent[id]) or 0)
+        local active = self:IsActive(r)
+        if active then from = from + left end
+        self:Print(string.format("  Anfrage %s von %s: Status %s%s, bestellt %d, versendet %d, offen %d%s", code, r.p or "?", tostring(r.s),
+          (self:ReqState(r) ~= r.s) and (" (" .. self:ReqState(r) .. ")") or "", r.items[id], (r.sent and r.sent[id]) or 0, left, active and " <- zaehlt" or ""))
+      end
+    end
+    local q = {}
+    self:QuestReserved(q)
+    if (q[id] or 0) > 0 then self:Print("  Gildenquests (mit Reservierung): " .. q[id]) end
+    self:Print(string.format("  Summe aus Anfragen: %d, aus Quests: %d", from, q[id] or 0))
+  end
+  if n == 0 then self:Print("nichts gefunden") end
+end

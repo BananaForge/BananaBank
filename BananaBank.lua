@@ -204,6 +204,8 @@ SlashCmdList["BANANABANK"] = function(msg)
     BB:PrintCraft(rest)
   elseif cmd == "items" or cmd == "load" then
     if BB.UI.PreloadStart then BB.UI:PreloadStart(true) end
+  elseif cmd == "reserved" or cmd == "reserviert" then
+    BB:PrintReserved(rest)
   elseif cmd == "why" or cmd == "warum" then
     BB:PrintWhy(rest)
   elseif cmd == "maildebug" then
