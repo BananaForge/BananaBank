@@ -12,7 +12,7 @@ local BB = BananaBank
 
 -- Anfrage-Code (Discord-Code erzeugen/einloesen): aus, Anfragen laufen ueber den Gildenabgleich
 BB.USE_CODE = false
-BB.VERSION = "3.10.2"
+BB.VERSION = "3.10.3"
 BB.PREFIX = "BBNK"
 BB.DONATE_NAME = "Lumihunt"
 -- Einziger erlaubter Bank-Rang, deutsch und englisch. Fest eingebaut, es gibt
@@ -620,6 +620,8 @@ function BB:MergeRequest(r)
   -- "frei" (Preis 0) darf nur eine Bank gesetzt haben, sonst koennte sich jeder Gratis-Items zuschreiben
   if r.fr and next(r.fr) and not self:MayBeBank(r.by) then r.fr = nil end
   if r.sh and next(r.sh) == nil then r.sh = nil end
+  -- Quest-Auszahlung (keine Nachnahme): nur gueltig, wenn ein Quest-Verwalter oder eine Bank sie gesetzt hat
+  if r.qid and not self:CanManageQuests(r.by) then r.qid = nil end
   if r.sh and not self:MayBeBank(r.by) then r.sh = nil end
   if r.cl and next(r.cl) == nil then r.cl = nil end
   if not cur then
@@ -629,6 +631,7 @@ function BB:MergeRequest(r)
   local changed = false
   local rc, rn = BB.RANK[cur.s] or 0, BB.RANK[r.s] or 0
   if not cur.cl and r.cl then cur.cl = r.cl changed = true end
+  if r.qid and not cur.qid then cur.qid = r.qid changed = true end
   if rn > rc or (rn == rc and (r.u or 0) > (cur.u or 0)) then
     if cur.s ~= r.s or cur.u ~= r.u then changed = true end
     local before = cur.s

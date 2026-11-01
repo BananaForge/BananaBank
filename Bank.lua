@@ -280,6 +280,7 @@ end
 function BB:RequestCodTotals(r)
   local now, after = 0, 0
   if BananaBankDB.cod == false then return 0, 0 end
+  if r.qid then return 0, 0 end
   for id, n in pairs(r.items) do
     local u = self:GetPrice(id) or 0
     -- was nicht lieferbar ist, kostet nichts
@@ -612,6 +613,8 @@ function BB:MailCod(e, r)
   if BananaBankDB.cod == false then return 0 end
   if not SetSendMailCOD then return 0 end
   r = r or (self.prep and self.prep.r)
+  -- Quest-Auszahlung (Material zum Verarbeiten, kommt als Ware zurueck): nie Nachnahme
+  if r and r.qid then return 0 end
   -- von der Bank als Gildencrafter akzeptiert: dieses Rezept ist kostenlos
   local u = self:GetPrice(e.id)
   if not u or u <= 0 then return 0 end

@@ -121,7 +121,7 @@ function BB:SerializeRequests(list)
     local r = list[i]
     table.insert(recs, table.concat({
       r.id, BB.Clean(r.p), r.ts or 0, r.s, r.u or 0, BB.Clean(r.by or ""),
-      pairsToString(r.items), pairsToString(r.sent), pairsToString(r.cl or {}), pairsToString(r.fr or {}), pairsToString(r.sh or {}),
+      pairsToString(r.items), pairsToString(r.sent), pairsToString(r.cl or {}), pairsToString(r.fr or {}), pairsToString(r.sh or {}), BB.Clean(r.qid or ""),
     }, "~"))
   end
   return table.concat(recs, "^")
@@ -136,6 +136,7 @@ function BB:ParseRequests(payload)
         id = f[1], p = f[2], ts = tonumber(f[3]) or 0, s = f[4], u = tonumber(f[5]) or 0,
         by = f[6], items = stringToPairs(f[7]), sent = stringToPairs(f[8]),
         cl = stringToPairs(f[9] or ""), fr = stringToPairs(f[10] or ""), sh = stringToPairs(f[11] or ""),
+        qid = (f[12] and f[12] ~= "") and f[12] or nil,
       }
       r.code = BB:BuildCode(r.id, r.p, r.items)
       table.insert(out, r)
