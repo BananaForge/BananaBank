@@ -282,6 +282,9 @@ function BB:RequestCodTotals(r)
   if BananaBankDB.cod == false then return 0, 0 end
   for id, n in pairs(r.items) do
     local u = self:GetPrice(id) or 0
+    -- was nicht lieferbar ist, kostet nichts
+    n = n - self:ProjectedShort(r, id)
+    if n < 0 then n = 0 end
     -- ein Gildencrafter-Anspruch gilt fuer genau ein Exemplar, jedes weitere kostet normal
     local left = n - 1
     if left < 0 then left = 0 end

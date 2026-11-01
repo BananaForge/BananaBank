@@ -12,7 +12,7 @@ local BB = BananaBank
 
 -- Anfrage-Code (Discord-Code erzeugen/einloesen): aus, Anfragen laufen ueber den Gildenabgleich
 BB.USE_CODE = false
-BB.VERSION = "3.8.0"
+BB.VERSION = "3.8.1"
 BB.PREFIX = "BBNK"
 BB.DONATE_NAME = "Lumihunt"
 -- Einziger erlaubter Bank-Rang, deutsch und englisch. Fest eingebaut, es gibt
@@ -434,13 +434,38 @@ function BB:ReqLeft(r, id)
   return left
 end
 
+-- Was von dieser Anfrage voraussichtlich nicht lieferbar ist: mehr offen, als nach den aelteren Anfragen und
+-- Quests noch im Bestand liegt (Bestandsdifferenz). Wird beim letzten Brief abgeschrieben, hier nur Vorschau.
+function BB:ProjectedShort(r, id)
+  if not self:IsActive(r) then return 0 end
+  local left = self:ReqLeft(r, id)
+  if left <= 0 then return 0 end
+  local stock = self.stockCache or self:GetStock()
+  local have = (stock[id] and stock[id].c) or 0
+  local taken = 0
+  for code, o in pairs(BananaBankDB.reqs) do
+    if o ~= r and o.items[id] and self:IsActive(o) then
+      local older = (o.ts or 0) < (r.ts or 0) or ((o.ts or 0) == (r.ts or 0) and code < r.id)
+      if older then taken = taken + self:ReqLeft(o, id) end
+    end
+  end
+  local q = {}
+  self:QuestReserved(q)
+  taken = taken + (q[id] or 0)
+  local free = have - taken
+  if free < 0 then free = 0 end
+  if left > free then return left - free end
+  return 0
+end
+
 -- reservierte Menge je Item (offene und bestaetigte Anfragen, abzueglich Versandtem)
 function BB:GetReserved(exceptCode)
   local res = {}
   for code, r in pairs(BananaBankDB.reqs) do
     if code ~= exceptCode and self:IsActive(r) then
       for id, n in pairs(r.items) do
-        local left = self:ReqLeft(r, id)
+        -- nie mehr reservieren, als lieferbar ist
+        local left = self:ReqLeft(r, id) - self:ProjectedShort(r, id)
         if left > 0 then res[id] = (res[id] or 0) + left end
       end
     end

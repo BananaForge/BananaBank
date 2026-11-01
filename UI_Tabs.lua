@@ -194,7 +194,16 @@ function UI:RefreshRequests()
       row.code:SetText(r.id)
       row.player:SetText(r.p)
       if r.p == me then row.player:SetTextColor(C.gold[1], C.gold[2], C.gold[3]) else row.player:SetTextColor(C.text[1], C.text[2], C.text[3]) end
-      row.items:SetText(itemSummary(r.items, 34))
+      -- voraussichtlich nicht lieferbare Mengen (Bestandsdifferenz) gleich abziehen und orange anzeigen
+      local adj, shortSum = {}, 0
+      for id, n in pairs(r.items) do
+        local s = BB:ProjectedShort(r, id)
+        shortSum = shortSum + s
+        if n - s > 0 then adj[id] = n - s end
+      end
+      local itxt = itemSummary(adj, shortSum > 0 and 26 or 34)
+      if shortSum > 0 then itxt = itxt .. " |cffff9a2e(-" .. shortSum .. ")|r" end
+      row.items:SetText(itxt)
       row.date:SetText(BB.Date(r.ts))
       -- Nachnahme, mit der die Mail rausgeht (nach einem Gildencrafter-Anspruch entfaellt der Preis des Rezepts)
       if st == "open" or st == "confirmed" or st == "sent" then
@@ -821,10 +830,15 @@ function UI:RefreshBank()
       local want = r.items[id]
       local sent = (r.sent and r.sent[id]) or 0
       local here = BB:LocalCount(id)
-      row.want:SetText(want)
+      local pshort = BB:ProjectedShort(r, id)
+      if pshort > 0 then
+        row.want:SetText("|cffff9a2e" .. (want - pshort) .. "|r")
+      else
+        row.want:SetText(want)
+      end
       row.sent:SetText(sent)
       row.here:SetText(here)
-      if here < BB:ReqLeft(r, id) then
+      if here < BB:ReqLeft(r, id) - pshort then
         row.here:SetTextColor(C.red[1], C.red[2], C.red[3])
         shortage = true
       else

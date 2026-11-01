@@ -24,7 +24,7 @@ local QROWS = 6
 local function remaining(r)
   local rem = {}
   for id in pairs(r.items) do
-    local left = BB:ReqLeft(r, id)
+    local left = BB:ReqLeft(r, id) - BB:ProjectedShort(r, id)
     if left > 0 then rem[id] = left end
   end
   return rem

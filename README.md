@@ -93,6 +93,7 @@ Pull requests welcome, tested in-game on a 1.12 client. Lua 5.0 rules: no `#`, `
 
 ## Changelog
 
+- **3.8.1:** preview of short deliveries: an open request that asks for more than the guild holds now already shows the deliverable amount (`84x Mageweave Cloth (-36)`), the cash on delivery only for what can be delivered, and the reservation is capped at the stock (older requests are served first).
 - **3.8.0:** short deliveries: if the guild holds less of an item than a request asked for (stock differences from addon sync), the missing amount is written off when the last letter goes out, the reservation is released at once, and that last letter carries a polite note in German and English (not charged, no COD for it). The stock list shows over-reservations as `0 (120)` in red instead of a negative number; the request tooltip shows `(-36)` for written-off amounts.
 - **3.7.4:** new diagnostic `/bb reserved <item>`: lists stock, reserved amount and every request / quest that counts for it.
 - **3.7.3:** GZ popup and level-60 splash use the BananaGuild logo (new file Media/GZLogo.tga, restart WoW once).
