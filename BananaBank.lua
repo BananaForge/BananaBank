@@ -204,6 +204,13 @@ SlashCmdList["BANANABANK"] = function(msg)
     BB:PrintCraft(rest)
   elseif cmd == "items" or cmd == "load" then
     if BB.UI.PreloadStart then BB.UI:PreloadStart(true) end
+  elseif cmd == "nocod" or cmd == "ohnenachnahme" then
+    local r
+    for c, req in pairs(BananaBankDB.reqs) do
+      if string.lower(c) == string.lower(rest or "") then r = req end
+    end
+    if not r then BB:Print("/bb nocod <Code>") return end
+    BB:SetNoCod(r)
   elseif cmd == "sent" or cmd == "versendet" then
     -- /bb sent <Code> [Anzahl]: Anfrage als versendet buchen; mit Anzahl (nur bei einem Item) gilt der Rest als nicht lieferbar
     local _, _, code, num = string.find(rest, "^(%S+)%s*(%d*)$")

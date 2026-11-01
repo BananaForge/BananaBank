@@ -986,6 +986,18 @@ function BB:OnManualMailSent()
   if mm and GetTime() - mm.t < 60 then self:CreditManualMail(mm.to, mm.items) end
 end
 
+-- /bb nocod <Code>: eine bestehende Anfrage ohne Nachnahme verschicken (z. B. eine Quest-Auszahlung, die vor 3.10.3 angelegt wurde)
+function BB:SetNoCod(r)
+  if not r then return end
+  if not self:CanManageQuests() then self:Print("|cffff4040" .. self.T("ERR_NOT_BANK") .. "|r") return end
+  r.qid = r.qid or "manual"
+  r.u = time()
+  r.by = self:Me()
+  self:PushRequests({ r })
+  self:Print(string.format(self.T("MSG_NOCOD_SET"), r.id))
+  if self.UI then self.UI:Refresh() end
+end
+
 -- Notfall: alles, was an dieser Anfrage noch offen ist, als versendet buchen (z. B. von Hand verschickt).
 -- amount (nur bei einer Anfrage mit einem Item): so viele wurden wirklich verschickt, der Rest wird als
 -- Bestandsdifferenz abgeschrieben.

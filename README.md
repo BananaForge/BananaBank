@@ -93,6 +93,7 @@ Pull requests welcome, tested in-game on a 1.12 client. Lua 5.0 rules: no `#`, `
 
 ## Changelog
 
+- **3.10.4:** `/bb nocod <code>` ships an existing request without cash on delivery (for quest payouts created before 3.10.3).
 - **3.10.3:** quest payouts ("Pay out") are shipped **without cash on delivery** (the material comes back as goods); the payout flag is synced to all bank chars, and only accepted from quest managers or banks.
 - **3.10.2:** mail taken with `AutoLootMailItem` ("open all" mail addons, some clients) is now booked like normal takes; the "not in bank mode" warning also appears when items are taken, not only gold.
 - **3.10.1:** `/bb sent <code> [amount]` books a confirmed request as sent; with an amount (single-item requests) only that many count as delivered and the rest is written off as a stock difference.
