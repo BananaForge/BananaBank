@@ -93,6 +93,7 @@ Pull requests welcome, tested in-game on a 1.12 client. Lua 5.0 rules: no `#`, `
 
 ## Changelog
 
+- **3.10.2:** mail taken with `AutoLootMailItem` ("open all" mail addons, some clients) is now booked like normal takes; the "not in bank mode" warning also appears when items are taken, not only gold.
 - **3.10.1:** `/bb sent <code> [amount]` books a confirmed request as sent; with an amount (single-item requests) only that many count as delivered and the rest is written off as a stock difference.
 - **3.10.0:** mailing is robust against changed bags: if a prepared stack changed (e.g. stacks merged by hand) the rest is prepared again automatically and sending continues (max 3 times); partial stacks of the same item in the bags are merged into full stacks before sending; items mailed by hand to the requester are booked on their confirmed request automatically; new button "Mark as sent" (two clicks) in the bank view books everything still open of a request.
 - **3.9.2:** one-time full price recalculation: the next AH scan fetches every non-hand price again (also "not on the AH" results); an aborted scan continues where it stopped, and the flag is cleared once nothing old is left.

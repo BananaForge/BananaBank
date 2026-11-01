@@ -1250,19 +1250,47 @@ function BB:HookMail()
   if self.mailHooked then return end
   self.mailHooked = true
   self:HookSend()
+  local function warnNotBank()
+    if not BB:IsBank() and BB:MayBeBank(BB:Me()) and not BB.warnedNoBank then
+      BB.warnedNoBank = true
+      BB:Print("|cffff8000" .. BB.T("MSG_MAIL_NOTBANK") .. "|r")
+    end
+  end
   local origItem = TakeInboxItem
   TakeInboxItem = function(i, j)
+    warnNotBank()
     BB:OnTakeInbox(i, true, j)
     return origItem(i, j)
   end
   local origMoney = TakeInboxMoney
   TakeInboxMoney = function(i)
-    if not BB:IsBank() and BB:MayBeBank(BB:Me()) and not BB.warnedNoBank then
-      BB.warnedNoBank = true
-      BB:Print("|cffff8000" .. BB.T("MSG_MAIL_NOTBANK") .. "|r")
-    end
+    warnNotBank()
     BB:OnTakeInbox(i, false)
     return origMoney(i)
+  end
+  -- Post-Addons ("alles oeffnen") und der Client selbst nehmen Briefe oft mit AutoLootMailItem
+  -- und umgehen die beiden Funktionen oben: dort ebenfalls buchen
+  if AutoLootMailItem then
+    local origAuto = AutoLootMailItem
+    AutoLootMailItem = function(i)
+      warnNotBank()
+      if BB:IsBank() then
+        local _, _, _, _, money, cod, _, hasItem = GetInboxHeaderInfo(i)
+        if hasItem then
+          if BB:MailSlots() > 1 then
+            for j = 1, 12 do
+              local nm = GetInboxItem(i, j)
+              if not nm then break end
+              BB:OnTakeInbox(i, true, j)
+            end
+          else
+            BB:OnTakeInbox(i, true)
+          end
+        end
+        if money and money > 0 and not (cod and cod > 0) then BB:OnTakeInbox(i, false) end
+      end
+      return origAuto(i)
+    end
   end
 end
 
