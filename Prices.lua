@@ -185,6 +185,13 @@ function BB:PriceTargets()
   local fresh, old = {}, {}
   local limit = self:PriceMaxAgeDays() * 86400
   local now = time()
+  -- einmalige Neuberechnung (3.9.2): jeder Preis, der vor diesem Zeitpunkt entstand, wird neu geholt
+  local rescanTs = db.priceRescanTs
+  if rescanTs == nil and not db.priceRescanDone then
+    rescanTs = now
+    db.priceRescanTs = now
+  end
+  local stale = 0
   for id in pairs(stock) do
     local cur = db.prices[id]
     -- graue Items sind ohnehin Trash und werden nicht gesucht
@@ -196,6 +203,10 @@ function BB:PriceTargets()
         local scanned = cur and ((cur.src == "ah" and (cur.u or 0) > 0) or cur.src == "none")
         -- ein Preis von genau 50 Silber stammt aus der alten Mindestpreis-Regel: neu holen
         if scanned and cur.src == "ah" and cur.u == BB.PRICE_MIN_OLD then scanned = false end
+        if scanned and rescanTs and (cur.ts or 0) < rescanTs then
+          scanned = false
+          stale = stale + 1
+        end
         if not scanned then
           table.insert(fresh, id)
         elseif now - (cur.ts or 0) >= limit then
@@ -210,6 +221,12 @@ function BB:PriceTargets()
     if ta ~= tb then return ta < tb end
     return a < b
   end)
+  -- nichts Altes mehr uebrig: die Neuberechnung ist fertig
+  self.priceRescanActive = rescanTs ~= nil and stale > 0
+  if rescanTs and stale == 0 then
+    db.priceRescanTs = nil
+    db.priceRescanDone = true
+  end
   self.priceFreshCount = getn(fresh)
   local ids = {}
   for i = 1, getn(fresh) do table.insert(ids, fresh[i]) end
@@ -234,6 +251,7 @@ function BB:StartAHScan()
   end
   self.scan = { ids = ids, idx = 1, set = 0, seen = 0, none = 0, page = 0, hits = {},
     started = GetTime() }
+  if self.priceRescanActive then self:Print(self.T("MSG_AH_RESCAN")) end
   self:Print(string.format(self.T("MSG_AH_START"), getn(ids), self.priceFreshCount or 0, self:PriceMaxAgeDays()))
   self:AHQuery()
 end
