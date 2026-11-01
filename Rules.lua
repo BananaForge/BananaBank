@@ -94,8 +94,8 @@ function BB:ItemBlockText(name, id)
     local ct = self:ClassBlockText(name, id)
     if ct then return ct end
   end
-  -- ohne Preis nicht anfragbar: Haendlerwert unbekannt (BOE, Rezepte und Taschen haben ihren AH-Preis)
-  if self.VendorPrice and not self:NeedsPrice(id) and not self:GetPrice(id) then return self.T("RB_NOPRICE") end
+  -- ohne Preis nicht anfragbar: nicht im Auktionshaus gefunden oder noch nicht gescannt
+  if not self:GetPrice(id) then return self.T("RB_NOPRICE") end
   -- Taschen nur mit dem Keyword fuer Taschen
   if self:ItemIsBag(id) and not self:HasProfKeyword(name, "bags") then return self.T("RB_BAG") end
   if self:InDepotOnly(id) then return self.T("RB_DEPOT") end

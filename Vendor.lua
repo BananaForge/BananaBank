@@ -1,9 +1,8 @@
 -- BananaBank: Haendlerwerte, Trash und Klassenbeschraenkungen
 --
 -- * Haendlerwert je Stueck kommt aus VendorData.lua (Daten aus ShaguTweaks, MIT-Lizenz).
--- * Preis fuer alles ausser BOE, Rezepten und Taschen: Haendlerwert + 25 % (siehe Prices.lua, GetPrice).
--- * Trash: graue Items (Qualitaet "Schlecht") und Items, deren Haendlerwert unter der Grenze liegt
---   (Standard 2 Silber, einstellbar).
+-- * Preise kommen nur noch aus dem Auktionshaus (siehe Prices.lua), der Haendlerwert dient nur der Erloesvorschau.
+-- * Trash: graue Items (Qualitaet "Schlecht") und alles, was laut AH-Scan nicht im Auktionshaus ist.
 -- * Klassenbeschraenkung ("Classes: Druid") wird beim Bank-Scan aus dem Tooltip gelesen und mit dem Item
 --   synchronisiert; angefragt werden darf nur mit passender Klasse.
 
@@ -54,8 +53,8 @@ local function qualityOf(id)
   return e and e.q or nil
 end
 
--- Automatik: graue Items und Items unter der Wertgrenze.
--- Quest-Items und Schluessel sind nie Trash; unter der Wertgrenze auch keine BOE, Rezepte und Taschen.
+-- Automatik: graue Items und alles, was laut AH-Scan nicht im Auktionshaus gefunden wurde.
+-- Quest-Items und Schluessel sind nie Trash.
 function BB:TrashAuto(id)
   if not id then return false end
   local db = BananaBankDB
@@ -65,12 +64,8 @@ function BB:TrashAuto(id)
   if ltype and (ltype == "quest" or ltype == "key" or ltype == "schlüssel" or ltype == "schluessel") then return false end
   -- grau = Trash, egal was der Haendler zahlt
   if qualityOf(id) == 0 then return true end
-  local v = self:VendorValue(id)
-  if not v or v >= self:TrashMax() then return false end
-  if db.bind and db.bind[id] == "boe" then return false end
-  if self:NeedsPrice(id) or (self.ItemIsBag and self:ItemIsBag(id)) then return false end
-  if ltype and PROTECTED_TYPES[ltype] then return false end
-  return true
+  -- gesucht und nicht im AH: Trash. Noch nie gesucht heisst unbekannt, das ist kein Trash.
+  return self:AHAbsent(id)
 end
 
 -- Trash? Nur auf Bank-Chars. Eine manuelle Entscheidung (Mittelklick) geht der Automatik vor.

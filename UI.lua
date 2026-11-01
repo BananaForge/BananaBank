@@ -966,9 +966,10 @@ function UI:OnSlotEnter(slot)
   if u then
     local label = T("TT_PRICE")
     if src == "man" then label = label .. " " .. T("TT_PRICE_MAN") end
-    if src == "vendor" then label = label .. " " .. T("TT_PRICE_VENDOR") end
     table.insert(lines, { label, BB.Money(u), C.gold[1], C.gold[2], C.gold[3] })
-  elseif BB:NeedsPrice(id) then
+  elseif BB:AHAbsent(id) then
+    table.insert(lines, { T("TT_PRICE"), T("TT_PRICE_ABSENT"), 1, 0.5, 0.25 })
+  else
     table.insert(lines, { T("TT_PRICE"), T("TT_PRICE_NONE"), 0.8, 0.8, 0.8 })
   end
   local block = BB:ItemBlockText(BB:Me(), id)

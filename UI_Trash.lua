@@ -245,7 +245,7 @@ function UI:RefreshTrashWindow()
   f.l1:SetText(string.format(T("TRASH_COUNT"), getn(plan), items))
   f.l2:SetText(string.format(T("TRASH_INCOME"), BB.Money(total)))
   local sbank, ibank = BB:TrashInBank()
-  f.l3:SetText(string.format(T("TRASH_LIMIT"), BB.Money(BB:TrashMax())) .. (sbank > 0 and ("\n" .. string.format(T("TRASH_IN_BANK"), sbank, ibank)) or ""))
+  f.l3:SetText(T("TRASH_LIMIT") .. (sbank > 0 and ("\n" .. string.format(T("TRASH_IN_BANK"), sbank, ibank)) or ""))
   if self.TS.running then
     f.sell.fs:SetText(T("TRASH_RUNNING"))
     f.sell:SetOn(false)

@@ -148,14 +148,9 @@ function UI:PriceList()
   local list = {}
   for id, e in pairs(stock) do
     local u, src = BB:GetPrice(id)
-    local boe = BB:NeedsPrice(id)
-    -- Haendlerpreise (+25 %) stehen nicht hier, nur AH- und Handpreise
-    if src == "vendor" then u = nil end
-    local take = boe or u
-    if take then
-      if P.filter == "with" then take = u ~= nil end
-      if P.filter == "without" then take = (u == nil) end
-    end
+    local take = true
+    if P.filter == "with" then take = u ~= nil end
+    if P.filter == "without" then take = (u == nil) end
     if take then table.insert(list, { id = id, e = e, u = u }) end
   end
   table.sort(list, function(a, b)
@@ -211,7 +206,7 @@ function UI:RefreshPrices()
       row.name:SetTextColor(qc[1], qc[2], qc[3])
       if entry.e.k == "recipe" then row.bind:SetText(T("BIND_RECIPE"))
       elseif BB:IsBOE(id) then row.bind:SetText(T("BIND_BOE"))
-      elseif BB:NeedsPrice(id) then row.bind:SetText(T("BIND_BAG"))
+      elseif BB.ItemIsBag and BB:ItemIsBag(id) then row.bind:SetText(T("BIND_BAG"))
       else row.bind:SetText("-") end
       local u, src, ts, n = BB:GetPrice(id)
       if u then

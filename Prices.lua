@@ -88,22 +88,19 @@ function BB:GetPrice(id)
     if p.src ~= "man" and u < BB.PRICE_MIN then u = BB.PRICE_MIN end
     return u, p.src, p.ts, p.n
   end
-  -- alles ausser BOE, Rezepte und Taschen: Haendlerwert + 25 % (ohne Mindestpreis, der gilt nur fuer AH-Preise);
-  -- ohne bekannten Wert kein Preis
-  if self.VendorPrice and not self:NeedsPrice(id) then
-    local v = self:VendorPrice(id)
-    if v then return v, "vendor", nil, nil end
-  end
+  -- ohne AH-Preis (und ohne Handpreis) gibt es keinen Preis
   return nil
 end
 
--- Braucht dieses Item einen Gildenpreis aus dem AH? BOE-Items, Rezepte und Taschen.
+-- Jedes Item bekommt seinen Gildenpreis aus dem AH (Ausnahmen gibt es nicht).
 function BB:NeedsPrice(id)
-  if self:IsBOE(id) then return true end
-  local e = self.stockCache and self.stockCache[id]
-  if not e then return false end
-  local k = self:ResolveCategory(id, e)
-  return k == "bag"
+  return true
+end
+
+-- Laut AH-Scan nicht im Auktionshaus gefunden (gesucht, nichts da)? Ein Handpreis hebt das auf.
+function BB:AHAbsent(id)
+  local p = BananaBankDB.prices[id]
+  return p ~= nil and p.src == "none" and (p.u or 0) == 0
 end
 
 function BB:PriceTotal(items)
@@ -192,11 +189,13 @@ function BB:PriceTargets()
   local now = time()
   for id in pairs(stock) do
     local cur = db.prices[id]
-    if self:NeedsPrice(id) and not (cur and cur.src == "man") then
+    -- graue Items sind ohnehin Trash und werden nicht gesucht
+    local e = stock[id]
+    if not (cur and cur.src == "man") and not (e and e.q == 0) then
       local name = self:ItemInfo(id)
       if name and name ~= "" and not string.find(name, "^#%d") then
-        -- ohne Preis (nie gescannt, zurueckgesetzt oder im AH nicht gefunden) wird immer neu gescannt, unabhaengig vom Alter
-        local scanned = cur and cur.src == "ah" and (cur.u or 0) > 0
+        -- nie gescannt oder zurueckgesetzt: sofort; gescannt (Preis gefunden oder nicht im AH): erst nach den eingestellten Tagen
+        local scanned = cur and ((cur.src == "ah" and (cur.u or 0) > 0) or cur.src == "none")
         if not scanned then
           table.insert(fresh, id)
         elseif now - (cur.ts or 0) >= limit then
