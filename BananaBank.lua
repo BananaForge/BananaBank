@@ -204,6 +204,18 @@ SlashCmdList["BANANABANK"] = function(msg)
     BB:PrintCraft(rest)
   elseif cmd == "items" or cmd == "load" then
     if BB.UI.PreloadStart then BB.UI:PreloadStart(true) end
+  elseif cmd == "reissue" or cmd == "neu" then
+    -- /bb reissue <Code> [Item] [Anzahl]
+    local _, _, code, tail = string.find(rest or "", "^(%S+)%s*(.*)$")
+    local r
+    for c, req in pairs(BananaBankDB.reqs) do
+      if code and string.lower(c) == string.lower(code) then r = req end
+    end
+    if not r then BB:Print("/bb reissue <Code> [Item] [Anzahl]") return end
+    local item, num = tail, nil
+    local _, _, it2, n2 = string.find(tail or "", "^(.-)%s+(%d+)$")
+    if it2 then item, num = it2, tonumber(n2) end
+    BB:Reissue(r, item, num)
   elseif cmd == "nocod" or cmd == "ohnenachnahme" then
     local r
     for c, req in pairs(BananaBankDB.reqs) do

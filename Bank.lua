@@ -986,6 +986,40 @@ function BB:OnManualMailSent()
   if mm and GetTime() - mm.t < 60 then self:CreditManualMail(mm.to, mm.items) end
 end
 
+-- /bb reissue <Code> [Item] [Anzahl]: eine Anfrage fuer denselben Spieler neu ausloesen (z. B. wenn etwas nicht angekommen ist).
+-- Ohne Item alle Items der Anfrage, sonst nur das genannte (Teil des Namens), optional mit Anzahl.
+-- Ein Quest-Auszahlungs- oder Gildencrafter-Merkmal der alten Anfrage wird uebernommen (keine Nachnahme).
+function BB:Reissue(r, itemText, count)
+  if not r then return nil end
+  if not self:CanManageQuests() then self:Print("|cffff4040" .. self.T("ERR_NOT_BANK") .. "|r") return nil end
+  itemText = string.lower(itemText or "")
+  local items = {}
+  for id, n in pairs(r.items) do
+    local nm = string.lower(self:ItemInfo(id) or "")
+    if itemText == "" or string.find(nm, itemText, 1, true) then
+      local c = (count and count > 0) and count or n
+      items[id] = c
+    end
+  end
+  if next(items) == nil then self:Print(self.T("MSG_REISSUE_NOITEM")) return nil end
+  local id = self:NewCodeId()
+  while BananaBankDB.reqs[id] do id = self:NewCodeId() end
+  local me = self:Me()
+  local nr = { id = id, p = r.p, ts = time(), items = items, s = "confirmed", u = time(), by = me, sent = {}, qid = r.qid }
+  if r.fr and next(r.fr) then
+    nr.fr = {}
+    for iid in pairs(items) do if r.fr[iid] then nr.fr[iid] = 1 end end
+    if next(nr.fr) == nil then nr.fr = nil end
+  end
+  nr.code = self:BuildCode(id, r.p, items)
+  BananaBankDB.reqs[id] = nr
+  self:PushRequests({ nr })
+  if r.p ~= me then self:Notify(nr, "WHISPER_CONFIRMED") end
+  self:Print(string.format(self.T("MSG_REISSUED"), nr.id, r.p, r.id))
+  if self.UI then self.UI:Refresh() end
+  return nr
+end
+
 -- /bb nocod <Code>: eine bestehende Anfrage ohne Nachnahme verschicken (z. B. eine Quest-Auszahlung, die vor 3.10.3 angelegt wurde)
 function BB:SetNoCod(r)
   if not r then return end
