@@ -216,6 +216,8 @@ SlashCmdList["BANANABANK"] = function(msg)
     local _, _, it2, n2 = string.find(tail or "", "^(.-)%s+(%d+)$")
     if it2 then item, num = it2, tonumber(n2) end
     BB:Reissue(r, item, num)
+  elseif cmd == "overview" or cmd == "uebersicht" then
+    if BB.UI.OpenSendOverview then BB.UI:OpenSendOverview() end
   elseif cmd == "nocod" or cmd == "ohnenachnahme" then
     local r
     for c, req in pairs(BananaBankDB.reqs) do

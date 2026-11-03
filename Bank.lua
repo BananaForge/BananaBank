@@ -233,6 +233,92 @@ function BB:Notify(r, key)
   SendChatMessage(string.format(self.T(key), r.id), "WHISPER", nil, r.p)
 end
 
+-- Wie viele Anfragen warten auf die Bestaetigung?
+function BB:OpenRequestCount()
+  local n = 0
+  for _, r in pairs(BananaBankDB.reqs) do
+    if self:ReqState(r) == "open" then n = n + 1 end
+  end
+  return n
+end
+
+-- Alle offenen Anfragen mit einem Klick bestaetigen (aelteste zuerst). Mit Gildencrafter-Anspruch wird er
+-- geprueft und akzeptiert; was die Regeln nicht erlauben, bleibt offen und steht im Chat.
+function BB:ConfirmAll()
+  if not self:BankActive() then
+    self:Print("|cffff4040" .. string.format(self.T("ERR_RANK_LOST"), BB.BANK_RANK_LABEL) .. "|r")
+    return 0, 0
+  end
+  local list = {}
+  for _, r in pairs(BananaBankDB.reqs) do
+    if self:ReqState(r) == "open" then table.insert(list, r) end
+  end
+  table.sort(list, function(a, b)
+    if (a.ts or 0) ~= (b.ts or 0) then return (a.ts or 0) < (b.ts or 0) end
+    return a.id < b.id
+  end)
+  local ok, left = 0, 0
+  for i = 1, getn(list) do
+    local r = list[i]
+    if r.cl and next(r.cl) ~= nil then self:AcceptCrafter(r) else self:ConfirmRequest(r) end
+    if r.s == "confirmed" then ok = ok + 1 else left = left + 1 end
+  end
+  self:Print(string.format(self.T("MSG_CONFIRM_ALL"), ok, left))
+  if self.UI then self.UI:Refresh() end
+  return ok, left
+end
+
+-- Uebersicht vor dem Versand: alle vorbereiteten Anfragen mit Items, Nachnahme und Hinweisen untereinander
+function BB:SendOverview()
+  local preps = {}
+  if self.prep then table.insert(preps, self.prep) end
+  for i = 1, getn(self.queue or {}) do table.insert(preps, self.queue[i]) end
+  local lines = {}
+  local totalCod, totalLetters = 0, 0
+  for i = 1, getn(preps) do
+    local p = preps[i]
+    local r = p.r
+    local agg, order = {}, {}
+    local cod, stacks = 0, 0
+    for k = p.idx, getn(p.slots) do
+      local e = p.slots[k]
+      local a = agg[e.id]
+      if not a then a = { c = 0, cod = 0 } agg[e.id] = a table.insert(order, e.id) end
+      a.c = a.c + e.c
+      local c = self:MailCod(e, r)
+      a.cod = a.cod + c
+      cod = cod + c
+      stacks = stacks + 1
+    end
+    local letters = math.ceil(stacks / self:MailSlots())
+    totalCod = totalCod + cod
+    totalLetters = totalLetters + letters
+    table.insert(lines, { kind = "head", l = r.id .. "  " .. r.p, r = cod > 0 and BB.Money(cod) or self.T("OV_FREE"),
+      sub = string.format(self.T("OV_LETTERS"), letters) })
+    table.sort(order)
+    for j = 1, getn(order) do
+      local id = order[j]
+      local a = agg[id]
+      local u = self:GetPrice(id)
+      local name = self:ColoredName(id)
+      local left = a.c .. "x " .. name
+      if u and a.cod > 0 then left = left .. "  |cff888888" .. string.format(self.T("OV_EACH"), BB.Money(u)) .. "|r" end
+      table.insert(lines, { kind = "item", l = left, r = a.cod > 0 and BB.Money(a.cod) or "-" })
+    end
+    if p.short and next(p.short) then
+      table.insert(lines, { kind = "warn", l = string.format(self.T("OV_SHORT"), self:ShortList(p.short)) })
+    end
+    local elseMiss = {}
+    for id, n in pairs(p.missing or {}) do
+      if n > 0 and not (p.short and p.short[id]) then elseMiss[id] = n end
+    end
+    if next(elseMiss) then
+      table.insert(lines, { kind = "warn", l = string.format(self.T("OV_ELSE"), self:ShortList(elseMiss)) })
+    end
+  end
+  return lines, getn(preps), totalLetters, totalCod
+end
+
 -- Gildencrafter: die Bank prueft, was sie sehen kann (Rang, Keyword, Beruf des Rezepts, noch nicht erhalten),
 -- setzt bei den beanspruchten Rezepten den Preis auf 0 und bestaetigt die Anfrage.
 function BB:AcceptCrafter(r)
@@ -526,7 +612,10 @@ function BB:BatchFinish()
   self.prep = table.remove(preps, 1)
   self.queue = getn(preps) > 0 and preps or nil
   self:Print(string.format(self.T("MSG_BATCH_DONE"), getn(preps) + 1, stacks))
-  if self.UI then self.UI:Refresh() end
+  if self.UI then
+    self.UI:Refresh()
+    if self.UI.OpenSendOverview then self.UI:OpenSendOverview() end
+  end
 end
 
 function BB:PrepareFail(key)

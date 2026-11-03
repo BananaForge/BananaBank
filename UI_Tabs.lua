@@ -57,6 +57,13 @@ function UI:BuildRequests(parent)
   self.reqBankBtn = self:Button(p, 190, 20, "BTN_BANKVIEW", function() UI:ShowPage("bank") end)
   self.reqBankBtn:SetPoint("TOPLEFT", p, "TOPLEFT", 260, -2)
   if not BB:IsBank() then self.reqBankBtn:Hide() end
+  -- alle offenen Anfragen mit einem Klick bestaetigen
+  self.reqAllBtn = self:Button(p, 170, 20, "", function()
+    BB:ConfirmAll()
+    UI:Refresh()
+  end, "ok")
+  self.reqAllBtn:SetPoint("LEFT", self.reqBankBtn, "RIGHT", 8, 0)
+  self.reqAllBtn:Hide()
   R.info = self:Font(p, 11, C.muted)
   R.info:SetPoint("TOPRIGHT", p, "TOPRIGHT", -8, -5)
   R.info:SetJustifyH("RIGHT")
@@ -180,6 +187,16 @@ function UI:RefreshRequests()
     if BB:IsActive(r) then openCount = openCount + 1 end
   end
   R.info:SetText(string.format(T("REQ_INFO"), openCount))
+  -- Knopf "Alle bestaetigen (N)": nur fuer Bank-Chars und wenn etwas wartet
+  if self.reqAllBtn then
+    local waiting = BB:OpenRequestCount()
+    if isBank and waiting > 0 then
+      self.reqAllBtn.fs:SetText(string.format(T("LO_CONFIRM_ALL"), waiting))
+      self.reqAllBtn:Show()
+    else
+      self.reqAllBtn:Hide()
+    end
+  end
   for i = 1, REQ_ROWS do
     local row = R.rows[i]
     local r = list[(R.page - 1) * REQ_ROWS + i]

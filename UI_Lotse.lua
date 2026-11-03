@@ -120,6 +120,24 @@ function UI:LotseSelect(r)
   if self.bank then self.bank.current = r end
 end
 
+-- Zurueck / vor durch alle laufenden Anfragen
+function UI:LotseStepRequest(dir)
+  local L = self.L
+  local here, away = BB:LotseQueue()
+  local list = {}
+  for i = 1, getn(here) do table.insert(list, here[i].r) end
+  for i = 1, getn(away) do table.insert(list, away[i].r) end
+  local n = getn(list)
+  if n == 0 then return end
+  local idx = 0
+  for i = 1, n do if L.cur == list[i] then idx = i end end
+  idx = idx + dir
+  if idx < 1 then idx = n end
+  if idx > n then idx = 1 end
+  self:LotseSelect(list[idx])
+  self:RefreshLotse()
+end
+
 function UI:LotseNext()
   local L = self.L
   local here = BB:LotseQueue()
@@ -248,6 +266,10 @@ function UI:BuildLotse()
     GameTooltip:Show()
   end)
   f.modeBtn:SetScript("OnLeave", function() GameTooltip:Hide() end)
+  f.prevBtn = self:Button(f, 16, 15, "<", function() UI:LotseStepRequest(-1) end, "flat")
+  f.prevBtn:SetPoint("TOPLEFT", f, "TOPLEFT", 78, -5)
+  f.nextBtn = self:Button(f, 16, 15, ">", function() UI:LotseStepRequest(1) end, "flat")
+  f.nextBtn:SetPoint("LEFT", f.prevBtn, "RIGHT", 2, 0)
   f.closeBtn = self:Button(f, 16, 15, "x", function() UI:LotseClose() end, "danger")
   f.closeBtn:SetPoint("TOPRIGHT", f, "TOPRIGHT", -5, -5)
 
@@ -305,6 +327,12 @@ function UI:BuildLotse()
     UI:Refresh()
   end, "danger")
   f.b4 = self:Button(f, W - 20, 22, "", function() UI:LotseClose() end)
+
+  f.bAll = self:Button(f, W - 20, 22, "", function()
+    BB:ConfirmAll()
+    UI:Refresh()
+  end, "ok")
+  f.bOv = self:Button(f, 72, 18, "LO_OVERVIEW", function() UI:OpenSendOverview() end, "flat")
 
   f.chk = self:Check(f, "LO_AUTO_MAIL", function() return BananaBankDB.auto end, function(v) BananaBankDB.auto = v end)
   f.chk:SetWidth(W - 20)
@@ -451,7 +479,7 @@ end
 
 local function showOnly(f, list)
   local all = { f.t1, f.t2, f.cl1, f.cv1, f.cl2, f.cv2, f.bar, f.b1, f.b2, f.b3, f.b4, f.chk, f.chk2, f.foot,
-    f.mini, f.miniBtn, f.qfoot }
+    f.mini, f.miniBtn, f.qfoot, f.bAll, f.bOv }
   for i = 1, getn(all) do all[i]:Hide() end
   for i = 1, getn(list) do list[i]:Show() end
 end
@@ -639,6 +667,18 @@ function UI:RefreshLotse()
     f.b3:ClearAllPoints()
     f.b3:SetPoint("LEFT", f.b2, "RIGHT", 6, 0)
     f.b3:SetOn(true)
+    -- alle offenen Anfragen mit einem Klick
+    local nOpenAll = BB:OpenRequestCount()
+    if nOpenAll >= 2 then
+      f:SetHeight(HEIGHT.A + 28)
+      f.bAll:Show()
+      f.bAll:ClearAllPoints()
+      f.bAll:SetPoint("TOPLEFT", f, "TOPLEFT", 10, (ncl > 0 and -180 or -162))
+      setBtnText(f.bAll, string.format(T("LO_CONFIRM_ALL"), nOpenAll))
+      f.bAll:SetOn(true)
+    else
+      f.bAll:Hide()
+    end
     -- der Hauptknopf bei Anspruch ist "Als Crafter akzeptieren" (b1), dessen Klick LotseSecondary macht
     if ncl > 0 then f.b1:Show() end
     return
@@ -706,7 +746,11 @@ function UI:RefreshLotse()
     f.b2:SetOn(p ~= nil and e ~= nil and not p.sending and BB.mailOpen and true or false)
     f.chk:ClearAllPoints()
     f.chk:SetPoint("TOPLEFT", f, "TOPLEFT", 10, -168)
+    f.chk:SetWidth(W - 100)
     f.chk.Update()
+    f.bOv:Show()
+    f.bOv:ClearAllPoints()
+    f.bOv:SetPoint("TOPRIGHT", f, "TOPRIGHT", -8, -168)
     self:LotseLive()
     return
   end
@@ -783,4 +827,134 @@ function UI:LotseFillMini(r, step, here)
     setBtnText(f.miniBtn, n > 0 and T("LO_NEXT_SHORT") or T("LO_CLOSE"))
     f.miniBtn:SetOn(true)
   end
+end
+
+-- ------------------------------------------------------------
+-- Versandübersicht: alle vorbereiteten Anfragen mit Items, Preisen und Hinweisen untereinander
+-- ------------------------------------------------------------
+local OV_ROWS, OV_ROW_H = 14, 20
+
+function UI:BuildSendOverview()
+  if self.ovWin then return end
+  local f = CreateFrame("Frame", "BananaBankSendOverview", UIParent)
+  self.ovWin = f
+  f:SetWidth(480)
+  f:SetHeight(130 + OV_ROWS * OV_ROW_H + 40)
+  f:SetPoint("CENTER", UIParent, "CENTER", 0, 20)
+  f:SetFrameStrata("FULLSCREEN_DIALOG")
+  f:SetToplevel(true)
+  f:SetMovable(true)
+  f:EnableMouse(true)
+  f:RegisterForDrag("LeftButton")
+  f:SetScript("OnDragStart", function() this:StartMoving() end)
+  f:SetScript("OnDragStop", function() this:StopMovingOrSizing() end)
+  f:SetBackdrop({
+    bgFile = WHITE, edgeFile = "Interface\DialogFrame\UI-DialogBox-Border",
+    tile = true, tileSize = 16, edgeSize = 32,
+    insets = { left = 11, right = 12, top = 12, bottom = 11 },
+  })
+  f:SetBackdropColor(0.015, 0.025, 0.06, 1)
+  self:Solid(f, 12, 1)
+  f:Hide()
+  tinsert(UISpecialFrames, "BananaBankSendOverview")
+  local close = CreateFrame("Button", nil, f, "UIPanelCloseButton")
+  close:SetPoint("TOPRIGHT", f, "TOPRIGHT", -6, -6)
+  local title = self:Font(f, 20, UI.C.gold, UI.FONT_TITLE)
+  title:SetPoint("TOPLEFT", f, "TOPLEFT", 26, -20)
+  self:Loc(title, "OV_TITLE")
+  self:GlowLine(f, -50, 20, -20)
+  f.sum = self:Font(f, 11, UI.C.text)
+  f.sum:SetPoint("TOPLEFT", f, "TOPLEFT", 26, -58)
+  f.sum:SetWidth(430)
+  f.sum:SetHeight(14)
+  f.hint = self:Font(f, 10, UI.C.muted)
+  f.hint:SetPoint("TOPLEFT", f, "TOPLEFT", 26, -76)
+  f.hint:SetWidth(430)
+  f.hint:SetHeight(14)
+
+  local sf = CreateFrame("ScrollFrame", "BananaBankOverviewScroll", f, "FauxScrollFrameTemplate")
+  sf:SetPoint("TOPLEFT", f, "TOPLEFT", 20, -98)
+  sf:SetPoint("BOTTOMRIGHT", f, "TOPRIGHT", -46, -98 - OV_ROWS * OV_ROW_H)
+  sf:SetScript("OnVerticalScroll", function()
+    FauxScrollFrame_OnVerticalScroll(OV_ROW_H, function() UI:RefreshSendOverview() end)
+  end)
+  sf:EnableMouseWheel(true)
+  sf:SetScript("OnMouseWheel", function()
+    local sb = getglobal("BananaBankOverviewScrollScrollBar")
+    if sb then sb:SetValue(sb:GetValue() - arg1 * OV_ROW_H) end
+  end)
+  f.sf = sf
+  f.rows = {}
+  for i = 1, OV_ROWS do
+    local row = CreateFrame("Frame", nil, f)
+    row:SetHeight(OV_ROW_H - 2)
+    row:SetPoint("TOPLEFT", f, "TOPLEFT", 26, -98 - (i - 1) * OV_ROW_H)
+    row:SetPoint("TOPRIGHT", f, "TOPRIGHT", -54, -98 - (i - 1) * OV_ROW_H)
+    row.bg = row:CreateTexture(nil, "BACKGROUND")
+    row.bg:SetTexture(WHITE)
+    row.bg:SetAllPoints(row)
+    row.l = self:Font(row, 11, UI.C.text)
+    row.l:SetPoint("LEFT", row, "LEFT", 4, 0)
+    row.l:SetWidth(300)
+    row.l:SetHeight(14)
+    row.sub = self:Font(row, 10, UI.C.muted)
+    row.sub:SetPoint("RIGHT", row, "RIGHT", -120, 0)
+    row.sub:SetJustifyH("RIGHT")
+    row.r = self:Font(row, 11, UI.C.gold)
+    row.r:SetPoint("RIGHT", row, "RIGHT", -4, 0)
+    row.r:SetWidth(110)
+    row.r:SetJustifyH("RIGHT")
+    f.rows[i] = row
+  end
+  local go = self:Button(f, 160, 22, "OV_GO", function()
+    f:Hide()
+    if BB.mailOpen then BB:SendNextMail() end
+    UI:Refresh()
+  end, "primary")
+  go:SetPoint("BOTTOMLEFT", f, "BOTTOMLEFT", 26, 22)
+  f.go = go
+  local done = self:Button(f, 120, 22, "OV_CLOSE", function() f:Hide() end)
+  done:SetPoint("BOTTOMRIGHT", f, "BOTTOMRIGHT", -26, 22)
+end
+
+function UI:RefreshSendOverview()
+  local f = self.ovWin
+  if not f then return end
+  local lines, nReq, nLetters, total = BB:SendOverview()
+  f.lines = lines
+  f.sum:SetText(string.format(T("OV_SUMMARY"), nReq, nLetters, total > 0 and BB.Money(total) or T("OV_FREE")))
+  f.hint:SetText(BB.mailOpen and "" or T("OV_OPEN_MAIL"))
+  FauxScrollFrame_Update(f.sf, getn(lines), OV_ROWS, OV_ROW_H)
+  local offset = FauxScrollFrame_GetOffset(f.sf)
+  if type(offset) ~= "number" then offset = 0 end
+  for i = 1, OV_ROWS do
+    local row = f.rows[i]
+    local e = lines[offset + i]
+    if e then
+      row:Show()
+      row.sub:SetText("")
+      row.r:SetText(e.r or "")
+      row.l:SetText(e.l or "")
+      if e.kind == "head" then
+        row.bg:SetVertexColor(1, 0.82, 0.3, 0.14)
+        row.l:SetTextColor(UI.C.gold[1], UI.C.gold[2], UI.C.gold[3])
+        row.sub:SetText(e.sub or "")
+      elseif e.kind == "warn" then
+        row.bg:SetVertexColor(0, 0, 0, 0)
+        row.l:SetTextColor(1, 0.65, 0.2)
+      else
+        row.bg:SetVertexColor(0, 0, 0, 0)
+        row.l:SetTextColor(UI.C.text[1], UI.C.text[2], UI.C.text[3])
+      end
+    else
+      row:Hide()
+    end
+  end
+  f.go:SetOn(nReq > 0)
+end
+
+function UI:OpenSendOverview()
+  self:BuildSendOverview()
+  self.ovWin:Show()
+  self:RefreshSendOverview()
 end
