@@ -10,7 +10,7 @@ local WHITE = UI.WHITE
 UI.settingsModule = true
 UI.set = {}
 
-local GEN_H, GUILD_H, BANK_H = 262, 108, 266
+local GEN_H, GUILD_H, BANK_H = 262, 108, 288
 local RULES_H = 246
 local DEPOT_H = 436
 local KW_H = 404
@@ -229,29 +229,32 @@ function UI:BuildSettings()
   S.cWhisper = check(g, "SET_WHISPER", 4, -70, function() return BananaBankDB.whisper ~= false end, function(v)
     BananaBankDB.whisper = v
   end, 420)
-  btn(g, "SET_SCAN", 4, -98, 100, function() BB:UpdateSnapshot(true) end)
-  btn(g, "SET_SYNC", 108, -98, 100, function()
+  S.cBatch = check(g, "SET_BATCH", 4, -92, function() return BB:BatchOn() end, function(v)
+    BananaBankDB.batch = v
+  end, 420)
+  btn(g, "SET_SCAN", 4, -120, 100, function() BB:UpdateSnapshot(true) end)
+  btn(g, "SET_SYNC", 108, -120, 100, function()
     BB:SendHello()
     BB:Print(T("MSG_SYNC"))
   end)
-  btn(g, "SET_AHSCAN", 212, -98, 100, function() BB:StartAHScan() end)
-  btn(g, "SET_BOOK", 316, -98, 108, function() UI:OpenBookDialog() end)
-  btn(g, "SET_MAILLOG", 4, -124, 200, function() BB:PrintMailLog() end)
-  btn(g, "SET_RECON", 210, -124, 214, function() BB:PrintReconcile("") end)
-  S.cAuto = check(g, "SET_AUTOBANK", 4, -152, function() return BananaBankDB.autoBank ~= false end, function(v)
+  btn(g, "SET_AHSCAN", 212, -120, 100, function() BB:StartAHScan() end)
+  btn(g, "SET_BOOK", 316, -120, 108, function() UI:OpenBookDialog() end)
+  btn(g, "SET_MAILLOG", 4, -146, 200, function() BB:PrintMailLog() end)
+  btn(g, "SET_RECON", 210, -146, 214, function() BB:PrintReconcile("") end)
+  S.cAuto = check(g, "SET_AUTOBANK", 4, -174, function() return BananaBankDB.autoBank ~= false end, function(v)
     BananaBankDB.autoBank = v
   end, 420)
   local ah = self:Font(g, 10, C.muted)
-  ah:SetPoint("TOPLEFT", g, "TOPLEFT", 4, -174)
+  ah:SetPoint("TOPLEFT", g, "TOPLEFT", 4, -196)
   ah:SetWidth(420)
   ah:SetHeight(24)
   ah:SetJustifyV("TOP")
   self:Loc(ah, "SET_AUTOBANK_HINT")
   local al = self:Font(g, 11, C.text)
-  al:SetPoint("TOPLEFT", g, "TOPLEFT", 4, -208)
+  al:SetPoint("TOPLEFT", g, "TOPLEFT", 4, -230)
   self:Loc(al, "SET_AGE")
   S.age = self:EditBox("BananaBankPriceAge", g, 44)
-  S.age:SetPoint("TOPLEFT", g, "TOPLEFT", 290, -203)
+  S.age:SetPoint("TOPLEFT", g, "TOPLEFT", 290, -225)
   S.age:SetMaxLetters(3)
   S.age:SetNumeric(true)
   local function saveAge()
@@ -267,7 +270,7 @@ function UI:BuildSettings()
   ad:SetPoint("LEFT", S.age, "RIGHT", 6, 0)
   self:Loc(ad, "SET_AGE_DAYS")
   -- Trash ergibt sich aus dem AH-Scan (nicht im Auktionshaus = Trash), hier nur die Ausnahmen
-  S.trashList = btn(g, "", 4, -236, 300, function() if UI.OpenTrashList then UI:OpenTrashList() end end)
+  S.trashList = btn(g, "", 4, -258, 300, function() if UI.OpenTrashList then UI:OpenTrashList() end end)
 
   -- Regeln (Rang und Qualitaet)
   g = group(f, "SET_SEC_RULES")
@@ -536,7 +539,7 @@ function UI:RefreshSettings()
     local gm = BB:GzMode()
     for i = 1, getn(S.gzChips) do S.gzChips[i]:SetActive(S.gzChips[i].code == gm) end
   end
-  if S.cBank then S.cBank.Update() S.cCod.Update() S.cWhisper.Update() S.cAuto.Update() end
+  if S.cBank then S.cBank.Update() S.cCod.Update() S.cWhisper.Update() S.cAuto.Update() S.cBatch.Update() end
   if S.age and not S.ageFocus then S.age:SetText(tostring(BB:PriceMaxAgeDays())) end
   if S.trashList and BB.TrashOverrideCount then S.trashList.fs:SetText(string.format(T("SET_TRASH_LIST"), BB:TrashOverrideCount())) end
   if not S.mainFocus then S.main:SetText(BB:MainBank()) end

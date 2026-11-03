@@ -93,6 +93,7 @@ Pull requests welcome, tested in-game on a 1.12 client. Lua 5.0 rules: no `#`, `
 
 ## Changelog
 
+- **3.11.0:** **batch run** ("fetch all at once", on by default, switch in Settings > Bank-Char): "Fetch items" now collects the items for ALL confirmed requests in one go (oldest first, no stack used twice, partial stacks merged), the pilot window then sends the letters of all requests one after the other and moves on by itself ("(+N more requests)" in the title). One trip to the bank, one trip to the mailbox. If the bags are full the run continues with what is already in the bags. Switching the option off restores the one-request-at-a-time flow.
 - **3.10.5:** `/bb reissue <code> [item] [amount]` creates a new confirmed request for the same player from a finished one (only the named item, optionally with a smaller amount); a quest-payout / free flag carries over, so no cash on delivery.
 - **3.10.4:** `/bb nocod <code>` ships an existing request without cash on delivery (for quest payouts created before 3.10.3).
 - **3.10.3:** quest payouts ("Pay out") are shipped **without cash on delivery** (the material comes back as goods); the payout flag is synced to all bank chars, and only accepted from quest managers or banks.

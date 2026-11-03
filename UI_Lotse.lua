@@ -141,7 +141,7 @@ function UI:LotsePrimary()
   if step == 1 then
     if r.cl and next(r.cl) ~= nil then BB:AcceptCrafter(r) else BB:ConfirmRequest(r) end
   elseif step == 2 then
-    BB:StartPrepare(r)
+    BB:FetchFor(r)
   elseif step == 3 then
     BB:SendNextMail()
   elseif step == 4 then
@@ -389,6 +389,13 @@ function UI:LotseTick()
   local r = L.cur
   if r then
     if BB.prep and BB.prep.r == r then L.sawPrep = r.id end
+    -- Sammelrunde: die naechste Anfrage ist dran, das Fenster folgt ihr
+    if L.sawPrep == r.id and BB.prep and BB.prep.r ~= r then
+      self:LotseSelect(BB.prep.r)
+      L.sawPrep = BB.prep.r.id
+      self:RefreshLotse()
+      return
+    end
     if L.sawPrep == r.id and not BB.prep and not BB.job then
       L.finished = r.id
       L.sawPrep = nil
@@ -399,7 +406,7 @@ function UI:LotseTick()
       local key = r.id .. (BB.bankOpen and "B" or "N")
       if L.tried ~= key and (BB.bankOpen or BB:BagsCover(r)) then
         L.tried = key
-        BB:StartPrepare(r)
+        BB:FetchFor(r)
         self:RefreshLotse()
       end
     end
@@ -675,7 +682,8 @@ function UI:RefreshLotse()
     place(f.t1, f, -64)
     local e = p and p.slots[p.idx]
     if p and e then
-      f.t1:SetText(string.format(T("LO_MAIL_T"), p.idx, getn(p.slots), p.r.p))
+      local qn = BB.queue and getn(BB.queue) or 0
+      f.t1:SetText(string.format(T("LO_MAIL_T"), p.idx, getn(p.slots), p.r.p) .. (qn > 0 and string.format(T("LO_QUEUE"), qn) or ""))
       f.t2:SetText(BB:ColoredName(e.id) .. " x" .. e.c .. (BB.mailOpen and "" or ("\n" .. T("LO_OPEN_MAIL"))))
     else
       f.t1:SetText(T("LO_DONE"))

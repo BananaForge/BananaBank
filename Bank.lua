@@ -444,14 +444,99 @@ function BB:StartPrepare(r)
     return
   end
   self.prep = nil
+  -- ein einzelnes Holen verwirft eine alte Sammelrunde (ausser beim automatischen Neuvorbereiten)
+  if not self.batch and not self.reprep then self.queue = nil end
   self.job = { r = r, need = need, slots = {}, missing = {} }
-  self:Print(string.format(self.T("MSG_PREPARING"), r.id))
+  if not self.batch then self:Print(string.format(self.T("MSG_PREPARING"), r.id)) end
   self:PrepareStep()
+end
+
+-- ------------------------------------------------------------
+-- Sammelrunde: alle bestaetigten Anfragen auf einmal aus der Bank holen und danach am Briefkasten
+-- hintereinander versenden (ein Weg zur Bank, ein Weg zum Briefkasten)
+-- ------------------------------------------------------------
+function BB:BatchOn()
+  return BananaBankDB.batch ~= false
+end
+
+-- Holen je nach Einstellung: alle Anfragen oder nur diese
+function BB:FetchFor(r)
+  if self:BatchOn() then self:StartPrepareAll(r) else self:StartPrepare(r) end
+end
+
+function BB:StartPrepareAll(first)
+  if not self:BankActive() then
+    self:Print("|cffff4040" .. string.format(self.T("ERR_RANK_LOST"), BB.BANK_RANK_LABEL) .. "|r")
+    return
+  end
+  if self.job then return end
+  local list = {}
+  for _, r in pairs(BananaBankDB.reqs) do
+    if r.s == "confirmed" and self:IsActive(r) then
+      local left = 0
+      for id in pairs(r.items) do left = left + self:ReqLeft(r, id) end
+      if left > 0 then table.insert(list, r) end
+    end
+  end
+  if getn(list) == 0 then
+    self:Print(self.T("MSG_NOTHING_LEFT"))
+    return
+  end
+  table.sort(list, function(a, b)
+    if first then
+      if a == first then return true end
+      if b == first then return false end
+    end
+    if (a.ts or 0) ~= (b.ts or 0) then return (a.ts or 0) < (b.ts or 0) end
+    return a.id < b.id
+  end)
+  self.queue = nil
+  self.prep = nil
+  self.batch = { list = list, idx = 0, preps = {} }
+  self:Print(string.format(self.T("MSG_BATCH_START"), getn(list)))
+  self:BatchNext()
+end
+
+function BB:BatchNext()
+  local b = self.batch
+  if not b then return end
+  b.idx = b.idx + 1
+  local r = b.list[b.idx]
+  if not r then return self:BatchFinish() end
+  local mine = b.idx
+  self:StartPrepare(r)
+  -- ohne Job (Fehler beim Start) mit der naechsten Anfrage weitermachen; lief die Vorbereitung schon
+  -- zu Ende, ist der Index weiter und hier nichts mehr zu tun
+  if not self.job and self.batch == b and b.idx == mine then return self:BatchNext() end
+end
+
+function BB:BatchFinish()
+  local b = self.batch
+  self.batch = nil
+  self.job = nil
+  if not b then return end
+  local preps = b.preps
+  if getn(preps) == 0 then
+    self:Print("|cffff4040" .. self.T("ERR_NOTHING_PREPARED") .. "|r")
+    if self.UI then self.UI:Refresh() end
+    return
+  end
+  local stacks = 0
+  for i = 1, getn(preps) do stacks = stacks + getn(preps[i].slots) end
+  self.prep = table.remove(preps, 1)
+  self.queue = getn(preps) > 0 and preps or nil
+  self:Print(string.format(self.T("MSG_BATCH_DONE"), getn(preps) + 1, stacks))
+  if self.UI then self.UI:Refresh() end
 end
 
 function BB:PrepareFail(key)
   self.job = nil
   self.reprep = nil
+  if self.batch then
+    -- Sammelrunde: mit dem weitermachen, was schon in den Taschen liegt
+    self:Print("|cffff4040" .. self.T(key) .. "|r")
+    return self:BatchFinish()
+  end
   self:Print("|cffff4040" .. self.T(key) .. "|r")
   if self.UI then self.UI:Refresh() end
 end
@@ -462,6 +547,12 @@ function BB:PrepareStep()
   if CursorHasItem() then ClearCursor() end
 
   local used = {}
+  -- Stapel, die schon fuer andere Anfragen der Sammelrunde vorgesehen sind
+  local function markUsed(p)
+    for k = 1, getn(p.slots) do used[slotKey(p.slots[k].bag, p.slots[k].slot)] = true end
+  end
+  if self.batch then for i = 1, getn(self.batch.preps) do markUsed(self.batch.preps[i]) end end
+  if self.queue then for i = 1, getn(self.queue) do markUsed(self.queue[i]) end end
   for i = 1, getn(job.slots) do
     local s = job.slots[i]
     used[slotKey(s.bag, s.slot)] = true
@@ -587,6 +678,8 @@ function BB:PrepareDone()
     if not self.bankOpen then self:Print(self.T("MSG_OPEN_BANK_FOR_REST")) end
   end
   if getn(job.slots) == 0 then
+    -- in der Sammelrunde ist "hier nichts zu holen" nur fuer diese Anfrage so
+    if self.batch then return self:BatchNext() end
     self:Print("|cffff4040" .. self.T("ERR_NOTHING_PREPARED") .. "|r")
     if self.UI then self.UI:Refresh() end
     return
@@ -596,7 +689,12 @@ function BB:PrepareDone()
   for id, n in pairs(job.missing) do
     if n > 0 and not self:OtherBankHas(id) then short[id] = n end
   end
-  self.prep = { r = job.r, slots = job.slots, idx = 1, missing = job.missing, short = next(short) and short or nil }
+  local newPrep = { r = job.r, slots = job.slots, idx = 1, missing = job.missing, short = next(short) and short or nil }
+  if self.batch then
+    table.insert(self.batch.preps, newPrep)
+    return self:BatchNext()
+  end
+  self.prep = newPrep
   self:Print(string.format(self.T("MSG_PREPARED"), getn(job.slots), job.r.p))
   -- nach einer automatischen Neuvorbereitung (Faecher hatten sich veraendert) gleich weiter senden
   if self.reprep then
@@ -1137,6 +1235,18 @@ function BB:MailDone()
     self:Print(string.format(self.T("MSG_REQUEST_PARTIAL"), r.id))
   end
   self:ScheduleSnapshot(2)
+  -- Sammelrunde: weiter mit der naechsten vorbereiteten Anfrage (Abgeschlossenes oder Abgelehntes ueberspringen)
+  local nxt
+  while self.queue and getn(self.queue) > 0 and not nxt do
+    local cand = table.remove(self.queue, 1)
+    if cand.r.s == "confirmed" then nxt = cand end
+  end
+  if self.queue and getn(self.queue) == 0 then self.queue = nil end
+  if nxt then
+    self.prep = nxt
+    self:Print(string.format(self.T("MSG_BATCH_NEXT"), nxt.r.id, nxt.r.p))
+    if BananaBankDB.auto and self.mailOpen then self:After(1.5, function() BB:SendNextMail() end, "automail") end
+  end
   if self.UI then self.UI:Refresh() end
 end
 
