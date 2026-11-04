@@ -905,6 +905,14 @@ function UI:CartAdd(id, delta, absolute)
   local avail = BB:GetAvailable(id)
   local n = (basket[id] or 0) + delta
   if absolute then n = delta end
+  -- ein Rezept nur einmal (ausser fuer Bank-Raenge)
+  if n > 1 and not BB:MayBeBank(BB:Me()) then
+    local e = BB.stockCache and BB.stockCache[id]
+    if e and (BB:ResolveCategory(id, e)) == "recipe" then
+      n = 1
+      if delta > 0 then BB:Print("|cffff4040" .. T("RB_RECIPE_ONE") .. "|r") end
+    end
+  end
   if n > avail then
     n = avail
     if delta > 0 and not absolute then BB:Print(T("MSG_NOT_MORE")) end

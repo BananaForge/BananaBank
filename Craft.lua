@@ -100,6 +100,13 @@ function BB:CraftEligible(id)
   if k ~= "recipe" or not sub then return false, "NOTRECIPE" end
   local me = self:Me()
   if not self:HasProfKeyword(me, sub) then return false, "NOKEYWORD" end
+  return self:RecipeUsable(id, e, sub)
+end
+
+-- Kann dieser Char (eigener Client) das Rezept benutzen? Beruf gescannt, Rezept noch nicht gelernt, Skill reicht.
+-- true | false, Grund, Zahl. Gruende: NOSCAN, KNOWN, SKILL
+function BB:RecipeUsable(id, e, sub)
+  local me = self:Me()
   local known = BananaBankDB.known and BananaBankDB.known[me]
   if not known or not known.skill[sub] then return false, "NOSCAN", sub end
   local rname = self:RecipeName(e.n)

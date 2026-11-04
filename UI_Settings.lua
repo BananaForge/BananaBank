@@ -436,7 +436,7 @@ function UI:BuildSettings()
   S.kwAdd = self:Button(g, 110, 20, "KW_ADD", function()
     S.edit.keywords = S.edit.keywords or {}
     if getn(S.edit.keywords) < BB.KW_MAX then
-      table.insert(S.edit.keywords, { kw = "", prof = "bags" })
+      table.insert(S.edit.keywords, { kw = "", prof = "alch" })
       S.editDirty = true
       UI:RefreshSettings()
     end

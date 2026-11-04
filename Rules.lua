@@ -96,13 +96,35 @@ function BB:ItemBlockText(name, id)
   end
   -- ohne Preis nicht anfragbar: nicht im Auktionshaus gefunden oder noch nicht gescannt
   if not self:GetPrice(id) then return self.T("RB_NOPRICE") end
-  -- Taschen nur mit dem Keyword fuer Taschen
-  if self:ItemIsBag(id) and not self:HasProfKeyword(name, "bags") then return self.T("RB_BAG") end
+  -- Rezepte: nur einmal ueber die Gildenbank, und nur, wenn der Char es benutzen kann
+  local rt = self:RecipeBlockText(name, id)
+  if rt then return rt end
   if self:InDepotOnly(id) then return self.T("RB_DEPOT") end
   return nil
 end
 
 -- Pruefung einer fertigen Anfrage durch die Bank. Gibt true oder false und die Liste der Verstoesse zurueck.
+-- Rezepte (zum AH-Preis wie zum Gildencrafter-Anspruch): 1. hat dieser Char es schon ueber die Gildenbank
+-- bekommen (laut Buch), dann kein zweites; 2. auf dem eigenen Client: Beruf gescannt, Rezept noch nicht
+-- gelernt, Skill reicht. Berufe und gelernte Rezepte kennt nur der eigene Client, die Bank prueft das Buch.
+function BB:RecipeBlockText(name, id)
+  local e = self.stockCache and self.stockCache[id]
+  if not e then return nil end
+  local k, sub = self:ResolveCategory(id, e)
+  if k ~= "recipe" then return nil end
+  local got = self.RecipeReceived and self:RecipeReceived(name, e.n or "")
+  if got then return string.format(self.T("RB_RECIPE_OWNED"), BB.Date(got)) end
+  if name == self:Me() and sub and self.RecipeUsable then
+    local ok, why, n = self:RecipeUsable(id, e, sub)
+    if not ok then
+      if why == "NOSCAN" then return string.format(self.T("CR_NOSCAN"), self.T("SUB_" .. string.upper(n or "other"))) end
+      if why == "SKILL" then return string.format(self.T("CR_SKILL"), n or 0) end
+      return self.T("CR_" .. why)
+    end
+  end
+  return nil
+end
+
 function BB:CheckRequestRules(r)
   local bad = {}
   local ok, why = self:CanRequest(r.p, nil)
@@ -112,7 +134,15 @@ function BB:CheckRequestRules(r)
   end
   for id in pairs(r.items) do
     local t = self:ItemBlockText(r.p, id)
-    if t then table.insert(bad, { id = id, text = t }) end
+    if t then
+      table.insert(bad, { id = id, text = t })
+    elseif r.items[id] > 1 and not self:MayBeBank(r.p) then
+      -- ein Rezept nur einmal pro Anfrage
+      local e = self.stockCache and self.stockCache[id]
+      if e and (self:ResolveCategory(id, e)) == "recipe" then
+        table.insert(bad, { id = id, text = self.T("RB_RECIPE_ONE") })
+      end
+    end
   end
   return getn(bad) == 0, bad
 end
@@ -427,7 +457,7 @@ end
 -- ------------------------------------------------------------
 -- Keywords in der Offiziersnotiz: [B, GSN, GE]
 -- ------------------------------------------------------------
-BB.KW_PROFS = { "bags", "alch", "bs", "ench", "eng", "lw", "tail", "jc", "cook", "fa" }
+BB.KW_PROFS = { "alch", "bs", "ench", "eng", "lw", "tail", "jc", "cook", "fa" }
 BB.KW_PROF_SET = {}
 for i = 1, getn(BB.KW_PROFS) do BB.KW_PROF_SET[BB.KW_PROFS[i]] = true end
 BB.KW_MAX = 10
@@ -471,7 +501,7 @@ function BB:KeywordsOf(name)
   return {}
 end
 
--- Hat der Spieler ein Keyword, das laut Regelsatz zu diesem Beruf (oder "bags") gehoert?
+-- Hat der Spieler ein Keyword, das laut Regelsatz zu diesem Beruf gehoert?
 function BB:HasProfKeyword(name, prof)
   local rules = BananaBankDB.rules
   if not rules or not rules.keywords then return false end
