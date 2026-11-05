@@ -357,28 +357,73 @@ end)
 -- Knopf an der Bank: Trash aus den Bankfaechern in die Taschen holen
 -- ------------------------------------------------------------
 function UI:BuildTrashFetchButton()
-  if self.trashFetch or not BankFrame then return end
-  local b = self:Button(BankFrame, 130, 20, "", function() UI:TrashFetchStart() end)
-  b:SetPoint("TOPRIGHT", BankFrame, "TOPRIGHT", -50, -14)
-  b:Hide()
-  self.trashFetch = b
+  if self.trashFetch then return end
+  -- eigenes Fenster neben der Bank (nicht am BankFrame: Taschen-Addons ersetzen oder verstecken ihn)
+  local f = CreateFrame("Frame", "BananaBankTrashFetch", UIParent)
+  f:SetWidth(232)
+  f:SetHeight(116)
+  f:SetFrameStrata("DIALOG")
+  f:SetToplevel(true)
+  f:SetMovable(true)
+  f:EnableMouse(true)
+  f:RegisterForDrag("LeftButton")
+  f:SetScript("OnDragStart", function() this:StartMoving() this.moved = true end)
+  f:SetScript("OnDragStop", function() this:StopMovingOrSizing() end)
+  f:SetBackdrop({
+    bgFile = WHITE, edgeFile = "Interface\Tooltips\UI-Tooltip-Border",
+    tile = true, tileSize = 16, edgeSize = 14,
+    insets = { left = 3, right = 3, top = 3, bottom = 3 },
+  })
+  f:SetBackdropColor(0.03, 0.045, 0.11, 0.98)
+  f:SetBackdropBorderColor(C.brass[1], C.brass[2], C.brass[3], 1)
+  f:Hide()
+  local logo = f:CreateTexture(nil, "OVERLAY")
+  logo:SetTexture(COIN)
+  logo:SetWidth(26)
+  logo:SetHeight(26)
+  logo:SetPoint("TOPLEFT", f, "TOPLEFT", 10, -10)
+  local title = self:Font(f, 14, C.gold, UI.FONT_TITLE)
+  title:SetPoint("TOPLEFT", f, "TOPLEFT", 42, -14)
+  self:Loc(title, "TRASH_FETCH_TITLE")
+  f.l1 = self:Font(f, 11, C.text)
+  f.l1:SetPoint("TOPLEFT", f, "TOPLEFT", 14, -44)
+  f.l1:SetWidth(204)
+  f.l1:SetHeight(14)
+  f.l2 = self:Font(f, 10, C.muted)
+  f.l2:SetPoint("TOPLEFT", f, "TOPLEFT", 14, -60)
+  f.l2:SetWidth(204)
+  f.l2:SetHeight(26)
+  f.l2:SetJustifyV("TOP")
+  f.btn = self:Button(f, 204, 24, "", function() UI:TrashFetchStart() end, "primary")
+  f.btn:SetPoint("BOTTOMLEFT", f, "BOTTOMLEFT", 14, 12)
+  self.trashFetch = f
 end
 
 function UI:RefreshTrashFetch()
-  local b = self.trashFetch
-  if not b then return end
+  local f = self.trashFetch
+  if not f then return end
   if not (BB:IsBank() and BB.bankOpen) then
-    b:Hide()
+    f:Hide()
     return
   end
   local stacks, items = BB:TrashInBank()
   if stacks == 0 then
-    b:Hide()
+    f:Hide()
     return
   end
-  b.fs:SetText(string.format(T("TRASH_FETCH"), stacks))
-  b:SetOn(not self.TS.fetching)
-  b:Show()
+  if not f.moved then
+    f:ClearAllPoints()
+    if BankFrame and BankFrame:IsVisible() then
+      f:SetPoint("TOPLEFT", BankFrame, "TOPRIGHT", -30, -14)
+    else
+      f:SetPoint("TOPRIGHT", UIParent, "TOPRIGHT", -60, -260)
+    end
+  end
+  f.l1:SetText(string.format(T("TRASH_COUNT_BANK"), stacks, items))
+  f.l2:SetText(T("TRASH_FETCH_HINT"))
+  f.btn.fs:SetText(string.format(T("TRASH_FETCH"), stacks))
+  f.btn:SetOn(not self.TS.fetching)
+  f:Show()
 end
 
 function UI:TrashFetchStart()
