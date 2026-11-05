@@ -86,7 +86,13 @@ function UI:BuildPrices(parent)
       h:SetPoint("TOPLEFT", list, "TOPLEFT", cols[i][2], -9)
     end
     self:Loc(h, cols[i][1])
+    if cols[i][1] == "COL_BIND" then P.hBind = h end
   end
+  -- Spalte "Bank" (nur auf Bank-Chars): auf welchem Char das Item liegt
+  P.hBank = self:Font(list, 10, C.goldDim)
+  P.hBank:SetPoint("TOPLEFT", list, "TOPLEFT", 316, -9)
+  self:Loc(P.hBank, "COL_BANK")
+  P.hBank:Hide()
   self:HLine(list, -24, 8, -8, C.brass, 0.8)
 
   P.rows = {}
@@ -111,6 +117,11 @@ function UI:BuildPrices(parent)
     row.bind = self:Font(row, 10, C.muted)
     row.bind:SetPoint("LEFT", row, "LEFT", 292, 0)
     row.bind:SetWidth(100)
+    row.bank = self:Font(row, 10, C.text)
+    row.bank:SetPoint("LEFT", row, "LEFT", 308, 0)
+    row.bank:SetWidth(72)
+    row.bank:SetHeight(12)
+    row.bank:Hide()
     row.price = self:Font(row, 11, C.gold, UI.FONT, "OUTLINE")
     row.price:SetPoint("LEFT", row, "LEFT", 380, 0)
     row.price:SetWidth(98)
@@ -160,6 +171,24 @@ function UI:PriceList()
   return list
 end
 
+-- Auf Bank-Chars eine Spalte mehr (Bank-Char des Items): Name und Bindung rutschen zusammen
+function UI:PriceLayout(isBank)
+  local P = self.price
+  if P.layoutBank == isBank then return end
+  P.layoutBank = isBank
+  for i = 1, getn(P.rows) do
+    local row = P.rows[i]
+    row.name:SetWidth(isBank and 214 or 258)
+    row.bind:ClearAllPoints()
+    row.bind:SetPoint("LEFT", row, "LEFT", isBank and 244 or 292, 0)
+    row.bind:SetWidth(isBank and 62 or 100)
+    if isBank then row.bank:Show() else row.bank:Hide() end
+  end
+  P.hBind:ClearAllPoints()
+  P.hBind:SetPoint("TOPLEFT", P.sf:GetParent(), "TOPLEFT", isBank and 252 or 300, -9)
+  if isBank then P.hBank:Show() else P.hBank:Hide() end
+end
+
 function UI:RefreshPrices()
   if not self.price then return end
   local P = self.price
@@ -167,6 +196,7 @@ function UI:RefreshPrices()
   for i = 1, getn(P.chips) do P.chips[i]:SetActive(P.chips[i].key == P.filter) end
 
   local isBank = BB:IsBank()
+  self:PriceLayout(isBank and true or false)
   if isBank then P.scanBtn:Show() else P.scanBtn:Hide() end
   if isBank then P.cod:Show() else P.cod:Hide() end
   P.cod.Update()
@@ -203,6 +233,17 @@ function UI:RefreshPrices()
       row.ic:SetQuality(entry.e.q)
       local qc = BB.QUALITY_COLOR[entry.e.q or 1] or BB.QUALITY_COLOR[1]
       row.name:SetText(entry.e.n .. "  |cff888888x" .. entry.e.c .. "|r")
+      if isBank then
+        -- Bank-Char mit dem groessten Bestand, weitere als "+N"
+        local best, bestC, n = nil, -1, 0
+        for bank, c in pairs(entry.e.per or {}) do
+          n = n + 1
+          if c > bestC or (c == bestC and bank < best) then best, bestC = bank, c end
+        end
+        local txt = best or "-"
+        if n > 1 then txt = txt .. " |cff888888+" .. (n - 1) .. "|r" end
+        row.bank:SetText(txt)
+      end
       row.name:SetTextColor(qc[1], qc[2], qc[3])
       if entry.e.k == "recipe" then row.bind:SetText(T("BIND_RECIPE"))
       elseif BB:IsBOE(id) then row.bind:SetText(T("BIND_BOE"))
