@@ -93,6 +93,7 @@ Pull requests welcome, tested in-game on a 1.12 client. Lua 5.0 rules: no `#`, `
 
 ## Changelog
 
+- **3.12.3:** fix: the "Fetch trash" window did not show up at the bank because the check ran before the main module had noted that the bank is open; it is now re-checked 0.4 s and 1.5 s after opening and every 2 s while the bank is open.
 - **3.12.2:** "Fetch trash" is now its own window next to the bank (like the "Sell trash" window at the vendor) instead of a small button on the bank frame, so it also shows with bag addons that replace the bank frame; it lists stacks/items and moves everything marked as trash from the bank slots into the bags. Draggable.
 - **3.12.1:** Prices tab (bank chars only): new column "Bank" shows the char that holds the item (the one with the biggest stock, "+N" if more banks have it).
 - **3.12.0:** recipe checks for **every** request, not only guild-crafter claims: a recipe can only be requested once per request, never again if the character already got it through the guild bank (checked against the ledger by every client and by the bank when confirming), and on the own client the profession must be scanned, the recipe not yet learned and the skill high enough. The bags keyword ("B") is removed completely (no bag restriction any more; old bags keywords are ignored).

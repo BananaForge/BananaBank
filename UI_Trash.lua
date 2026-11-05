@@ -635,7 +635,9 @@ ev:SetScript("OnEvent", function()
     UI:RefreshTrashWindow()
   elseif event == "BANKFRAME_OPENED" then
     UI:BuildTrashFetchButton()
-    UI:RefreshTrashFetch()
+    -- dieses Ereignis kommt vor dem des Hauptmoduls (BB.bankOpen ist noch nicht gesetzt): spaeter nochmal pruefen
+    BB:After(0.4, function() UI:RefreshTrashFetch() end, "trashfetch1")
+    BB:After(1.5, function() UI:RefreshTrashFetch() end, "trashfetch2")
   elseif event == "BANKFRAME_CLOSED" then
     UI.TS.fetching = nil
     UI:RefreshTrashFetch()
@@ -643,7 +645,14 @@ ev:SetScript("OnEvent", function()
     acc = 0.3
   end
 end)
+local poll = 0
 ev:SetScript("OnUpdate", function()
+  -- solange die Bank offen ist, das Fetch-Fenster regelmaessig nachziehen (Taschen-Addons, spaete Scans)
+  poll = poll + (arg1 or 0)
+  if poll >= 2 then
+    poll = 0
+    if BB.bankOpen and UI.trashFetch and not UI.trashFetch:IsShown() and BB:IsBank() then UI:RefreshTrashFetch() end
+  end
   if acc > 0 then
     acc = acc - (arg1 or 0)
     if acc <= 0 then
