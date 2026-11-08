@@ -1153,6 +1153,15 @@ function UI:BuildQuestEditor()
       local it = f.items[(f.eoff or 0) + idx]
       if it and not f.loading then it.need = tonumber(this:GetText()) or it.need end
     end)
+    -- Tab springt zur naechsten Menge, Umschalt+Tab zur vorherigen (am Ende wieder von vorn, die Liste scrollt mit)
+    r.amt:SetScript("OnTabPressed", function()
+      local n = getn(f.items)
+      if n == 0 then return end
+      local target = (f.eoff or 0) + idx + (IsShiftKeyDown() and -1 or 1)
+      if target < 1 then target = n end
+      if target > n then target = 1 end
+      UI:QuestEditorFocusAmt(target)
+    end)
     r.del = self:Button(r, 22, 20, "x", function()
       table.remove(f.items, (f.eoff or 0) + idx)
       UI:RefreshQuestEditor()
@@ -1626,12 +1635,31 @@ function UI:QuestAddItem(id, meta)
   if sb and getn(f.items) > EDIT_ROWS then sb:SetValue((getn(f.items) - EDIT_ROWS) * 28) end
 end
 
+-- Eingabe in die Mengen-Zeile des Items Nummer n setzen (scrollt bei Bedarf)
+function UI:QuestEditorFocusAmt(n)
+  local f = self.qe
+  if not f or not f.items[n] then return end
+  local sb = getglobal("BananaBankQuestEditScrollScrollBar")
+  local off = f.eoff or 0
+  if sb then
+    if n <= off then sb:SetValue((n - 1) * 28)
+    elseif n > off + EDIT_ROWS then sb:SetValue((n - EDIT_ROWS) * 28) end
+  end
+  self:RefreshQuestEditor()
+  local row = f.rows[n - (f.eoff or 0)]
+  if row then
+    row.amt:SetFocus()
+    row.amt:HighlightText()
+  end
+end
+
 function UI:SaveQuestEditor()
   local f = self.qe
   local items, meta = {}, {}
   for i = 1, getn(f.items) do
     local it = f.items[i]
-    local need = numberOf(f.rows[i].amt, it.need or 1)
+    -- die Menge steht im Eintrag (die Zeilen zeigen nur den sichtbaren Ausschnitt)
+    local need = tonumber(it.need) or 1
     if need < 1 then need = 1 end
     if need > 99999 then need = 99999 end
     items[it.id] = need
