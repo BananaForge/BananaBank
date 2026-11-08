@@ -1418,8 +1418,13 @@ end
 function BB:OnTakeInbox(i, isItem, j)
   if not self:IsBank() then return end
   local _, _, sender, subject, money, cod, daysLeft, hasItem, _, wasReturned = GetInboxHeaderInfo(i)
+  -- AH-Briefe liefern auf manchen Clients keinen Absender: dann am Betreff erkennen
+  if not sender and not isItem and subject
+      and (string.find(string.lower(subject), "auction successful", 1, true) or string.find(string.lower(subject), "auktion erfolgreich", 1, true)) then
+    sender = "Auction House"
+  end
   if not sender then
-    self:MailLog("?", isItem, nil, 0, 0, "nosender", "Brief " .. tostring(i))
+    self:MailLog("?", isItem, nil, 0, 0, "nosender", "Brief " .. tostring(i) .. " " .. tostring(subject or ""))
     return
   end
   if cod and cod > 0 then
@@ -1427,8 +1432,19 @@ function BB:OnTakeInbox(i, isItem, j)
     return
   end
   -- Erloes eines Verkaufs im Auktionshaus ("Auction successful: Item"): als AH-Verkauf buchen
-  if not isItem and money and money > 0 and self:IsSystemSender(sender) and subject
-      and (string.find(subject, "^[Aa]uction successful") or string.find(subject, "^Auktion erfolgreich")) then
+  -- Jeder Gold-Brief vom Auktionshaus gilt als Verkauf, ausser Rueckerstattungen (ueberboten/abgebrochen);
+  -- der Betreff ist je nach Server/Sprache unterschiedlich, deshalb nicht exakt vergleichen
+  local lowSub = string.lower(tostring(subject or ""))
+  local ahMail = false
+  if not isItem and money and money > 0 and self:IsSystemSender(sender) then
+    local lowSender = string.lower(sender)
+    local fromAH = string.find(lowSender, "auction", 1, true) or string.find(lowSender, "auktion", 1, true)
+    local refund = string.find(lowSub, "outbid", 1, true) or string.find(lowSub, "berboten", 1, true)
+      or string.find(lowSub, "cancel", 1, true) or string.find(lowSub, "abgebrochen", 1, true)
+    if fromAH and not refund then ahMail = true end
+    if string.find(lowSub, "auction successful", 1, true) or string.find(lowSub, "auktion erfolgreich", 1, true) then ahMail = true end
+  end
+  if ahMail then
     local akey = "ah|" .. sender .. "|" .. tostring(subject) .. "|" .. tostring(daysLeft) .. "|" .. tostring(money)
     if akey == lastTake.key and lastTake.serial == (self.inboxSerial or 0) and GetTime() - lastTake.t < 3 then
       self:MailLog(sender, false, nil, 0, money, "dup")
@@ -1437,14 +1453,14 @@ function BB:OnTakeInbox(i, isItem, j)
     lastTake.key, lastTake.t, lastTake.serial = akey, GetTime(), (self.inboxSerial or 0)
     local _, _, nm = string.find(subject, ":%s*(.+)$")
     self:AddLedger({ k = "ah", p = sender, n = nm or "", c = 1, q = 1, m = money, code = "" })
-    self:MailLog(sender, false, nil, 0, money, "ah", nm)
+    self:MailLog(sender, false, nil, 0, money, "ah", nm or tostring(subject))
     self:ScheduleSnapshot(4)
     if self.UI then self.UI:Refresh() end
     return
   end
   -- Uebergaben zwischen Bank-Chars sind keine Spenden
   if BananaBankDB.banks[sender] or self:MayBeBank(sender) or self:IsSystemSender(sender) then
-    self:MailLog(sender, isItem, nil, 0, money, "bank")
+    self:MailLog(sender, isItem, nil, 0, money, "bank", tostring(subject or ""))
     return
   end
 
