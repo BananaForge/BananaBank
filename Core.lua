@@ -189,6 +189,8 @@ function BB:InitDB()
   if type(BananaBankDB) ~= "table" then BananaBankDB = {} end
   local db = BananaBankDB
   db.v = 1
+  db.activity = db.activity or {}  -- Online-Messung fuer die BananaGuild-Heatmap (BananaActivity.lua)
+  if BananaActivity then BananaActivity.Init(db.activity) end
   if db.lang == nil then db.lang = "auto" end
   db.banks = db.banks or {}       -- Chars dieses Accounts, die als Bank laufen
   db.snaps = db.snaps or {}       -- Bestand je Bank-Char
