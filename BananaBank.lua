@@ -32,6 +32,32 @@ function BB:HookBags()
   end
 end
 
+-- Protokoll aller gesendeten Chat-Nachrichten (auch blockierter, "You are unable to speak yet") mit Herkunft:
+-- /bb chatlog zeigt die letzten, damit klar ist, welches Addon was senden wollte
+BB.chatLog = {}
+local origSendChat = SendChatMessage
+if origSendChat then
+  SendChatMessage = function(msg, ctype, lang, target)
+    local stack = debugstack and debugstack(2, 1, 0) or ""
+    local _, _, addon = string.find(stack, "AddOns\\([^\\]+)\\")
+    local _, _, line = string.find(stack, "([^\n]+)")
+    table.insert(BB.chatLog, { t = time(), ctype = ctype or "SAY", to = target, msg = msg or "", addon = addon or "?", src = line or "" })
+    while table.getn(BB.chatLog) > 40 do table.remove(BB.chatLog, 1) end
+    return origSendChat(msg, ctype, lang, target)
+  end
+end
+
+function BB:PrintChatLog()
+  local log = self.chatLog
+  if table.getn(log) == 0 then self:Print(self.T("CHATLOG_EMPTY")) return end
+  self:Print(string.format(self.T("CHATLOG_HEAD"), table.getn(log)))
+  for i = math.max(1, table.getn(log) - 14), table.getn(log) do
+    local e = log[i]
+    DEFAULT_CHAT_FRAME:AddMessage(date("%H:%M:%S", e.t) .. " [" .. e.ctype .. (e.to and ("->" .. tostring(e.to)) or "") .. "] "
+      .. string.sub(e.msg, 1, 90) .. "  |cff9a9cb3(" .. e.addon .. ")|r")
+  end
+end
+
 local ev = CreateFrame("Frame", "BananaBankEvents")
 local EVENTS = {
   "ADDON_LOADED", "PLAYER_ENTERING_WORLD", "CHAT_MSG_ADDON",
@@ -216,6 +242,21 @@ SlashCmdList["BANANABANK"] = function(msg)
     local _, _, it2, n2 = string.find(tail or "", "^(.-)%s+(%d+)$")
     if it2 then item, num = it2, tonumber(n2) end
     BB:Reissue(r, item, num)
+  elseif cmd == "ahstats" then
+    BB:PrintAHStats()
+  elseif cmd == "ahfee" then
+    -- /bb ahfee <Gold> [Anzahl]: eine Einstell-Gebuehr von Hand nachtragen (z. B. fuer Auktionen vor der Statistik)
+    local _, _, g, cnt = string.find(rest or "", "^(%d+)%s*(%d*)$")
+    if g and BB:IsBank() then
+      BB:AddLedger({ k = "ahfee", p = BB:Me(), n = "manuell", c = tonumber(cnt) or 1, q = 1, m = tonumber(g) * BB.GOLD, code = "" })
+      BB:PrintAHStats()
+    else
+      BB:Print("/bb ahfee <Gold> [Anzahl]")
+    end
+  elseif cmd == "chatlog" then
+    BB:PrintChatLog()
+  elseif cmd == "ah" and restLower == "check" then
+    BB:AHCheck()
   elseif cmd == "ah" then
     -- /bb ah: Kandidaten fuers Auktionshaus; /bb ah keep <N>, /bb ah gold <Gold>
     local _, _, what, num = string.find(rest or "", "^(%a+)%s*(%d*)$")

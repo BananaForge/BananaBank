@@ -325,7 +325,7 @@ function UI:BuildLedger(parent)
   strip:SetPoint("TOPLEFT", p, "TOPLEFT", 0, 0)
   strip:SetPoint("TOPRIGHT", p, "TOPRIGHT", 0, 0)
   Lg.tiles = {}
-  local tdefs = { { "LG_T_IN", 14, 170 }, { "LG_T_OUT", 190, 130 }, { "LG_T_COD", 330, 200 }, { "LG_T_N", 560, 90 } }
+  local tdefs = { { "LG_T_IN", 14, 160 }, { "LG_T_OUT", 180, 120 }, { "LG_T_COD", 310, 200 }, { "LG_T_N", 520, 70 }, { "LG_T_AH", 600, 120 } }
   for i = 1, getn(tdefs) do
     local lbl = self:Font(strip, 10, C.goldDim)
     lbl:SetPoint("TOPLEFT", strip, "TOPLEFT", tdefs[i][2], -7)
@@ -496,7 +496,7 @@ local function fillTop(pnl, list)
   if list[1] then pnl.empty:Hide() else pnl.empty:Show() end
 end
 
-local KIND_TAG = { out = "-", gout = "-", ["in"] = "+", gold = "+", back = "<", cod = "$", qfix = "*", trash = "$", ah = "$" }
+local KIND_TAG = { out = "-", gout = "-", ["in"] = "+", gold = "+", back = "<", cod = "$", qfix = "*", trash = "$", ah = "$", ahfee = "-" }
 
 function UI:RefreshLedger()
   if not self.led then return end
@@ -516,6 +516,10 @@ function UI:RefreshLedger()
   Lg.tiles[2]:SetText(to .. " " .. T("UNIT_ITEMS"))
   Lg.tiles[3]:SetText(BB.GoldText and (BB.GoldText(paid) .. " / " .. BB.GoldText(openCod)) or (BB.Money(paid) .. " / " .. BB.Money(openCod)))
   Lg.tiles[4]:SetText(BB.Count(BananaBankDB.ledger))
+  if Lg.tiles[5] and BB.AHStats then
+    local st = BB:AHStats()
+    Lg.tiles[5]:SetText((st.net < 0 and "-" or "+") .. (BB.GoldText and BB.GoldText(math.abs(st.net)) or BB.Money(math.abs(st.net))))
+  end
 
   local list = BB:LedgerSorted()
   if Lg.search and Lg.search ~= "" then
@@ -544,7 +548,7 @@ function UI:RefreshLedger()
       if tag == "-" then col = C.orange elseif tag == "<" then col = C.muted elseif tag == "$" then col = C.gold elseif tag == "*" then col = { 0.5, 0.7, 1 } end
       row.tag:SetTextColor(col[1], col[2], col[3])
       local what
-      if e.k == "gold" or e.k == "gout" or e.k == "cod" or e.k == "trash" or e.k == "ah" then
+      if e.k == "gold" or e.k == "gout" or e.k == "cod" or e.k == "trash" or e.k == "ah" or e.k == "ahfee" then
         what = BB.Money(e.m)
       else
         local qc = BB.QUALITY_COLOR[e.q or 1] or BB.QUALITY_COLOR[1]

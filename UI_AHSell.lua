@@ -161,17 +161,97 @@ local function postOne(entry)
   end
   local buyout = entry.price
   local bid = math.max(1, math.floor(buyout * BID_SHARE))
+  local deposit = 0
   if CalculateAuctionDeposit then
     local ok, dep = pcall(CalculateAuctionDeposit, DURATION)
-    if ok and dep and dep > GetMoney() then
+    if ok and dep then deposit = dep end
+    if deposit > GetMoney() then
       ClickAuctionSellItemButton()
       if CursorHasItem() then PickupContainerItem(bag, slot) end
       BB:Print("|cffff4040" .. T("AHS_NO_MONEY") .. "|r")
       return nil
     end
   end
+  -- wie viele Exemplare waren vorher in der Gilde (fuer die Kontrolle "es bleibt eines")
+  local before
+  local e = BB.stockCache and BB.stockCache[entry.id]
+  if e then before = e.c end
   StartAuction(bid, buyout, DURATION)
+  BB:AHLogPost(entry, deposit, before)
   return true
+end
+
+-- Gebuehr (Pfand) ins Buch und Eintrag ins Kontrollprotokoll
+function BB:AHLogPost(entry, deposit, before)
+  local db = BananaBankDB
+  db.ahLog = db.ahLog or {}
+  table.insert(db.ahLog, { t = time(), id = entry.id, n = entry.n, price = entry.price, dep = deposit, had = before })
+  while getn(db.ahLog) > 300 do table.remove(db.ahLog, 1) end
+  if deposit > 0 then
+    self:AddLedger({ k = "ahfee", p = self:Me(), n = entry.n or "", c = 1, q = 1, m = deposit, code = "" })
+  end
+end
+
+-- Statistik aus dem Buch (gilt fuer alle Banken): eingestellt, Gebuehren, verkauft, Erloes, Netto
+function BB:AHStats()
+  local s = { posted = 0, fees = 0, sold = 0, proceeds = 0 }
+  for _, e in pairs(BananaBankDB.ledger) do
+    if e.k == "ahfee" then
+      s.posted = s.posted + (e.c or 1)
+      s.fees = s.fees + (e.m or 0)
+    elseif e.k == "ah" then
+      s.sold = s.sold + 1
+      s.proceeds = s.proceeds + (e.m or 0)
+    end
+  end
+  s.net = s.proceeds - s.fees
+  return s
+end
+
+function BB:PrintAHStats()
+  local s = self:AHStats()
+  self:Print(string.format(T("AHS_STATS"), s.posted, BB.Money(s.fees), s.sold, BB.Money(s.proceeds)))
+  local sign = s.net < 0 and "-" or "+"
+  self:Print(string.format(T("AHS_NET"), sign .. BB.Money(math.abs(s.net))))
+end
+
+-- Kontrolle am Auktionshaus: eigene Auktionen gegen den Bestand der Gilde. Meldet Items, von denen nichts
+-- mehr in der Gilde liegt (alle Exemplare im AH) und zeigt die Laufzeit-Stufe.
+function BB:AHCheck()
+  if not (BB:IsBank() and BB:AHOpen()) then
+    self:Print(T("AHS_CHECK_OPEN"))
+    return
+  end
+  local n = GetNumAuctionItems and GetNumAuctionItems("owner") or 0
+  local mine = {}
+  local tiers = {}
+  for i = 1, n do
+    local name, _, count = GetAuctionItemInfo("owner", i)
+    if name then
+      mine[name] = (mine[name] or 0) + (count or 1)
+      if GetAuctionItemTimeLeft then
+        local tl = GetAuctionItemTimeLeft("owner", i)
+        tiers[tl or 0] = (tiers[tl or 0] or 0) + 1
+      end
+    end
+  end
+  local stock = self:GetStock()
+  local byName = {}
+  for id, e in pairs(stock) do byName[e.n or ""] = (byName[e.n or ""] or 0) + e.c end
+  local bad = 0
+  self:Print(string.format(T("AHS_CHECK_HEAD"), n))
+  for name, c in pairs(mine) do
+    local left = byName[name] or 0
+    if left == 0 then
+      bad = bad + 1
+      DEFAULT_CHAT_FRAME:AddMessage("|cffff4040" .. string.format(T("AHS_CHECK_ALL"), name, c) .. "|r")
+    end
+  end
+  if bad == 0 then self:Print(T("AHS_CHECK_OK")) end
+  local tl = {}
+  for k, v in pairs(tiers) do table.insert(tl, v .. "x " .. k) end
+  table.sort(tl)
+  if getn(tl) > 0 then self:Print(string.format(T("AHS_CHECK_TIME"), table.concat(tl, ", "))) end
 end
 
 local ev = CreateFrame("Frame")
@@ -293,6 +373,11 @@ function UI:RefreshAHSell()
   f.l1:SetText(string.format(T("AHS_COUNT"), getn(list), pieces, BB.Money(total)))
   local bankLeft = pieces - inBags
   local hint = string.format(T("AHS_RULE"), BB:AHKeep(), BB:AHKeepGold())
+  local st = BB:AHStats()
+  if st.posted > 0 or st.sold > 0 then
+    local sign = st.net < 0 and "-" or "+"
+    hint = hint .. " " .. string.format(T("AHS_STATS_LINE"), BB.Money(st.fees), BB.Money(st.proceeds), sign .. BB.Money(math.abs(st.net)))
+  end
   if bankLeft > 0 then hint = string.format(T("AHS_IN_BANK"), bankLeft) .. " " .. hint end
   f.l2:SetText(hint)
   for i = 1, ROWS do
