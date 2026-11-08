@@ -26,6 +26,13 @@ if BananaActivity and BananaActivity.libVersion and BananaActivity.libVersion >=
 	return
 end
 
+-- an older copy (version 1) is already running: switch its frame off, this copy replaces it
+if BananaActivity and BananaActivityFrame then
+	BananaActivityFrame:UnregisterAllEvents()
+	BananaActivityFrame:SetScript("OnEvent", nil)
+	BananaActivityFrame:SetScript("OnUpdate", nil)
+end
+
 BananaActivity = BananaActivity or {}
 local A = BananaActivity
 
