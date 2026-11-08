@@ -882,7 +882,13 @@ function UI:RefreshStock()
     local snap = BananaBankDB.snaps[S.bank]
     S.info:SetText(string.format(T("STOCK_INFO_BANK"), S.bank, total, snap and BB.Date(snap.ts) or "-"))
   else
-    S.info:SetText(string.format(T("STOCK_INFO"), total, reserved))
+    local infoTxt = string.format(T("STOCK_INFO"), total, reserved)
+    -- Bank-Chars: wie viele Faecher nicht stapelbare Items belegen
+    if BB:IsBank() and BB.SlotHogs then
+      local hogs = BB:SlotHogs()
+      if hogs > 0 then infoTxt = infoTxt .. " - " .. string.format(T("AHS_HOGS"), hogs) end
+    end
+    S.info:SetText(infoTxt)
   end
   self:RefreshCart()
 end

@@ -496,7 +496,7 @@ local function fillTop(pnl, list)
   if list[1] then pnl.empty:Hide() else pnl.empty:Show() end
 end
 
-local KIND_TAG = { out = "-", gout = "-", ["in"] = "+", gold = "+", back = "<", cod = "$", qfix = "*", trash = "$" }
+local KIND_TAG = { out = "-", gout = "-", ["in"] = "+", gold = "+", back = "<", cod = "$", qfix = "*", trash = "$", ah = "$" }
 
 function UI:RefreshLedger()
   if not self.led then return end
@@ -544,7 +544,7 @@ function UI:RefreshLedger()
       if tag == "-" then col = C.orange elseif tag == "<" then col = C.muted elseif tag == "$" then col = C.gold elseif tag == "*" then col = { 0.5, 0.7, 1 } end
       row.tag:SetTextColor(col[1], col[2], col[3])
       local what
-      if e.k == "gold" or e.k == "gout" or e.k == "cod" or e.k == "trash" then
+      if e.k == "gold" or e.k == "gout" or e.k == "cod" or e.k == "trash" or e.k == "ah" then
         what = BB.Money(e.m)
       else
         local qc = BB.QUALITY_COLOR[e.q or 1] or BB.QUALITY_COLOR[1]

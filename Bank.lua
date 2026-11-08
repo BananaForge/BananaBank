@@ -1426,6 +1426,22 @@ function BB:OnTakeInbox(i, isItem, j)
     self:MailLog(sender, isItem, nil, 0, money, "cod", BB.Money(cod))
     return
   end
+  -- Erloes eines Verkaufs im Auktionshaus ("Auction successful: Item"): als AH-Verkauf buchen
+  if not isItem and money and money > 0 and self:IsSystemSender(sender) and subject
+      and (string.find(subject, "^[Aa]uction successful") or string.find(subject, "^Auktion erfolgreich")) then
+    local akey = "ah|" .. sender .. "|" .. tostring(subject) .. "|" .. tostring(daysLeft) .. "|" .. tostring(money)
+    if akey == lastTake.key and lastTake.serial == (self.inboxSerial or 0) and GetTime() - lastTake.t < 3 then
+      self:MailLog(sender, false, nil, 0, money, "dup")
+      return
+    end
+    lastTake.key, lastTake.t, lastTake.serial = akey, GetTime(), (self.inboxSerial or 0)
+    local _, _, nm = string.find(subject, ":%s*(.+)$")
+    self:AddLedger({ k = "ah", p = sender, n = nm or "", c = 1, q = 1, m = money, code = "" })
+    self:MailLog(sender, false, nil, 0, money, "ah", nm)
+    self:ScheduleSnapshot(4)
+    if self.UI then self.UI:Refresh() end
+    return
+  end
   -- Uebergaben zwischen Bank-Chars sind keine Spenden
   if BananaBankDB.banks[sender] or self:MayBeBank(sender) or self:IsSystemSender(sender) then
     self:MailLog(sender, isItem, nil, 0, money, "bank")

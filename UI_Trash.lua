@@ -361,7 +361,7 @@ function UI:BuildTrashFetchButton()
   -- eigenes Fenster neben der Bank (nicht am BankFrame: Taschen-Addons ersetzen oder verstecken ihn)
   local f = CreateFrame("Frame", "BananaBankTrashFetch", UIParent)
   f:SetWidth(232)
-  f:SetHeight(116)
+  f:SetHeight(146)
   f:SetFrameStrata("DIALOG")
   f:SetToplevel(true)
   f:SetMovable(true)
@@ -395,7 +395,12 @@ function UI:BuildTrashFetchButton()
   f.l2:SetHeight(26)
   f.l2:SetJustifyV("TOP")
   f.btn = self:Button(f, 204, 24, "", function() UI:TrashFetchStart() end, "primary")
-  f.btn:SetPoint("BOTTOMLEFT", f, "BOTTOMLEFT", 14, 12)
+  f.btn:SetPoint("BOTTOMLEFT", f, "BOTTOMLEFT", 14, 42)
+  -- nicht stapelbare Items fuers Auktionshaus aus der Bank holen (UI_AHSell.lua)
+  f.btn2 = self:Button(f, 204, 24, "", function()
+    if BB.AHFetchSlots then UI:TrashFetchStart(BB:AHFetchSlots()) end
+  end)
+  f.btn2:SetPoint("BOTTOMLEFT", f, "BOTTOMLEFT", 14, 12)
   self.trashFetch = f
 end
 
@@ -407,7 +412,8 @@ function UI:RefreshTrashFetch()
     return
   end
   local stacks, items = BB:TrashInBank()
-  if stacks == 0 then
+  local ahSlots = BB.AHFetchSlots and getn(BB:AHFetchSlots()) or 0
+  if stacks == 0 and ahSlots == 0 then
     f:Hide()
     return
   end
@@ -422,19 +428,23 @@ function UI:RefreshTrashFetch()
   f.l1:SetText(string.format(T("TRASH_COUNT_BANK"), stacks, items))
   f.l2:SetText(T("TRASH_FETCH_HINT"))
   f.btn.fs:SetText(string.format(T("TRASH_FETCH"), stacks))
-  f.btn:SetOn(not self.TS.fetching)
+  f.btn:SetOn(not self.TS.fetching and stacks > 0)
+  f.btn2.fs:SetText(string.format(T("AHS_FETCH"), ahSlots))
+  f.btn2:SetOn(not self.TS.fetching and ahSlots > 0)
   f:Show()
 end
 
-function UI:TrashFetchStart()
+function UI:TrashFetchStart(given)
   if self.TS.fetching or not BB.bankOpen then return end
-  local list = {}
-  for _, bag in ipairs(BB.BANK_LIST) do
-    for slot = 1, (GetContainerNumSlots(bag) or 0) do
-      local link = GetContainerItemLink(bag, slot)
-      if link then
-        local id = BB.ParseLink(link)
-        if id and BB:IsTrash(id) then table.insert(list, { bag = bag, slot = slot, id = id }) end
+  local list = given or {}
+  if not given then
+    for _, bag in ipairs(BB.BANK_LIST) do
+      for slot = 1, (GetContainerNumSlots(bag) or 0) do
+        local link = GetContainerItemLink(bag, slot)
+        if link then
+          local id = BB.ParseLink(link)
+          if id and BB:IsTrash(id) then table.insert(list, { bag = bag, slot = slot, id = id }) end
+        end
       end
     end
   end

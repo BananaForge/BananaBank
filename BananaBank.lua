@@ -216,6 +216,22 @@ SlashCmdList["BANANABANK"] = function(msg)
     local _, _, it2, n2 = string.find(tail or "", "^(.-)%s+(%d+)$")
     if it2 then item, num = it2, tonumber(n2) end
     BB:Reissue(r, item, num)
+  elseif cmd == "ah" then
+    -- /bb ah: Kandidaten fuers Auktionshaus; /bb ah keep <N>, /bb ah gold <Gold>
+    local _, _, what, num = string.find(rest or "", "^(%a+)%s*(%d*)$")
+    if what == "keep" and tonumber(num) then
+      BananaBankDB.ahKeep = tonumber(num)
+    elseif what == "gold" and tonumber(num) then
+      BananaBankDB.ahKeepGold = tonumber(num)
+    end
+    local list, total = BB:AHCandidates()
+    local pieces = 0
+    for i = 1, table.getn(list) do pieces = pieces + list[i].sell end
+    BB:Print(string.format(BB.T("AHS_COUNT"), table.getn(list), pieces, BB.Money(total)))
+    BB:Print(string.format(BB.T("AHS_RULE"), BB:AHKeep(), BB:AHKeepGold()))
+    for i = 1, math.min(table.getn(list), 15) do
+      DEFAULT_CHAT_FRAME:AddMessage("  " .. list[i].sell .. "x " .. (list[i].n or "?") .. "  " .. BB.Money(list[i].price))
+    end
   elseif cmd == "overview" or cmd == "uebersicht" then
     if BB.UI.OpenSendOverview then BB.UI:OpenSendOverview() end
   elseif cmd == "nocod" or cmd == "ohnenachnahme" then
