@@ -13,7 +13,8 @@ UI.q = { view = "quests", filter = "active", page = 1, sel = nil, period = "all"
 
 local LIST_ROWS = 6
 local ROW_H = 44
-local ITEM_ROWS = 5   -- sichtbare Zeilen; mehr Eintraege (Items + Gold-Ziele, bis 6) scrollen
+local ITEM_ROWS = 5   -- sichtbare Zeilen; mehr Eintraege (Items + Gold-Ziele, bis 12) scrollen
+local EDIT_ROWS = 6   -- sichtbare Item-Zeilen im Quest-Editor, mehr scrollen
 local HELPER_ROWS = 5
 local RANK_ROWS = 9
 
@@ -1091,18 +1092,34 @@ function UI:BuildQuestEditor()
   end)
   f.search:SetScript("OnEnterPressed", function() this:ClearFocus() end)
 
-  local ip = self:Panel(f, 488, 6 * 28 + 10)
+  local ip = self:Panel(f, 488, EDIT_ROWS * 28 + 10)
   ip:SetPoint("TOPLEFT", f, "TOPLEFT", 26, -326)
+  -- mehr Items als sichtbare Zeilen: scrollen
+  f.esf = CreateFrame("ScrollFrame", "BananaBankQuestEditScroll", ip, "FauxScrollFrameTemplate")
+  f.esf:SetPoint("TOPLEFT", ip, "TOPLEFT", 0, -3)
+  f.esf:SetPoint("BOTTOMRIGHT", ip, "BOTTOMRIGHT", -26, 3)
+  f.esf:SetScript("OnVerticalScroll", function()
+    FauxScrollFrame_OnVerticalScroll(28, function() UI:RefreshQuestEditor() end)
+  end)
+  local function ewheel()
+    local sb = getglobal("BananaBankQuestEditScrollScrollBar")
+    if sb then sb:SetValue(sb:GetValue() - arg1 * 28) end
+  end
+  f.esf:EnableMouseWheel(true)
+  f.esf:SetScript("OnMouseWheel", ewheel)
+  ip:EnableMouseWheel(true)
+  ip:SetScript("OnMouseWheel", ewheel)
   f.empty = self:Font(ip, 11, C.muted)
   f.empty:SetPoint("CENTER", ip, "CENTER", 0, 0)
   self:Loc(f.empty, "QE_ITEMS_EMPTY")
   f.rows = {}
   f.items = {}
-  for i = 1, BB.QUEST_MAX_ITEMS do
+  f.eoff = 0
+  for i = 1, EDIT_ROWS do
     local r = CreateFrame("Frame", nil, ip)
     r:SetHeight(26)
     r:SetPoint("TOPLEFT", ip, "TOPLEFT", 10, -7 - (i - 1) * 28)
-    r:SetPoint("TOPRIGHT", ip, "TOPRIGHT", -10, -7 - (i - 1) * 28)
+    r:SetPoint("TOPRIGHT", ip, "TOPRIGHT", -30, -7 - (i - 1) * 28)
     r.slot = self:Slot(r, 24)
     r.slot:SetPoint("LEFT", r, "LEFT", 0, 0)
     r.slot:SetScript("OnEnter", function()
@@ -1133,11 +1150,11 @@ function UI:BuildQuestEditor()
     r.amt:SetJustifyH("CENTER")
     local idx = i
     r.amt:SetScript("OnTextChanged", function()
-      local it = f.items[idx]
-      if it then it.need = tonumber(this:GetText()) or it.need end
+      local it = f.items[(f.eoff or 0) + idx]
+      if it and not f.loading then it.need = tonumber(this:GetText()) or it.need end
     end)
     r.del = self:Button(r, 22, 20, "x", function()
-      table.remove(f.items, idx)
+      table.remove(f.items, (f.eoff or 0) + idx)
       UI:RefreshQuestEditor()
     end, "danger")
     r.del:SetPoint("RIGHT", r, "RIGHT", 0, 0)
@@ -1345,6 +1362,8 @@ function UI:OpenQuestEditor(q)
   self:BuildQuestEditor()
   local f = self.qe
   f.editing = q
+  local esb = getglobal("BananaBankQuestEditScrollScrollBar")
+  if esb then esb:SetValue(0) end
   f.items = {}
   f.meta = {}
   f.gold = {}
@@ -1386,9 +1405,17 @@ end
 function UI:RefreshQuestEditor()
   local f = self.qe
   if not f then return end
-  for i = 1, BB.QUEST_MAX_ITEMS do
+  local offset = 0
+  if f.esf and FauxScrollFrame_Update then
+    FauxScrollFrame_Update(f.esf, getn(f.items), EDIT_ROWS, 28)
+    offset = FauxScrollFrame_GetOffset(f.esf)
+    if type(offset) ~= "number" then offset = 0 end
+  end
+  f.eoff = offset
+  f.loading = true
+  for i = 1, EDIT_ROWS do
     local r = f.rows[i]
-    local it = f.items[i]
+    local it = f.items[offset + i]
     if it then
       local qc = BB.QUALITY_COLOR[it.q or 1] or BB.QUALITY_COLOR[1]
       r.slot.id = it.id
@@ -1402,6 +1429,7 @@ function UI:RefreshQuestEditor()
       r:Hide()
     end
   end
+  f.loading = nil
   if f.items[1] then f.empty:Hide() else f.empty:Show() end
   f.goldBtn.fs:SetText(string.format(T("QE_GOLD_BTN"), getn(f.gold)))
   -- Icon: gewaehltes, sonst das des ersten Items
@@ -1558,6 +1586,9 @@ function UI:QuestAddItem(id, meta)
   end
   table.insert(f.items, { id = id, need = 1, n = name, q = quality, t = tex })
   self:RefreshQuestEditor()
+  -- ans Ende scrollen, damit das neue Item sichtbar ist
+  local sb = getglobal("BananaBankQuestEditScrollScrollBar")
+  if sb and getn(f.items) > EDIT_ROWS then sb:SetValue((getn(f.items) - EDIT_ROWS) * 28) end
 end
 
 function UI:SaveQuestEditor()
@@ -1989,7 +2020,7 @@ function UI:BuildIconPicker()
   il:SetPoint("TOPLEFT", f, "TOPLEFT", 16, -60)
   self:Loc(il, "QX_PICK_ITEMS")
   f.itemTiles = {}
-  for i = 1, BB.QUEST_MAX_ITEMS do
+  for i = 1, PICK_COLS do
     table.insert(f.itemTiles, pickTile(f, 16 + (i - 1) * PICK_SIZE, -76))
   end
   f.tiles = {}
@@ -2012,7 +2043,7 @@ function UI:RefreshIconPicker()
   local f = self.picker
   if not f then return end
   local ed = self.qe
-  for i = 1, BB.QUEST_MAX_ITEMS do
+  for i = 1, PICK_COLS do
     local t = f.itemTiles[i]
     local it = ed and ed.items[i]
     if it and it.t and it.t ~= "" then

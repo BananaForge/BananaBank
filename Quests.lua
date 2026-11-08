@@ -10,7 +10,7 @@ local getn = table.getn
 local floor = math.floor
 
 BB.questModule = true
-BB.QUEST_MAX_ITEMS = 6
+BB.QUEST_MAX_ITEMS = 12
 BB.QUEST_MAX_GOLD = 6          -- Gold-Ziele (je ein Bank-Char); Items + Gold-Ziele zusammen hoechstens QUEST_MAX_ITEMS
 BB.GOLD = 10000
 BB.QUEST_MAX_OPEN = 8

@@ -93,6 +93,7 @@ Pull requests welcome, tested in-game on a 1.12 client. Lua 5.0 rules: no `#`, `
 
 ## Changelog
 
+- **3.14.0:** up to **12** items / gold goals per quest (was 6). The quest editor list scrolls (6 visible rows), the detail view and the tracker already coped with more; the icon picker shows the first 8 item icons. Chat posts wrap over several lines. Older clients only keep the first 6 items of such a quest until they update.
 - **3.13.0:** item search in the guild quest editor: type a name or an item ID above the item list, matches (every item name the client knows, searched in blocks so the game does not hitch) appear as a clickable list with icon, name, ID and the normal item tooltip on hover; a click adds the item. An ID is looked up at the server. The 1.12 client has no item database, so only items it has already seen show up by name.
 - **3.12.4:** counts the guild members online every 10 minutes (peak per server hour, shared invisibly over the guild channel with everybody running BananaBank or BananaGuild) so the BananaGuild dashboard gets a complete activity heatmap. Nothing to set up, no extra chat output (new file `BananaActivity.lua`).
 - **3.12.3:** fix: the "Fetch trash" window did not show up at the bank because the check ran before the main module had noted that the bank is open; it is now re-checked 0.4 s and 1.5 s after opening and every 2 s while the bank is open.
