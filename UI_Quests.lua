@@ -1192,6 +1192,24 @@ end
 local SEARCH_MAX_ID, SEARCH_CHUNK, SEARCH_ROWS = 70000, 2500, 8
 local qsTip
 
+-- Item beim Server abfragen (damit der Client Name, Qualitaet und Icon kennenlernt)
+local function qsQuery(id)
+  if not qsTip then
+    qsTip = CreateFrame("GameTooltip", "BananaBankQuestSearchTip", UIParent, "GameTooltipTemplate")
+    qsTip:SetOwner(UIParent, "ANCHOR_NONE")
+  end
+  qsTip:SetHyperlink("item:" .. id .. ":0:0:0")
+end
+
+-- Name zum Anzeigen: Client, sonst die Namensliste in der Sprache des Addons
+local function qsName(id)
+  local n = GetItemInfo(id)
+  if n then return n end
+  local de, en = BB.ItemNamesDE, BB.ItemNamesEN
+  if BB.lang == "deDE" then return (de and de[id]) or (en and en[id]) end
+  return (en and en[id]) or (de and de[id])
+end
+
 local function qsRows(self)
   local f = self.qe
   if self.qsBox then return self.qsBox end
@@ -1235,6 +1253,7 @@ local function qsRows(self)
       local h = f.qsHits and f.qsHits[idx]
       if h then
         UI:QuestAddItem(h.id, { n = h.n, q = h.q, t = h.t })
+        UI:QSearchLearn(h.id)
         UI.qsBox:Hide()
         f.search:SetText("")
         f.search:ClearFocus()
@@ -1300,10 +1319,15 @@ qsFrame:SetScript("OnUpdate", function()
   end
   local last = math.min(s.id + SEARCH_CHUNK - 1, SEARCH_MAX_ID)
   local hits = f.qsHits
+  local den, een = BB.ItemNamesDE, BB.ItemNamesEN
   for id = s.id, last do
     local n, _, q, _, _, _, _, _, tex = GetItemInfo(id)
-    if n and string.find(string.lower(n), s.text, 1, true) then
-      table.insert(hits, { id = id, n = n, q = q or 1, t = tex })
+    local hit = n and string.find(string.lower(n), s.text, 1, true)
+    -- Namensliste (englisch und deutsch): findet auch Items, die der Client noch nie gesehen hat
+    if not hit and een and een[id] then hit = string.find(string.lower(een[id]), s.text, 1, true) end
+    if not hit and den and den[id] then hit = string.find(string.lower(den[id]), s.text, 1, true) end
+    if hit then
+      table.insert(hits, { id = id, n = n or qsName(id), q = q or 1, t = tex })
       if getn(hits) >= 40 then last = SEARCH_MAX_ID break end
     end
   end
@@ -1316,6 +1340,22 @@ qsFrame:SetScript("OnUpdate", function()
     f.searchStatus:SetText(T("QE_SEARCH_SCAN"))
   end
 end)
+
+-- Gewaehltes Item beim Server abfragen und danach Qualitaet und Icon im Editor nachtragen
+function UI:QSearchLearn(id)
+  if not GetItemInfo(id) then qsQuery(id) end
+  BB:After(1.2, function()
+    local f = UI.qe
+    local n, _, q, _, _, _, _, _, tex = GetItemInfo(id)
+    if not (f and n and f.items) then return end
+    for i = 1, getn(f.items) do
+      if f.items[i].id == id then
+        f.items[i].n, f.items[i].q, f.items[i].t = n, q or f.items[i].q, tex or f.items[i].t
+      end
+    end
+    UI:RefreshQuestEditor()
+  end, "qslearn" .. id)
+end
 
 function UI:QSearchStart(raw)
   local f = self.qe
@@ -1332,14 +1372,9 @@ function UI:QSearchStart(raw)
   local num = tonumber(raw)
   if num and num > 0 and num < 100000 then
     -- ID: beim Server abfragen, danach den Namen lesen
-    if not GetItemInfo(num) then
-      if not qsTip then
-        qsTip = CreateFrame("GameTooltip", "BananaBankQuestSearchTip", UIParent, "GameTooltipTemplate")
-        qsTip:SetOwner(UIParent, "ANCHOR_NONE")
-      end
-      qsTip:SetHyperlink("item:" .. num .. ":0:0:0")
-    end
+    if not GetItemInfo(num) then qsQuery(num) end
     local n, _, q, _, _, _, _, _, tex = GetItemInfo(num)
+    if not n then n = qsName(num) end
     if n then
       f.qsHits = { { id = num, n = n, q = q or 1, t = tex } }
       f.searchStatus:SetText(string.format(T("QE_SEARCH_HITS"), 1))

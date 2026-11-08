@@ -12,7 +12,7 @@ local BB = BananaBank
 
 -- Anfrage-Code (Discord-Code erzeugen/einloesen): aus, Anfragen laufen ueber den Gildenabgleich
 BB.USE_CODE = false
-BB.VERSION = "3.14.0"
+BB.VERSION = "3.15.0"
 BB.PREFIX = "BBNK"
 BB.DONATE_NAME = "Lumihunt"
 -- Einziger erlaubter Bank-Rang, deutsch und englisch. Fest eingebaut, es gibt
@@ -934,6 +934,7 @@ function BB:CheckModules()
   if not (self.UI and self.UI.questModule) then table.insert(missing, "UI_Quests.lua") end
   if not (self.UI and self.UI.priceModule) then table.insert(missing, "UI_Prices.lua") end
   if not self.VendorDB then table.insert(missing, "VendorData.lua") end
+  if not self.ItemNamesEN then table.insert(missing, "ItemNames.lua") end
   if not self.vendorModule then table.insert(missing, "Vendor.lua") end
   if not (self.UI and self.UI.lotseModule) then table.insert(missing, "UI_Lotse.lua") end
   if not (self.UI and self.UI.trashModule) then table.insert(missing, "UI_Trash.lua") end
