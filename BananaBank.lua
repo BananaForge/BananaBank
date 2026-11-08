@@ -132,6 +132,8 @@ ev:SetScript("OnEvent", function()
       local cnt = GetInboxNumItems()
       BB:MailLog("-", true, "", 0, 0, "open", tostring(cnt or 0))
     end
+    BB.inboxSnap = nil
+    BB:InboxWatch(true)
     BB.UI:Refresh()
 
   elseif event == "TRADE_SKILL_SHOW" or event == "TRADE_SKILL_UPDATE" then
@@ -143,9 +145,11 @@ ev:SetScript("OnEvent", function()
   elseif event == "MAIL_INBOX_UPDATE" then
     -- der Briefkasten hat sich geaendert: die naechste gleiche Entnahme ist ein neuer Brief, kein doppelter Aufruf
     BB.inboxSerial = (BB.inboxSerial or 0) + 1
+    if BB.InboxWatch then BB:InboxWatch() end
 
   elseif event == "MAIL_CLOSED" then
     BB.mailOpen = false
+    BB.inboxSnap = nil
     BB:Cancel("automail")
     BB.UI:Refresh()
 

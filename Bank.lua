@@ -1453,6 +1453,10 @@ function BB:OnTakeInbox(i, isItem, j)
     lastTake.key, lastTake.t, lastTake.serial = akey, GetTime(), (self.inboxSerial or 0)
     local _, _, nm = string.find(subject, ":%s*(.+)$")
     self:AddLedger({ k = "ah", p = sender, n = nm or "", c = 1, q = 1, m = money, code = "" })
+    -- merken, dass dieser Brief schon ueber den Hook gebucht wurde (InboxWatch bucht nicht doppelt)
+    self.ahHooked = self.ahHooked or {}
+    local hk = string.lower(tostring(sender)) .. "|" .. lowSub .. "|" .. tostring(money)
+    self.ahHooked[hk] = (self.ahHooked[hk] or 0) + 1
     self:MailLog(sender, false, nil, 0, money, "ah", nm or tostring(subject))
     self:ScheduleSnapshot(4)
     if self.UI then self.UI:Refresh() end
@@ -1524,6 +1528,67 @@ function BB:OnTakeInbox(i, isItem, j)
     self:ScheduleSnapshot(4)
   end
   if self.UI then self.UI:Refresh() end
+end
+
+-- Unabhaengige Erkennung: Manche Post-Addons nehmen Briefe an unseren Hooks vorbei. Darum wird der
+-- Briefkasten bei jeder Aenderung mit dem letzten Stand verglichen; ein Gold-Brief vom Auktionshaus, der
+-- verschwindet oder sein Gold verliert, gilt als abgeholt und wird (falls der Hook ihn nicht schon
+-- gebucht hat) als AH-Verkauf gebucht.
+local function inboxList()
+  local list = {}
+  if not GetInboxNumItems then return list end
+  local n = GetInboxNumItems() or 0
+  for i = 1, n do
+    local _, _, sender, subject, money, cod = GetInboxHeaderInfo(i)
+    table.insert(list, { s = sender, sub = subject or "", m = money or 0, cod = cod or 0 })
+  end
+  return list
+end
+
+local function isAHMail(e)
+  if not e.s or e.m <= 0 or e.cod > 0 then return false end
+  local ls = string.lower(e.s)
+  local lsub = string.lower(e.sub)
+  if string.find(lsub, "outbid", 1, true) or string.find(lsub, "berboten", 1, true)
+      or string.find(lsub, "cancel", 1, true) or string.find(lsub, "abgebrochen", 1, true) then return false end
+  return (string.find(ls, "auction", 1, true) or string.find(ls, "auktion", 1, true)) and true or false
+end
+
+function BB:InboxWatch(init)
+  if not self:IsBank() then return end
+  local new = inboxList()
+  local old = self.inboxSnap
+  if not init and old then
+    local claimed = {}
+    for i = 1, table.getn(old) do
+      local o = old[i]
+      if isAHMail(o) then
+        local found = false
+        for j = 1, table.getn(new) do
+          local nw = new[j]
+          if not claimed[j] and nw.s == o.s and nw.sub == o.sub and nw.m == o.m then
+            claimed[j] = true
+            found = true
+            break
+          end
+        end
+        if not found then
+          local hk = string.lower(tostring(o.s)) .. "|" .. string.lower(o.sub) .. "|" .. tostring(o.m)
+          self.ahHooked = self.ahHooked or {}
+          if (self.ahHooked[hk] or 0) > 0 then
+            self.ahHooked[hk] = self.ahHooked[hk] - 1
+          else
+            local _, _, nm = string.find(o.sub, ":%s*(.+)$")
+            self:AddLedger({ k = "ah", p = o.s, n = nm or "", c = 1, q = 1, m = o.m, code = "" })
+            self:MailLog(o.s, false, nil, 0, o.m, "ah", (nm or o.sub) .. " (Briefkasten)")
+            self:ScheduleSnapshot(4)
+            if self.UI then self.UI:Refresh() end
+          end
+        end
+      end
+    end
+  end
+  self.inboxSnap = new
 end
 
 function BB:HookMail()
