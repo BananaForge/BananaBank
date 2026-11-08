@@ -979,7 +979,7 @@ function UI:BuildQuestEditor()
   local f = CreateFrame("Frame", "BananaBankQuestEditor", UIParent)
   self.qe = f
   f:SetWidth(540)
-  f:SetHeight(606)
+  f:SetHeight(634)
   f:SetPoint("CENTER", UIParent, "CENTER", 0, 10)
   f:SetFrameStrata("DIALOG")
   f:SetMovable(true)
@@ -1071,8 +1071,28 @@ function UI:BuildQuestEditor()
   hint:SetJustifyH("RIGHT")
   self:Loc(hint, "QE_ITEMS_HINT")
 
+  -- Item-Suche: Name oder ID, Treffer zum Anklicken
+  f.search = self:EditBox("BananaBankQuestSearch", f, 250)
+  f.search:SetPoint("TOPLEFT", f, "TOPLEFT", 30, -296)
+  f.search:SetMaxLetters(40)
+  local sph = self:Font(f.search, 11, C.muted)
+  sph:SetPoint("LEFT", f.search, "LEFT", 2, 0)
+  self:Loc(sph, "QE_SEARCH_PH")
+  f.searchPh = sph
+  f.searchStatus = self:Font(f, 10, C.muted)
+  f.searchStatus:SetPoint("LEFT", f.search, "RIGHT", 10, 0)
+  f.searchStatus:SetWidth(220)
+  f.searchStatus:SetHeight(24)
+  f.searchStatus:SetJustifyH("LEFT")
+  f.search:SetScript("OnTextChanged", function()
+    local txt = this:GetText() or ""
+    if txt == "" then sph:Show() else sph:Hide() end
+    UI:QSearchStart(txt)
+  end)
+  f.search:SetScript("OnEnterPressed", function() this:ClearFocus() end)
+
   local ip = self:Panel(f, 488, 6 * 28 + 10)
-  ip:SetPoint("TOPLEFT", f, "TOPLEFT", 26, -294)
+  ip:SetPoint("TOPLEFT", f, "TOPLEFT", 26, -326)
   f.empty = self:Font(ip, 11, C.muted)
   f.empty:SetPoint("CENTER", ip, "CENTER", 0, 0)
   self:Loc(f.empty, "QE_ITEMS_EMPTY")
@@ -1126,25 +1146,195 @@ function UI:BuildQuestEditor()
 
   -- Frist und Reservierung
   local dueL = self:Font(f, 11, C.text)
-  dueL:SetPoint("TOPLEFT", f, "TOPLEFT", 30, -506)
+  dueL:SetPoint("TOPLEFT", f, "TOPLEFT", 30, -534)
   self:Loc(dueL, "QE_DUE")
   f.due = self:EditBox("BananaBankQuestDue", f, 46)
-  f.due:SetPoint("TOPLEFT", f, "TOPLEFT", 296, -501)
+  f.due:SetPoint("TOPLEFT", f, "TOPLEFT", 296, -529)
   f.due:SetNumeric(true)
   f.due:SetMaxLetters(3)
   f.due:SetJustifyH("CENTER")
   f.gold = {}
   f.goldBtn = self:Button(f, 160, 20, "", function() UI:OpenGoldDialog() end)
-  f.goldBtn:SetPoint("TOPLEFT", f, "TOPLEFT", 354, -501)
+  f.goldBtn:SetPoint("TOPLEFT", f, "TOPLEFT", 354, -529)
   f.reserve = true
   f.chk = self:Check(f, "QE_RESERVE", function() return f.reserve end, function(v) f.reserve = v end)
   f.chk:SetWidth(440)
-  f.chk:SetPoint("TOPLEFT", f, "TOPLEFT", 28, -532)
+  f.chk:SetPoint("TOPLEFT", f, "TOPLEFT", 28, -560)
 
   f.cancel = self:Button(f, 110, 26, "QE_CANCEL", function() f:Hide() end)
   f.cancel:SetPoint("BOTTOMRIGHT", f, "BOTTOMRIGHT", -154, 22)
   f.save = self:Button(f, 120, 26, "QE_SAVE", function() UI:SaveQuestEditor() end, "ok")
   f.save:SetPoint("BOTTOMRIGHT", f, "BOTTOMRIGHT", -26, 22)
+end
+
+-- ------------------------------------------------------------
+-- Item-Suche im Quest-Editor
+-- Der 1.12-Client kennt keine Item-Datenbank: durchsucht werden alle Item-IDs, die er schon einmal gesehen hat
+-- (Namen im Cache), in Bloecken ueber mehrere Bilder. Eine eingegebene ID fragt das Item beim Server ab.
+-- ------------------------------------------------------------
+local SEARCH_MAX_ID, SEARCH_CHUNK, SEARCH_ROWS = 70000, 2500, 8
+local qsTip
+
+local function qsRows(self)
+  local f = self.qe
+  if self.qsBox then return self.qsBox end
+  local box = CreateFrame("Frame", nil, f)
+  box:SetWidth(300)
+  box:SetHeight(SEARCH_ROWS * 22 + 8)
+  box:SetPoint("TOPLEFT", f.search, "BOTTOMLEFT", -4, -2)
+  box:SetFrameLevel(f:GetFrameLevel() + 20)
+  box:SetBackdrop({
+    bgFile = WHITE, edgeFile = "Interface\\Tooltips\\UI-Tooltip-Border",
+    tile = true, tileSize = 16, edgeSize = 12,
+    insets = { left = 3, right = 3, top = 3, bottom = 3 },
+  })
+  box:SetBackdropColor(0.02, 0.03, 0.08, 1)
+  box:SetBackdropBorderColor(C.brass[1], C.brass[2], C.brass[3], 1)
+  box:Hide()
+  box.rows = {}
+  for i = 1, SEARCH_ROWS do
+    local r = CreateFrame("Button", nil, box)
+    r:SetHeight(20)
+    r:SetPoint("TOPLEFT", box, "TOPLEFT", 6, -5 - (i - 1) * 22)
+    r:SetPoint("TOPRIGHT", box, "TOPRIGHT", -6, -5 - (i - 1) * 22)
+    local hl = r:CreateTexture(nil, "HIGHLIGHT")
+    hl:SetTexture(WHITE)
+    hl:SetAllPoints(r)
+    hl:SetVertexColor(1, 0.82, 0.3, 0.18)
+    r.ic = r:CreateTexture(nil, "ARTWORK")
+    r.ic:SetWidth(18)
+    r.ic:SetHeight(18)
+    r.ic:SetPoint("LEFT", r, "LEFT", 0, 0)
+    r.ic:SetTexCoord(0.07, 0.93, 0.07, 0.93)
+    r.name = self:Font(r, 11, C.text)
+    r.name:SetPoint("LEFT", r, "LEFT", 24, 0)
+    r.name:SetWidth(210)
+    r.name:SetHeight(13)
+    r.id = self:Font(r, 9, C.muted)
+    r.id:SetPoint("RIGHT", r, "RIGHT", -2, 0)
+    r.id:SetJustifyH("RIGHT")
+    local idx = i
+    r:SetScript("OnClick", function()
+      local h = f.qsHits and f.qsHits[idx]
+      if h then
+        UI:QuestAddItem(h.id, { n = h.n, q = h.q, t = h.t })
+        UI.qsBox:Hide()
+        f.search:SetText("")
+        f.search:ClearFocus()
+      end
+    end)
+    r:SetScript("OnEnter", function()
+      local h = f.qsHits and f.qsHits[idx]
+      if h then
+        GameTooltip:SetOwner(this, "ANCHOR_RIGHT")
+        GameTooltip:SetHyperlink("item:" .. h.id .. ":0:0:0")
+        GameTooltip:Show()
+      end
+    end)
+    r:SetScript("OnLeave", function() GameTooltip:Hide() end)
+    box.rows[i] = r
+  end
+  self.qsBox = box
+  return box
+end
+
+local function qsShow(self)
+  local f = self.qe
+  local box = qsRows(self)
+  local hits = f.qsHits or {}
+  table.sort(hits, function(a, b)
+    if string.len(a.n) ~= string.len(b.n) then return string.len(a.n) < string.len(b.n) end
+    return a.n < b.n
+  end)
+  for i = 1, SEARCH_ROWS do
+    local r = box.rows[i]
+    local h = hits[i]
+    if h then
+      local qc = BB.QUALITY_COLOR[h.q or 1] or BB.QUALITY_COLOR[1]
+      r.ic:SetTexture(h.t or "Interface\\Icons\\INV_Misc_QuestionMark")
+      r.name:SetText(h.n)
+      r.name:SetTextColor(qc[1], qc[2], qc[3])
+      r.id:SetText(h.id)
+      r:Show()
+    else
+      r:Hide()
+    end
+  end
+  if getn(hits) > 0 then
+    box:SetHeight(math.min(getn(hits), SEARCH_ROWS) * 22 + 8)
+    box:Show()
+  else
+    box:Hide()
+  end
+end
+
+local qsFrame = CreateFrame("Frame")
+UI.qsFrame = qsFrame
+qsFrame:SetScript("OnUpdate", function()
+  local f = UI.qe
+  local s = UI.qs
+  if not s or not f then return end
+  if s.wait then
+    s.wait = s.wait - (arg1 or 0)
+    if s.wait > 0 then return end
+    s.wait = nil
+    UI:QSearchStart(s.raw)
+    return
+  end
+  local last = math.min(s.id + SEARCH_CHUNK - 1, SEARCH_MAX_ID)
+  local hits = f.qsHits
+  for id = s.id, last do
+    local n, _, q, _, _, _, _, _, tex = GetItemInfo(id)
+    if n and string.find(string.lower(n), s.text, 1, true) then
+      table.insert(hits, { id = id, n = n, q = q or 1, t = tex })
+      if getn(hits) >= 40 then last = SEARCH_MAX_ID break end
+    end
+  end
+  s.id = last + 1
+  qsShow(UI)
+  if s.id > SEARCH_MAX_ID then
+    UI.qs = nil
+    if getn(hits) == 0 then f.searchStatus:SetText(T("QE_SEARCH_NONE")) else f.searchStatus:SetText(string.format(T("QE_SEARCH_HITS"), getn(hits))) end
+  else
+    f.searchStatus:SetText(T("QE_SEARCH_SCAN"))
+  end
+end)
+
+function UI:QSearchStart(raw)
+  local f = self.qe
+  if not f then return end
+  raw = string.gsub(raw or "", "^%s+", "")
+  raw = string.gsub(raw, "%s+$", "")
+  f.qsHits = {}
+  self.qs = nil
+  if raw == "" then
+    if self.qsBox then self.qsBox:Hide() end
+    f.searchStatus:SetText("")
+    return
+  end
+  local num = tonumber(raw)
+  if num and num > 0 and num < 100000 then
+    -- ID: beim Server abfragen, danach den Namen lesen
+    if not GetItemInfo(num) then
+      if not qsTip then
+        qsTip = CreateFrame("GameTooltip", "BananaBankQuestSearchTip", UIParent, "GameTooltipTemplate")
+        qsTip:SetOwner(UIParent, "ANCHOR_NONE")
+      end
+      qsTip:SetHyperlink("item:" .. num .. ":0:0:0")
+    end
+    local n, _, q, _, _, _, _, _, tex = GetItemInfo(num)
+    if n then
+      f.qsHits = { { id = num, n = n, q = q or 1, t = tex } }
+      f.searchStatus:SetText(string.format(T("QE_SEARCH_HITS"), 1))
+    else
+      f.searchStatus:SetText(T("QE_SEARCH_ASK"))
+      self.qs = { raw = raw, text = "", id = SEARCH_MAX_ID + 1, wait = 1 }
+    end
+    qsShow(self)
+    return
+  end
+  self.qs = { raw = raw, text = string.lower(raw), id = 1 }
+  f.searchStatus:SetText(T("QE_SEARCH_SCAN"))
 end
 
 function UI:OpenQuestEditor(q)

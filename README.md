@@ -93,6 +93,7 @@ Pull requests welcome, tested in-game on a 1.12 client. Lua 5.0 rules: no `#`, `
 
 ## Changelog
 
+- **3.13.0:** item search in the guild quest editor: type a name or an item ID above the item list, matches (every item name the client knows, searched in blocks so the game does not hitch) appear as a clickable list with icon, name, ID and the normal item tooltip on hover; a click adds the item. An ID is looked up at the server. The 1.12 client has no item database, so only items it has already seen show up by name.
 - **3.12.3:** fix: the "Fetch trash" window did not show up at the bank because the check ran before the main module had noted that the bank is open; it is now re-checked 0.4 s and 1.5 s after opening and every 2 s while the bank is open.
 - **3.12.2:** "Fetch trash" is now its own window next to the bank (like the "Sell trash" window at the vendor) instead of a small button on the bank frame, so it also shows with bag addons that replace the bank frame; it lists stacks/items and moves everything marked as trash from the bank slots into the bags. Draggable.
 - **3.12.1:** Prices tab (bank chars only): new column "Bank" shows the char that holds the item (the one with the biggest stock, "+N" if more banks have it).
