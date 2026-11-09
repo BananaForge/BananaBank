@@ -301,6 +301,190 @@ end
 -- Reiter Buch
 -- ------------------------------------------------------------
 local TOP_ROWS, RECENT_ROWS = 12, 8
+local KIND_TAG = { out = "-", gout = "-", ["in"] = "+", gold = "+", back = "<", cod = "$", qfix = "*", trash = "$", ah = "$", ahfee = "-" }
+
+-- Eine Buchungszeile (Art, Spieler: Inhalt, Zeit, Unterzeile) mit Tooltip; fuer das Tages-Fenster
+local function makeEntryRow(ui, parent, h)
+  local row = CreateFrame("Frame", nil, parent)
+  row:SetHeight(h)
+  row:EnableMouse(true)
+  row.tag = ui:Font(row, 13, C.green, UI.FONT, "OUTLINE")
+  row.tag:SetPoint("LEFT", row, "LEFT", 0, 0)
+  row.tag:SetWidth(12)
+  row.txt = ui:Font(row, 10, C.text)
+  row.txt:SetPoint("LEFT", row, "LEFT", 14, 5)
+  row.txt:SetWidth(290)
+  row.txt:SetHeight(12)
+  row.date = ui:Font(row, 9, C.muted)
+  row.date:SetPoint("TOPRIGHT", row, "TOPRIGHT", 0, -2)
+  row.date:SetWidth(50)
+  row.date:SetJustifyH("RIGHT")
+  row.sub = ui:Font(row, 9, C.muted)
+  row.sub:SetPoint("LEFT", row, "LEFT", 14, -6)
+  row.sub:SetWidth(330)
+  row:SetScript("OnEnter", function()
+    local e = this.e
+    if not e then return end
+    local id = e.i
+    -- Spenden werden oft gebucht, bevor das Item im Bestand steht: Id jetzt nachschlagen
+    if (not id or id == 0) and e.n and e.n ~= "" then id = BB:IdByName(e.n) end
+    if id and id > 0 then
+      UI:ItemTooltip(this, id, { { T("TT_BOOKED"), BB.Date(e.t) } })
+    else
+      GameTooltip:SetOwner(this, "ANCHOR_RIGHT")
+      if e.n and e.n ~= "" then
+        local qc = BB.QUALITY_COLOR[e.q or 1] or BB.QUALITY_COLOR[1]
+        GameTooltip:AddLine(e.n, qc[1], qc[2], qc[3])
+        GameTooltip:AddDoubleLine(T("TT_COUNT"), e.c .. "x", 0.7, 0.7, 0.7, 1, 1, 1)
+      else
+        GameTooltip:AddLine(BB.Money(e.m or 0), C.gold[1], C.gold[2], C.gold[3])
+      end
+      GameTooltip:AddDoubleLine(T("TT_FROM"), e.p, 0.7, 0.7, 0.7, 1, 1, 1)
+      GameTooltip:AddDoubleLine(T("TT_BOOKED"), BB.Date(e.t), 0.7, 0.7, 0.7, 1, 1, 1)
+      GameTooltip:Show()
+    end
+  end)
+  row:SetScript("OnLeave", function() GameTooltip:Hide() end)
+  return row
+end
+
+local function fillEntryRow(row, e)
+  row.e = e
+  local tag = KIND_TAG[e.k] or "?"
+  row.tag:SetText(tag)
+  local col = C.green
+  if tag == "-" then col = C.orange elseif tag == "<" then col = C.muted elseif tag == "$" then col = C.gold elseif tag == "*" then col = { 0.5, 0.7, 1 } end
+  row.tag:SetTextColor(col[1], col[2], col[3])
+  local what
+  if e.k == "gold" or e.k == "gout" or e.k == "cod" or e.k == "trash" or e.k == "ah" or e.k == "ahfee" then
+    what = BB.Money(e.m)
+  else
+    local qc = BB.QUALITY_COLOR[e.q or 1] or BB.QUALITY_COLOR[1]
+    what = e.c .. "x |cff" .. qc[4] .. e.n .. "|r"
+  end
+  local who = e.p
+  if (e.k == "in" or e.k == "gold" or e.k == "back") and BB:IsGuildMember(e.p) == false then
+    who = who .. " |cffff9a2e" .. T("LEDGER_EXTERN") .. "|r"
+  end
+  -- Gold-Spende an einen bestimmten Bank-Char (Gold-Ziel einer Quest)
+  if e.k == "gold" and e.n ~= "" then what = what .. "  >  " .. e.n end
+  row.txt:SetText(who .. ": " .. what)
+  row.date:SetText(date("%H:%M", e.t or 0))
+  local sub = T("KIND_" .. string.upper(e.k))
+  local qq = e.code ~= "" and BananaBankDB.quests[e.code]
+  if qq then
+    sub = sub .. "  |cffffd100" .. qq.title .. "|r"
+  elseif e.code ~= "" and e.code ~= "TRADE" then
+    sub = sub .. "  " .. e.code
+  end
+  row.sub:SetText(sub)
+end
+
+-- Pop-up mit allen Buchungen eines Tages
+local DAY_ROWS, DAY_ROW_H = 11, 26
+
+function UI:BuildDayWindow()
+  if self.dayWin then return end
+  local f = CreateFrame("Frame", "BananaBankDayWindow", UIParent)
+  self.dayWin = f
+  f:SetWidth(440)
+  f:SetHeight(100 + DAY_ROWS * DAY_ROW_H + 20)
+  f:SetPoint("CENTER", UIParent, "CENTER", 60, 10)
+  f:SetFrameStrata("FULLSCREEN_DIALOG")
+  f:SetToplevel(true)
+  f:SetMovable(true)
+  f:EnableMouse(true)
+  f:RegisterForDrag("LeftButton")
+  f:SetScript("OnDragStart", function() this:StartMoving() end)
+  f:SetScript("OnDragStop", function() this:StopMovingOrSizing() end)
+  f:SetBackdrop({
+    bgFile = "Interface\\Buttons\\WHITE8X8", edgeFile = "Interface\\DialogFrame\\UI-DialogBox-Border",
+    tile = true, tileSize = 16, edgeSize = 32,
+    insets = { left = 11, right = 12, top = 12, bottom = 11 },
+  })
+  f:SetBackdropColor(0.015, 0.025, 0.06, 1)
+  self:Solid(f, 12, 1)
+  f:Hide()
+  tinsert(UISpecialFrames, "BananaBankDayWindow")
+  local close = CreateFrame("Button", nil, f, "UIPanelCloseButton")
+  close:SetPoint("TOPRIGHT", f, "TOPRIGHT", -6, -6)
+  f.title = self:Font(f, 18, C.gold, UI.FONT_TITLE)
+  f.title:SetPoint("TOPLEFT", f, "TOPLEFT", 26, -20)
+  self:GlowLine(f, -48, 20, -20)
+  f.sum = self:Font(f, 10, C.muted)
+  f.sum:SetPoint("TOPLEFT", f, "TOPLEFT", 26, -56)
+  f.sum:SetWidth(380)
+  f.sum:SetHeight(14)
+  local sf = CreateFrame("ScrollFrame", "BananaBankDayScroll", f, "FauxScrollFrameTemplate")
+  sf:SetPoint("TOPLEFT", f, "TOPLEFT", 20, -76)
+  sf:SetPoint("BOTTOMRIGHT", f, "TOPRIGHT", -46, -76 - DAY_ROWS * DAY_ROW_H)
+  sf:SetScript("OnVerticalScroll", function()
+    FauxScrollFrame_OnVerticalScroll(DAY_ROW_H, function() UI:RefreshDayWindow() end)
+  end)
+  sf:EnableMouseWheel(true)
+  sf:SetScript("OnMouseWheel", function()
+    local sb = getglobal("BananaBankDayScrollScrollBar")
+    if sb then sb:SetValue(sb:GetValue() - arg1 * DAY_ROW_H) end
+  end)
+  f.sf = sf
+  f.rows = {}
+  for i = 1, DAY_ROWS do
+    local row = makeEntryRow(self, f, DAY_ROW_H - 2)
+    row:SetPoint("TOPLEFT", f, "TOPLEFT", 26, -76 - (i - 1) * DAY_ROW_H)
+    row:SetPoint("TOPRIGHT", f, "TOPRIGHT", -54, -76 - (i - 1) * DAY_ROW_H)
+    f.rows[i] = row
+  end
+end
+
+function UI:RefreshDayWindow(keepScroll)
+  local f = self.dayWin
+  if not f or not f.day then return end
+  -- Eintraege des Tages neu aus der aktuellen Liste holen (neue Buchungen erscheinen sofort)
+  local list = f.day.list
+  if self.led and self.led.days then
+    for i = 1, getn(self.led.days) do
+      if self.led.days[i].key == f.day.key then
+        f.day = self.led.days[i]
+        list = f.day.list
+        break
+      end
+    end
+  end
+  f.title:SetText(string.format(T("LEDGER_DAY_TITLE"), date("%d.%m.%Y", f.day.t)))
+  local parts = {}
+  local order = { "+", "-", "$", "<", "*" }
+  for k = 1, getn(order) do
+    if f.day.tags[order[k]] then table.insert(parts, order[k] .. " " .. f.day.tags[order[k]]) end
+  end
+  f.sum:SetText(string.format(T("LEDGER_DAY_N"), getn(list)) .. "    " .. table.concat(parts, "   "))
+  local offset = 0
+  if FauxScrollFrame_Update then
+    FauxScrollFrame_Update(f.sf, getn(list), DAY_ROWS, DAY_ROW_H)
+    offset = FauxScrollFrame_GetOffset(f.sf)
+  end
+  for i = 1, DAY_ROWS do
+    local row = f.rows[i]
+    local e = list[offset + i]
+    if e then
+      fillEntryRow(row, e)
+      row:Show()
+    else
+      row.e = nil
+      row:Hide()
+    end
+  end
+end
+
+function UI:OpenDayWindow(day)
+  self:BuildDayWindow()
+  local f = self.dayWin
+  f.day = day
+  if f.sf and FauxScrollFrame_SetOffset then FauxScrollFrame_SetOffset(f.sf, 0) end
+  local sb = getglobal("BananaBankDayScrollScrollBar")
+  if sb then sb:SetValue(0) end
+  f:Show()
+  self:RefreshDayWindow()
+end
 
 local function makeListPanel(ui, parent, w, key)
   local pnl = ui:Panel(parent, w, 0)
@@ -403,51 +587,38 @@ function UI:BuildLedger(parent)
   rp:SetPoint("TOPLEFT", p, "TOPLEFT", 480, -58)
   rp:SetPoint("BOTTOMRIGHT", p, "BOTTOMRIGHT", 0, 0)
   for i = 1, RECENT_ROWS do
-    local row = CreateFrame("Frame", nil, rp)
+    local row = CreateFrame("Button", nil, rp)
     row:SetHeight(24)
     row:SetPoint("TOPLEFT", rp, "TOPLEFT", 10, -38 - (i - 1) * 25)
     row:SetPoint("TOPRIGHT", rp, "TOPRIGHT", -10, -38 - (i - 1) * 25)
-    row:EnableMouse(true)
-    row.tag = self:Font(row, 13, C.green, UI.FONT, "OUTLINE")
-    row.tag:SetPoint("LEFT", row, "LEFT", 0, 0)
-    row.tag:SetWidth(12)
-    row.txt = self:Font(row, 10, C.text)
-    row.txt:SetPoint("LEFT", row, "LEFT", 14, 5)
+    row.hl = row:CreateTexture(nil, "BACKGROUND")
+    row.hl:SetTexture("Interface\\Buttons\\WHITE8X8")
+    row.hl:SetAllPoints(row)
+    row.hl:SetVertexColor(1, 1, 1, 0)
+    row.txt = self:Font(row, 11, C.gold)
+    row.txt:SetPoint("LEFT", row, "LEFT", 4, 5)
     row.txt:SetWidth(150)
     row.txt:SetHeight(12)
-    -- Datum rechts, klein: die zweite Zeile bleibt fuer Art und Quest
     row.date = self:Font(row, 9, C.muted)
-    row.date:SetPoint("TOPRIGHT", row, "TOPRIGHT", 0, -2)
-    row.date:SetWidth(76)
+    row.date:SetPoint("TOPRIGHT", row, "TOPRIGHT", -4, -2)
+    row.date:SetWidth(90)
     row.date:SetJustifyH("RIGHT")
-    row.txt:SetHeight(12)
     row.sub = self:Font(row, 9, C.muted)
-    row.sub:SetPoint("LEFT", row, "LEFT", 14, -6)
+    row.sub:SetPoint("LEFT", row, "LEFT", 4, -6)
     row.sub:SetWidth(222)
     row:SetScript("OnEnter", function()
-      local e = this.e
-      if not e then return end
-      local id = e.i
-      -- Spenden werden oft gebucht, bevor das Item im Bestand steht: Id jetzt nachschlagen
-      if (not id or id == 0) and e.n and e.n ~= "" then id = BB:IdByName(e.n) end
-      if id and id > 0 then
-        UI:ItemTooltip(this, id, { { T("TT_BOOKED"), BB.Date(e.t) } })
-      else
-        -- ohne bekannte Item-Id: einfacher Tooltip aus dem Buchungseintrag
-        GameTooltip:SetOwner(this, "ANCHOR_RIGHT")
-        if e.n and e.n ~= "" then
-          local qc = BB.QUALITY_COLOR[e.q or 1] or BB.QUALITY_COLOR[1]
-          GameTooltip:AddLine(e.n, qc[1], qc[2], qc[3])
-          GameTooltip:AddDoubleLine(T("TT_COUNT"), e.c .. "x", 0.7, 0.7, 0.7, 1, 1, 1)
-        else
-          GameTooltip:AddLine(BB.Money(e.m or 0), C.gold[1], C.gold[2], C.gold[3])
-        end
-        GameTooltip:AddDoubleLine(T("TT_FROM"), e.p, 0.7, 0.7, 0.7, 1, 1, 1)
-        GameTooltip:AddDoubleLine(T("TT_BOOKED"), BB.Date(e.t), 0.7, 0.7, 0.7, 1, 1, 1)
-        GameTooltip:Show()
-      end
+      this.hl:SetVertexColor(1, 1, 1, 0.08)
+      GameTooltip:SetOwner(this, "ANCHOR_RIGHT")
+      GameTooltip:AddLine(T("LEDGER_DAY_HINT"), 1, 1, 1)
+      GameTooltip:Show()
     end)
-    row:SetScript("OnLeave", function() GameTooltip:Hide() end)
+    row:SetScript("OnLeave", function()
+      this.hl:SetVertexColor(1, 1, 1, 0)
+      GameTooltip:Hide()
+    end)
+    row:SetScript("OnClick", function()
+      if this.day then UI:OpenDayWindow(this.day) end
+    end)
     table.insert(rp.rows, row)
   end
   Lg.search = ""
@@ -496,7 +667,6 @@ local function fillTop(pnl, list)
   if list[1] then pnl.empty:Hide() else pnl.empty:Show() end
 end
 
-local KIND_TAG = { out = "-", gout = "-", ["in"] = "+", gold = "+", back = "<", cod = "$", qfix = "*", trash = "$", ah = "$", ahfee = "-" }
 
 function UI:RefreshLedger()
   if not self.led then return end
@@ -532,59 +702,47 @@ function UI:RefreshLedger()
     end
     list = found
   end
-  local pages = floor((getn(list) - 1) / RECENT_ROWS) + 1
+  -- nach Tagen gruppieren (die Liste ist schon neueste zuerst sortiert)
+  local days, byKey = {}, {}
+  for i = 1, getn(list) do
+    local e = list[i]
+    local key = date("%Y%m%d", e.t or 0)
+    local d = byKey[key]
+    if not d then
+      d = { key = key, t = e.t or 0, list = {}, tags = {} }
+      byKey[key] = d
+      table.insert(days, d)
+    end
+    table.insert(d.list, e)
+    local tag = KIND_TAG[e.k] or "?"
+    d.tags[tag] = (d.tags[tag] or 0) + 1
+  end
+  Lg.days = days
+  local pages = floor((getn(days) - 1) / RECENT_ROWS) + 1
   if pages < 1 then pages = 1 end
   if Lg.page > pages then Lg.page = pages end
   if Lg.page < 1 then Lg.page = 1 end
   Lg.pageFs:SetText(Lg.page .. "/" .. pages)
+  if UI.dayWin and UI.dayWin:IsShown() and UI.dayWin.day then UI:RefreshDayWindow() end
   for i = 1, RECENT_ROWS do
     local row = Lg.recent.rows[i]
-    local e = list[(Lg.page - 1) * RECENT_ROWS + i]
-    row.e = e
-    if e then
-      local tag = KIND_TAG[e.k] or "?"
-      row.tag:SetText(tag)
-      local col = C.green
-      if tag == "-" then col = C.orange elseif tag == "<" then col = C.muted elseif tag == "$" then col = C.gold elseif tag == "*" then col = { 0.5, 0.7, 1 } end
-      row.tag:SetTextColor(col[1], col[2], col[3])
-      local what
-      if e.k == "gold" or e.k == "gout" or e.k == "cod" or e.k == "trash" or e.k == "ah" or e.k == "ahfee" then
-        what = BB.Money(e.m)
-      else
-        local qc = BB.QUALITY_COLOR[e.q or 1] or BB.QUALITY_COLOR[1]
-        what = e.c .. "x |cff" .. qc[4] .. e.n .. "|r"
+    local d = days[(Lg.page - 1) * RECENT_ROWS + i]
+    row.day = d
+    if d then
+      row.txt:SetText(date("%d.%m.%Y", d.t))
+      row.date:SetText(string.format(T("LEDGER_DAY_N"), getn(d.list)))
+      local parts = {}
+      local order = { "+", "-", "$", "<", "*" }
+      for k = 1, getn(order) do
+        if d.tags[order[k]] then table.insert(parts, order[k] .. " " .. d.tags[order[k]]) end
       end
-      local who = e.p
-      if (e.k == "in" or e.k == "gold" or e.k == "back") and BB:IsGuildMember(e.p) == false then
-        who = who .. " |cffff9a2e" .. T("LEDGER_EXTERN") .. "|r"
-      end
-      -- Gold-Spende an einen bestimmten Bank-Char (Gold-Ziel einer Quest)
-      if e.k == "gold" and e.n ~= "" then what = what .. "  >  " .. e.n end
-      row.txt:SetText(who .. ": " .. what)
-      row.date:SetText(BB.Date(e.t))
-      local sub = T("KIND_" .. string.upper(e.k))
-      local qq = e.code ~= "" and BananaBankDB.quests[e.code]
-      if qq then
-        -- Titel kuerzen, sonst bricht die Zeile um
-        local title = qq.title
-        if string.len(title) > 14 then
-          local cut = 13
-          while cut > 0 do
-            local nb = string.byte(title, cut + 1)
-            if nb and nb >= 128 and nb < 192 then cut = cut - 1 else break end
-          end
-          title = string.sub(title, 1, cut) .. ".."
-        end
-        sub = sub .. "  |cffffd100" .. title .. "|r"
-      elseif e.code ~= "" and e.code ~= "TRADE" then
-        sub = sub .. "  " .. e.code
-      end
-      row.sub:SetText(sub)
+      row.sub:SetText(table.concat(parts, "   "))
       row:Show()
     else
       row:Hide()
     end
   end
+  if days[1] then Lg.recent.empty:Hide() else Lg.recent.empty:Show() end
   if list[1] then Lg.recent.empty:Hide() else Lg.recent.empty:Show() end
 end
 
