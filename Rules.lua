@@ -84,7 +84,7 @@ function BB:BlockText(name, q)
   return string.format(self.T("RB_QUALITY"), self.T("RB_" .. string.upper(key or "q2")), rank or "?")
 end
 
-function BB:ItemBlockText(name, id)
+function BB:ItemBlockText(name, id, reqTs)
   local _, q = self:ItemInfo(id)
   local t = self:BlockText(name, q)
   if t then return t end
@@ -94,6 +94,8 @@ function BB:ItemBlockText(name, id)
     local ct = self:ClassBlockText(name, id)
     if ct then return ct end
   end
+  -- nur Verkaufsliste: BOE, Rezepte, Taschen und freigegebene Items (aeltere Anfragen bleiben gueltig)
+  if self:SaleRuleApplies(reqTs) and not self:IsForSale(id) then return self.T("RB_NOSALE") end
   -- ohne Preis nicht anfragbar: nicht im Auktionshaus gefunden oder noch nicht gescannt
   if not self:GetPrice(id) then return self.T("RB_NOPRICE") end
   -- Rezepte: nur einmal ueber die Gildenbank, und nur, wenn der Char es benutzen kann
@@ -133,7 +135,7 @@ function BB:CheckRequestRules(r)
     return false, bad
   end
   for id in pairs(r.items) do
-    local t = self:ItemBlockText(r.p, id)
+    local t = self:ItemBlockText(r.p, id, r.ts)
     if t then
       table.insert(bad, { id = id, text = t })
     elseif r.items[id] > 1 and not self:MayBeBank(r.p) then
@@ -619,4 +621,126 @@ end
 function BB:KeywordProfLabel(prof)
   if prof == "bags" then return self.T("KW_BAGS") end
   return self.T("SUB_" .. string.upper(prof or "other"))
+end
+
+-- ------------------------------------------------------------
+-- Verkaufsliste: was dürfen Gildenmitglieder kaufen?
+-- Automatisch im Verkauf: alle BOE-Items, alle Rezepte, alle Taschen.
+-- Alles andere nur, wenn ein Bank-Char es per Rechtsklick "zum Verkauf freigegeben" hat.
+-- saleOv[id] = { s = "y" (freigegeben) | "a" (Freigabe zurueckgenommen), ts =, by = }, unter allen geteilt
+-- ------------------------------------------------------------
+function BB:SaleOverride(id)
+  local o = BananaBankDB.saleOv and BananaBankDB.saleOv[id]
+  if o and o.s == "y" then return o end
+  return nil
+end
+
+-- true, wenn das Item von sich aus verkaufbar ist (BOE, Rezept, Tasche)
+function BB:SaleAuto(id)
+  if not id then return false end
+  if self.IsBOE and self:IsBOE(id) then return true end
+  local e = self.stockCache and self.stockCache[id]
+  if e then
+    local k = self:ResolveCategory(id, e)
+    if k == "bag" or k == "boe" or k == "recipe" then return true end
+  end
+  return false
+end
+
+function BB:IsForSale(id)
+  return (self:SaleOverride(id) or self:SaleAuto(id)) and true or false
+end
+
+-- Anfragen vor der Einfuehrung der Verkaufsliste bleiben gueltig
+function BB:SaleRuleApplies(reqTs)
+  local since = BananaBankDB.saleSince
+  if not since then
+    since = time()
+    BananaBankDB.saleSince = since
+  end
+  if reqTs and reqTs < since then return false end
+  return true
+end
+
+function BB:SetSale(id, on)
+  if not id or not self:IsBank() or not self:MayBeBank(self:Me()) then return false end
+  local db = BananaBankDB
+  db.saleOv = db.saleOv or {}
+  local ts = time()
+  local cur = db.saleOv[id]
+  if cur and cur.ts >= ts then ts = cur.ts + 1 end
+  db.saleOv[id] = { s = on and "y" or "a", ts = ts, by = self:Me() }
+  self:After(3, function() BB:PushSale() end, "salepush")
+  return true
+end
+
+function BB:SaleCount()
+  local n = 0
+  for _, o in pairs(BananaBankDB.saleOv or {}) do
+    if o.s == "y" then n = n + 1 end
+  end
+  return n
+end
+
+function BB:SerializeSale()
+  local recs = {}
+  for id, o in pairs(BananaBankDB.saleOv or {}) do
+    table.insert(recs, id .. ":" .. o.s .. ":" .. o.ts .. ":" .. BB.Clean(o.by or ""))
+  end
+  return table.concat(recs, ";")
+end
+
+function BB:ParseSale(payload)
+  local out = {}
+  for _, rec in ipairs(BB.Split(payload or "", ";")) do
+    local f = BB.Split(rec, ":")
+    local id, ts = tonumber(f[1]), tonumber(f[3])
+    if id and ts and (f[2] == "y" or f[2] == "a") and f[4] and f[4] ~= "" then
+      table.insert(out, { id = id, s = f[2], ts = ts, by = f[4] })
+    end
+  end
+  return out
+end
+
+-- nur von verifizierten Bank-Chars, je Item gewinnt der neuere Eintrag
+function BB:MergeSale(payload)
+  local db = BananaBankDB
+  db.saleOv = db.saleOv or {}
+  local changed = false
+  for _, r in ipairs(self:ParseSale(payload)) do
+    local cur = db.saleOv[r.id]
+    if r.ts <= time() + 86400 and (not cur or r.ts > cur.ts) and self:MayBeBank(r.by) then
+      db.saleOv[r.id] = { s = r.s, ts = r.ts, by = r.by }
+      changed = true
+    end
+  end
+  if changed and self.UI then self.UI:Refresh() end
+  return changed
+end
+
+function BB:SaleDigest()
+  local n, sum = 0, 0
+  for id, o in pairs(BananaBankDB.saleOv or {}) do
+    n = n + 1
+    sum = mod(sum + BB.Hash(id .. o.s .. o.ts), 16777213)
+  end
+  return n, sum
+end
+
+function BB:PushSale()
+  if BB.Count(BananaBankDB.saleOv or {}) == 0 then return end
+  self:SendTransfer("F", "one", self:SerializeSale())
+end
+
+function BB:PrintSale()
+  local list = {}
+  for id, o in pairs(BananaBankDB.saleOv or {}) do
+    if o.s == "y" then table.insert(list, id) end
+  end
+  self:Print(string.format(self.T("SALE_LIST_HEAD"), getn(list)))
+  table.sort(list)
+  for i = 1, getn(list) do
+    local o = BananaBankDB.saleOv[list[i]]
+    DEFAULT_CHAT_FRAME:AddMessage("  " .. self:ColoredName(list[i]) .. "  |cff999999(" .. tostring(o.by) .. ")|r")
+  end
 end

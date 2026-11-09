@@ -74,6 +74,7 @@ ev:SetScript("OnEvent", function()
   if event == "ADDON_LOADED" then
     if arg1 ~= "BananaBank" then return end
     BB:InitDB()
+    if not BananaBankDB.saleSince then BananaBankDB.saleSince = time() end
     BB:ApplyLanguage()
     BB:HookMail()
     BB:HookBags()
@@ -300,6 +301,8 @@ SlashCmdList["BANANABANK"] = function(msg)
     local amount = tonumber(num)
     if amount and BB.Count(r.items) ~= 1 then BB:Print(BB.T("MSG_SENT_ONE_ITEM")) return end
     BB:MarkSent(r, amount)
+  elseif cmd == "sale" or cmd == "verkauf" then
+    if BB.PrintSale then BB:PrintSale() end
   elseif cmd == "reserved" or cmd == "reserviert" then
     BB:PrintReserved(rest)
   elseif cmd == "why" or cmd == "warum" then

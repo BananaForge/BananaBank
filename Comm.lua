@@ -281,7 +281,9 @@ function BB:SendHello()
   -- zweite, kurze Hallo-Nachricht: Staende von Hauptbank, Regeln und Rechte-Liste (die erste kann bei vielen Banken zu lang werden)
   local tn, tsum = 0, 0
   if self.TrashDigest then tn, tsum = self:TrashDigest() end
-  self:Send("X~" .. (BananaBankDB.mainTs or 0) .. "~" .. ((BananaBankDB.rules and BananaBankDB.rules.ts) or 0) .. "~" .. ((BananaBankDB.rights and BananaBankDB.rights.ts) or 0) .. "~" .. tn .. "~" .. tsum)
+  local fn, fsum = 0, 0
+  if self.SaleDigest then fn, fsum = self:SaleDigest() end
+  self:Send("X~" .. (BananaBankDB.mainTs or 0) .. "~" .. ((BananaBankDB.rules and BananaBankDB.rules.ts) or 0) .. "~" .. ((BananaBankDB.rights and BananaBankDB.rights.ts) or 0) .. "~" .. tn .. "~" .. tsum .. "~" .. fn .. "~" .. fsum)
 end
 
 local function parseList(s)
@@ -439,6 +441,8 @@ function BB:OnTransfer(sender, kind, meta, payload)
     self:Debug(n .. " Bank-Rollen von " .. sender)
   elseif kind == "T" then
     if self.MergeTrash and self:MergeTrash(payload) then self:Debug("Trash-Entscheidungen von " .. sender) end
+  elseif kind == "F" then
+    if self.MergeSale and self:MergeSale(payload) then self:Debug("Verkaufsliste von " .. sender) end
   elseif kind == "K" then
     if self:MergeRights(payload) then self:Debug("Rechte von " .. sender) end
   elseif kind == "R" then
@@ -477,8 +481,12 @@ function BB:OnTransfer(sender, kind, meta, payload)
 end
 
 -- X~: Staende von Hauptbank, Regeln und Rechte-Liste: der neuere Stand wird gepusht
-function BB:OnHello2(sender, mt, rt, kt, tn, tsum)
+function BB:OnHello2(sender, mt, rt, kt, tn, tsum, fn, fsum)
   local db = BananaBankDB
+  if self.SaleDigest then
+    local n, sm = self:SaleDigest()
+    if n > 0 and (n ~= (tonumber(fn) or 0) or sm ~= (tonumber(fsum) or 0)) then schedulePush("F", function() BB:PushSale() end) end
+  end
   if self.TrashDigest then
     local n, s = self:TrashDigest()
     if n > 0 and (n ~= (tonumber(tn) or 0) or s ~= (tonumber(tsum) or 0)) then schedulePush("T", function() BB:PushTrash() end) end
@@ -537,12 +545,14 @@ function BB:OnAddonMessage(prefix, msg, channel, sender)
       pushes["K"] = nil
     elseif kind == "T" then
       pushes["T"] = nil
+    elseif kind == "F" then
+      pushes["F"] = nil
     end
   elseif t == "V~" then
     if self.OnLevelMessage then self:OnLevelMessage(sender, msg) end
   elseif t == "X~" then
     local f = BB.Split(msg, "~")
-    self:OnHello2(sender, f[2], f[3], f[4], f[5], f[6])
+    self:OnHello2(sender, f[2], f[3], f[4], f[5], f[6], f[7], f[8])
   elseif t == "H~" then
     local f = BB.Split(msg, "~")
     self:OnHello(sender, f[2], f[3], f[4], f[5], f[6], f[7], f[8], f[9], f[10], f[11], f[12], f[13])

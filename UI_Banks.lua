@@ -530,3 +530,42 @@ function UI:OpenBankEditor()
   f:Show()
   f.role:SetFocus()
 end
+
+-- Rechtsklick-Menue auf ein Item (nur Bank-Chars): zum Verkauf freigeben oder zuruecknehmen
+function UI:SaleMenu(slot)
+  local id = slot and slot.id
+  if not id or not UIDropDownMenu_Initialize then return end
+  if not self.saleMenuFrame then
+    self.saleMenuFrame = CreateFrame("Frame", "BananaBankSaleMenu", UIParent, "UIDropDownMenuTemplate")
+  end
+  local f = self.saleMenuFrame
+  UIDropDownMenu_Initialize(f, function()
+    local title = {}
+    title.text = BB:ColoredName(id)
+    title.isTitle = 1
+    title.notCheckable = 1
+    UIDropDownMenu_AddButton(title)
+    local b = {}
+    b.notCheckable = 1
+    if BB:SaleOverride(id) then
+      b.text = T("SALE_MENU_OFF")
+      b.func = function()
+        BB:SetSale(id, false)
+        BB:Print(string.format(T("SALE_UNSET"), BB:ColoredName(id)))
+        UI:RefreshStock()
+      end
+    elseif BB:SaleAuto(id) then
+      b.text = T("SALE_MENU_AUTO")
+      b.disabled = 1
+    else
+      b.text = T("SALE_MENU_ON")
+      b.func = function()
+        BB:SetSale(id, true)
+        BB:Print(string.format(T("SALE_SET"), BB:ColoredName(id)))
+        UI:RefreshStock()
+      end
+    end
+    UIDropDownMenu_AddButton(b)
+  end, "MENU")
+  ToggleDropDownMenu(1, nil, f, "cursor")
+end

@@ -833,6 +833,8 @@ function UI:StockList()
     if ok and S.search ~= "" and not string.find(string.lower(e.n or ""), S.search, 1, true) then ok = false end
     if ok and S.onlyAvail and avail <= 0 then ok = false end
     if ok and S.onlyTrash and not BB:IsTrash(id) then ok = false end
+    -- Mitglieder sehen nur die Verkaufsliste (BOE, Rezepte, Taschen, freigegebene Items)
+    if ok and not BB:MayBeBank(BB:Me()) and BB.IsForSale and not BB:IsForSale(id) then ok = false end
     local rk, rs
     if ok then rk, rs = BB:ResolveCategory(id, e) end
     if ok and typeSpec and not BB:MatchTypeFilter(typeSpec, { k = rk, s = rs }) then ok = false end
@@ -938,7 +940,12 @@ function UI:OnSlotClick(slot, button)
     -- Mausrad druecken: Trash umschalten (nur Bank-Chars)
     if BB:IsBank() and self.TrashMiddle then self:TrashMiddle(id) end
   elseif button == "RightButton" then
-    self:CartAdd(id, -1)
+    -- Bank-Char: Rechtsklick auf ein Item, das nicht im Korb liegt, oeffnet das Verkaufs-Menue
+    if BB:IsBank() and self.SaleMenu and not ((BananaBankDB.basket[id] or 0) > 0) then
+      self:SaleMenu(slot)
+    else
+      self:CartAdd(id, -1)
+    end
   elseif IsAltKeyDown() and BB:IsBank() then
     BananaBankDB.hidden[id] = true
     BB:Print(string.format(T("MSG_HIDDEN"), BB:ColoredName(id)))
@@ -990,6 +997,16 @@ function UI:OnSlotEnter(slot)
   if block then table.insert(lines, { block, "", 1, 0.5, 0.25 }) end
   if e and e.cr and e.cr ~= "" and BB.ClassLabels then
     table.insert(lines, { string.format(T("TT_CLASS"), BB:ClassLabels(e.cr)), "", 0.8, 0.8, 0.5 })
+  end
+  if BB:IsBank() and BB.SaleOverride then
+    local so = BB:SaleOverride(id)
+    if so then
+      table.insert(lines, { string.format(T("SALE_TT_FREE"), so.by or "?"), "", 0.5, 1, 0.5 })
+    elseif BB:SaleAuto(id) then
+      table.insert(lines, { T("SALE_TT_AUTO"), "", 0.5, 1, 0.5 })
+    else
+      table.insert(lines, { T("SALE_TT_NONE"), "", 0.8, 0.8, 0.8 })
+    end
   end
   if BB:IsBank() then
     local ov, o = BB:TrashOverride(id)
