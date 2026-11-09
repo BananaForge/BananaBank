@@ -133,8 +133,9 @@ ev:SetScript("OnEvent", function()
       local cnt = GetInboxNumItems()
       BB:MailLog("-", true, "", 0, 0, "open", tostring(cnt or 0))
     end
+    -- Briefkasten-Pruefung nie direkt im Ereignis: Post-Addons (TurtleMail) loesen beim Oeffnen viele Updates aus
     BB.inboxSnap = nil
-    pcall(function() BB:InboxWatch(true) end)
+    BB:After(1.5, function() pcall(function() BB:InboxWatch(true) end) end, "inboxwatch")
     BB.UI:Refresh()
 
   elseif event == "TRADE_SKILL_SHOW" or event == "TRADE_SKILL_UPDATE" then
@@ -146,7 +147,10 @@ ev:SetScript("OnEvent", function()
   elseif event == "MAIL_INBOX_UPDATE" then
     -- der Briefkasten hat sich geaendert: die naechste gleiche Entnahme ist ein neuer Brief, kein doppelter Aufruf
     BB.inboxSerial = (BB.inboxSerial or 0) + 1
-    if BB.InboxWatch then pcall(function() BB:InboxWatch() end) end
+    -- verzoegert und gebuendelt (der Timer wird bei jedem Update neu gesetzt)
+    if BB.InboxWatch and BB.inboxSnap then
+      BB:After(0.8, function() pcall(function() BB:InboxWatch() end) end, "inboxwatch")
+    end
 
   elseif event == "MAIL_CLOSED" then
     BB.mailOpen = false
