@@ -1555,40 +1555,53 @@ local function isAHMail(e)
 end
 
 function BB:InboxWatch(init)
-  if not self:IsBank() then return end
+  if not self:IsBank() or not self.mailOpen or BananaBankDB.noInboxWatch then return end
   local new = inboxList()
   local old = self.inboxSnap
-  if not init and old then
+  local booked = 0
+  if not init and old and table.getn(old) <= 60 then
     local claimed = {}
     for i = 1, table.getn(old) do
       local o = old[i]
-      if isAHMail(o) then
-        local found = false
+      -- gebucht wird nur, wenn derselbe Brief noch da ist und sein Gold weg ist (abgeholt);
+      -- ein Brief, der nur kurz aus der Liste fehlt (Client laedt neu), zaehlt nicht
+      if booked < 20 and isAHMail(o) then
+        local taken = false
+        local still = false
         for j = 1, table.getn(new) do
           local nw = new[j]
-          if not claimed[j] and nw.s == o.s and nw.sub == o.sub and nw.m == o.m then
-            claimed[j] = true
-            found = true
-            break
+          if not claimed[j] and nw.s == o.s and nw.sub == o.sub then
+            if nw.m == o.m then
+              claimed[j] = true
+              still = true
+              break
+            elseif nw.m == 0 then
+              claimed[j] = true
+              taken = true
+              break
+            end
           end
         end
-        if not found then
+        if taken and not still then
           local hk = string.lower(tostring(o.s)) .. "|" .. string.lower(o.sub) .. "|" .. tostring(o.m)
           self.ahHooked = self.ahHooked or {}
+          booked = booked + 1
           if (self.ahHooked[hk] or 0) > 0 then
             self.ahHooked[hk] = self.ahHooked[hk] - 1
           else
             local _, _, nm = string.find(o.sub, ":%s*(.+)$")
             self:AddLedger({ k = "ah", p = o.s, n = nm or "", c = 1, q = 1, m = o.m, code = "" })
             self:MailLog(o.s, false, nil, 0, o.m, "ah", (nm or o.sub) .. " (Briefkasten)")
-            self:ScheduleSnapshot(4)
-            if self.UI then self.UI:Refresh() end
           end
         end
       end
     end
   end
   self.inboxSnap = new
+  if booked > 0 then
+    self:ScheduleSnapshot(4)
+    if self.UI then self.UI:Refresh() end
+  end
 end
 
 function BB:HookMail()

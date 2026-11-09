@@ -134,7 +134,7 @@ ev:SetScript("OnEvent", function()
       BB:MailLog("-", true, "", 0, 0, "open", tostring(cnt or 0))
     end
     BB.inboxSnap = nil
-    BB:InboxWatch(true)
+    pcall(function() BB:InboxWatch(true) end)
     BB.UI:Refresh()
 
   elseif event == "TRADE_SKILL_SHOW" or event == "TRADE_SKILL_UPDATE" then
@@ -146,7 +146,7 @@ ev:SetScript("OnEvent", function()
   elseif event == "MAIL_INBOX_UPDATE" then
     -- der Briefkasten hat sich geaendert: die naechste gleiche Entnahme ist ein neuer Brief, kein doppelter Aufruf
     BB.inboxSerial = (BB.inboxSerial or 0) + 1
-    if BB.InboxWatch then BB:InboxWatch() end
+    if BB.InboxWatch then pcall(function() BB:InboxWatch() end) end
 
   elseif event == "MAIL_CLOSED" then
     BB.mailOpen = false
@@ -301,6 +301,9 @@ SlashCmdList["BANANABANK"] = function(msg)
     local amount = tonumber(num)
     if amount and BB.Count(r.items) ~= 1 then BB:Print(BB.T("MSG_SENT_ONE_ITEM")) return end
     BB:MarkSent(r, amount)
+  elseif cmd == "inboxwatch" then
+    BananaBankDB.noInboxWatch = (rest == "off") or nil
+    BB:Print("inboxwatch: " .. (BananaBankDB.noInboxWatch and "off" or "on"))
   elseif cmd == "sale" or cmd == "verkauf" then
     if BB.PrintSale then BB:PrintSale() end
   elseif cmd == "reserved" or cmd == "reserviert" then
