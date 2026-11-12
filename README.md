@@ -93,6 +93,7 @@ Pull requests welcome, tested in-game on a 1.12 client. Lua 5.0 rules: no `#`, `
 
 ## Changelog
 
+- **3.19.4:** BananaActivity.lua counts messages for the diagnosis in BananaGuild (/bgd activity).
 - **3.19.3:** activity tracker fix: gaps between two sessions are filled at login (asks for the last 14 days instead of only newer hours); update BananaActivity.lua.
 - **3.19.2:** the mailbox check no longer runs inside the mail events but 0.8 s after the last update (1.5 s after opening), so mail addons like TurtleMail that fire many updates while opening cannot make it loop.
 - **3.19.1:** fix: opening the mailbox on a bank char could freeze the game. The mailbox check from 3.17.2 is now much stricter (books an AH sale only when the same mail is still there and its gold is gone, at most 20 per update, never on a briefly empty list) and runs protected. `/bb inboxwatch off` switches it off completely.
