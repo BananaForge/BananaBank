@@ -93,6 +93,7 @@ Pull requests welcome, tested in-game on a 1.12 client. Lua 5.0 rules: no `#`, `
 
 ## Changelog
 
+- **3.19.5:** BananaActivity.lua counts hours in UTC instead of GetGameTime (the BananaGuild heatmap was shifted by one hour).
 - **3.19.4:** BananaActivity.lua counts messages for the diagnosis in BananaGuild (/bgd activity).
 - **3.19.3:** activity tracker fix: gaps between two sessions are filled at login (asks for the last 14 days instead of only newer hours); update BananaActivity.lua.
 - **3.19.2:** the mailbox check no longer runs inside the mail events but 0.8 s after the last update (1.5 s after opening), so mail addons like TurtleMail that fire many updates while opening cannot make it loop.
