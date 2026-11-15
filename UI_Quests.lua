@@ -2361,3 +2361,155 @@ if origSetItemRef then
     return origSetItemRef(link, text, button)
   end
 end
+
+-- ------------------------------------------------------------
+-- Quest erfuellt: Bildschirm mit den besten Helfern, optional Text im Gildenchat
+-- ------------------------------------------------------------
+local SPLASH_TOP = 5
+
+local function qdone()
+  local db = BananaBankDB
+  db.qdone = db.qdone or {}
+  return db.qdone
+end
+function BB:QuestSplashOn() return qdone().splash ~= false end
+function BB:QuestAutoChat() return qdone().chat == true end
+
+local function helperValue(h)
+  local parts = {}
+  if h.c > 0 then table.insert(parts, h.c .. "x") end
+  if h.g > 0 then table.insert(parts, BB.GoldText(h.g)) end
+  return table.concat(parts, " + ")
+end
+
+-- Text fuer den Gildenchat: die staerksten Helfer (hoechstens 3, unter 250 Byte)
+function BB:QuestDoneLine(q, top)
+  top = top or self:QuestTop(q)
+  if getn(top) == 0 then return nil end
+  local parts = {}
+  for i = 1, 3 do
+    local h = top[i]
+    if not h then break end
+    table.insert(parts, i .. ". " .. h.p .. " (" .. helperValue(h) .. ")")
+  end
+  local line = string.format(self.T("QDONE_CHAT"), q.title, table.concat(parts, ", "))
+  if string.len(line) > 245 then line = string.sub(line, 1, 245) end
+  return line
+end
+
+function BB:PostQuestDone(q)
+  if not q then return false end
+  if not IsInGuild or not IsInGuild() then return false end
+  local line = self:QuestDoneLine(q)
+  if not line then return false end
+  SendChatMessage(line, "GUILD")
+  return true
+end
+
+local qsplash, qsplashQueue = nil, {}
+
+local function qsplashNext()
+  if getn(qsplashQueue) == 0 then qsplash:Hide() return end
+  local item = table.remove(qsplashQueue, 1)
+  local f = qsplash
+  f.q = item.q
+  f.title:SetText(item.q.title)
+  for i = 1, SPLASH_TOP do
+    local row = f.rows[i]
+    local h = item.top[i]
+    if h then
+      row.name:SetText(h.p)
+      row.val:SetText(helperValue(h))
+      row:Show()
+    else
+      row:Hide()
+    end
+  end
+  if getn(item.top) == 0 then f.none:Show() else f.none:Hide() end
+  f.elapsed = 0
+  f:SetAlpha(0)
+  f:Show()
+  if PlaySound then PlaySound("QUESTCOMPLETED") end
+end
+
+local function buildQuestSplash()
+  local f = CreateFrame("Frame", "BananaBankQuestSplash", UIParent)
+  qsplash = f
+  f:SetWidth(520)
+  f:SetHeight(470)
+  f:SetPoint("CENTER", UIParent, "CENTER", 0, 60)
+  f:SetFrameStrata("FULLSCREEN_DIALOG")
+  f:EnableMouse(true)
+  local logo = f:CreateTexture(nil, "ARTWORK")
+  logo:SetTexture(UI.MEDIA .. "GZLogo")
+  logo:SetWidth(200)
+  logo:SetHeight(200)
+  logo:SetPoint("TOP", f, "TOP", 0, 0)
+  f.head = f:CreateFontString(nil, "OVERLAY")
+  f.head:SetFont(FONT_TITLE, 34, "OUTLINE")
+  f.head:SetTextColor(STATE_COLOR.complete[1], STATE_COLOR.complete[2], STATE_COLOR.complete[3])
+  f.head:SetPoint("TOP", logo, "BOTTOM", 0, 0)
+  f.head:SetText(T("QDONE_HEAD"))
+  f.title = f:CreateFontString(nil, "OVERLAY")
+  f.title:SetFont(FONT, 20, "OUTLINE")
+  f.title:SetTextColor(1, 1, 1)
+  f.title:SetWidth(480)
+  f.title:SetPoint("TOP", f.head, "BOTTOM", 0, -4)
+  f.sub = f:CreateFontString(nil, "OVERLAY")
+  f.sub:SetFont(FONT, 14, "OUTLINE")
+  f.sub:SetTextColor(C.gold[1], C.gold[2], C.gold[3])
+  f.sub:SetPoint("TOP", f.title, "BOTTOM", 0, -10)
+  f.sub:SetText(T("QDONE_TOP"))
+  f.rows = {}
+  for i = 1, SPLASH_TOP do
+    local row = CreateFrame("Frame", nil, f)
+    row:SetWidth(360)
+    row:SetHeight(24)
+    row:SetPoint("TOP", f.sub, "BOTTOM", 0, -6 - (i - 1) * 26)
+    local m = MEDAL[i] or { 0.7, 0.7, 0.7 }
+    row.rank = row:CreateFontString(nil, "OVERLAY")
+    row.rank:SetFont(FONT_TITLE, 20, "OUTLINE")
+    row.rank:SetTextColor(m[1], m[2], m[3])
+    row.rank:SetPoint("LEFT", row, "LEFT", 0, 0)
+    row.rank:SetText(i .. ".")
+    row.name = row:CreateFontString(nil, "OVERLAY")
+    row.name:SetFont(FONT, 18, "OUTLINE")
+    row.name:SetTextColor(m[1], m[2], m[3])
+    row.name:SetPoint("LEFT", row, "LEFT", 34, 0)
+    row.val = row:CreateFontString(nil, "OVERLAY")
+    row.val:SetFont(FONT, 14, "OUTLINE")
+    row.val:SetTextColor(1, 1, 1)
+    row.val:SetPoint("RIGHT", row, "RIGHT", 0, 0)
+    row.val:SetJustifyH("RIGHT")
+    f.rows[i] = row
+  end
+  f.none = f:CreateFontString(nil, "OVERLAY")
+  f.none:SetFont(FONT, 14, "OUTLINE")
+  f.none:SetTextColor(0.8, 0.8, 0.8)
+  f.none:SetPoint("TOP", f.sub, "BOTTOM", 0, -10)
+  f.none:SetText(T("QDONE_NONE"))
+  f.postBtn = UI:Button(f, 200, 26, "QDONE_BTN_POST", function()
+    if f.q then BB:PostQuestDone(f.q) end
+  end, "primary")
+  f.postBtn:SetPoint("BOTTOM", f, "BOTTOM", 0, 4)
+  f:SetScript("OnMouseUp", function() qsplashNext() end)
+  f.elapsed = 0
+  f:SetScript("OnUpdate", function()
+    this.elapsed = (this.elapsed or 0) + arg1
+    local t = this.elapsed
+    local a
+    if t < 0.8 then a = t / 0.8
+    elseif t < 14.8 then a = 1
+    elseif t < 16.3 then a = 1 - (t - 14.8) / 1.5
+    else qsplashNext() return end
+    this:SetAlpha(a)
+  end)
+  f:Hide()
+end
+
+function UI:QuestDoneSplash(q)
+  if not q then return end
+  if not qsplash then buildQuestSplash() end
+  table.insert(qsplashQueue, { q = q, top = BB:QuestTop(q) })
+  if not qsplash:IsVisible() then qsplashNext() end
+end

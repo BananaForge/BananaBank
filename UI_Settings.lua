@@ -10,7 +10,7 @@ local WHITE = UI.WHITE
 UI.settingsModule = true
 UI.set = {}
 
-local GEN_H, GUILD_H, BANK_H = 262, 108, 288
+local GEN_H, GUILD_H, BANK_H = 318, 108, 288
 local RULES_H = 246
 local DEPOT_H = 436
 local KW_H = 404
@@ -190,6 +190,15 @@ function UI:BuildSettings()
     BananaBankDB.gz.splash = v
   end, 300)
   btn(g, "SET_GZ_TEXTS", 4, -238, 210, function() UI:OpenGzTexts() end)
+  -- Gildenquest erfuellt
+  S.cQSplash = check(g, "SET_QDONE_SPLASH", 4, -270, function() return BB:QuestSplashOn() end, function(v)
+    BananaBankDB.qdone = BananaBankDB.qdone or {}
+    BananaBankDB.qdone.splash = v
+  end, 300)
+  S.cQChat = check(g, "SET_QDONE_CHAT", 4, -294, function() return BB:QuestAutoChat() end, function(v)
+    BananaBankDB.qdone = BananaBankDB.qdone or {}
+    BananaBankDB.qdone.chat = v
+  end, 300)
 
   -- Gilde (Verwalter)
   g = group(f, "SET_SEC_GUILD")
@@ -536,6 +545,7 @@ function UI:RefreshSettings()
   if S.cGz then
     S.cGz.Update()
     S.cGz60.Update()
+    if S.cQSplash then S.cQSplash.Update() S.cQChat.Update() end
     local gm = BB:GzMode()
     for i = 1, getn(S.gzChips) do S.gzChips[i]:SetActive(S.gzChips[i].code == gm) end
   end

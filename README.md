@@ -16,6 +16,7 @@ BananaBank only works in a guild that has a guild rank called **`Gildenbank`** (
 
 ## Features
 
+- **3.20.0:** **Guild quest complete screen.** When a guild quest is completed, every online member sees a big screen with the BananaGuild logo and the top 5 helpers (items and gold), click or 16 s to close (switch off in Settings). Button "Thank them in guild chat" posts the top 3 on demand; optional setting "Thank top helpers in guild chat" posts it automatically from the quest creator's client only, so it comes once.
 - **Stock for everyone:** the bank character records bags and bank on every bank visit. Grid with quality borders, search and filters. Soulbound items are hidden.
 - **Requests by code:** fill the cart, create a code, post it on Discord. The code reserves the items right away. Status: `Open → Confirmed → Sent`. Open requests expire after 7 days.
 - **Mail and trade:** *Fetch items* prepares exact stacks, the send helper mails them (several attachments if the client allows). A trade with a requester counts towards their confirmed request.

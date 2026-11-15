@@ -839,6 +839,15 @@ function BB:QuestTick()
         if self.UI and self.UI.ShowQuestToast then
           self.UI:ShowQuestToast(self.T("QTOAST_DONE"), q.title .. "  |cffa8a8c0" .. string.format(self.T("QTOAST_BEST"), best) .. "|r", true)
         end
+        -- grosser Bildschirm mit den besten Helfern (abschaltbar)
+        if self.UI and self.UI.QuestDoneSplash and self:QuestSplashOn() then
+          self.UI:QuestDoneSplash(q)
+        end
+        -- optional im Gildenchat: nur der Ersteller der Quest postet, damit es nicht mehrfach kommt
+        if self.QuestAutoChat and self:QuestAutoChat() and q.by == self:Me() then
+          local qq = q
+          self:After(2, function() BB:PostQuestDone(qq) end)
+        end
       elseif st == "expired" then
         self:Print(string.format(self.T("QMSG_EXPIRED"), q.title))
         self:QLog("expire", q, "-", nil, id .. ":expire")
