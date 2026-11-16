@@ -822,9 +822,22 @@ function BB:ExportStep()
       table.sort(per)
       local tip = self:ExportTooltip(id)
       if not tip then job.noTip = job.noTip + 1 end
+      -- AH-Preis laut letztem Scan: Rohschnitt der guenstigsten Angebote, wenn gespeichert;
+      -- sonst aus dem Gildenpreis zurueckgerechnet (pderived = 1, "ca.")
+      local ah = {}
+      local pr = BananaBankDB.prices[id]
+      if pr and pr.u and pr.u > 0 then
+        ah.src, ah.ts, ah.n, ah.lo = pr.src, pr.ts, pr.n, pr.lo
+        ah.a = pr.a
+        if not ah.a and pr.src == "ah" then
+          ah.a = math.floor(pr.u / (BB.PRICE_FACTOR or 0.5))
+          ah.derived = true
+        end
+      end
       table.insert(job.items, {
         id = id, n = e.n or ("#" .. id), q = e.q or 1, c = e.c or 0, tex = e.t or "", k = k or "", s = s or "",
         cr = e.cr or "", p = (self:GetPrice(id)) or 0, sale = self:IsForSale(id) and 1 or 0,
+        pa = ah.a or 0, pl = ah.lo or 0, pn = ah.n or 0, pts = ah.ts or 0, psrc = ah.src or "", pderived = ah.derived and 1 or 0,
         per = table.concat(per, ", "), tip = tip,
       })
     end

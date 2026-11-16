@@ -157,6 +157,29 @@ def money(c):
     return ("%dg " % g if g else "") + ("%ds " % s if s or g else "") + "%dc" % k
 
 
+def price_lines(it):
+    """Preisangaben fuer PDF und HTML: AH-Preis laut letztem Scan, guenstigstes Angebot, Gildenpreis."""
+    import datetime
+    out = []
+    pa, pl, p = int(it.get("pa") or 0), int(it.get("pl") or 0), int(it.get("p") or 0)
+    if pa:
+        out.append("AH-Preis: " + money(pa) + (" (ca., aus Gildenpreis)" if it.get("pderived") else ""))
+    elif it.get("psrc") == "man":
+        out.append("AH-Preis: kein Scan (Handpreis)")
+    else:
+        out.append("AH-Preis: kein Scan")
+    if pl:
+        out.append("Günstigstes Angebot: " + money(pl))
+    if p:
+        out.append("Gildenpreis: " + money(p) + (" (Handpreis)" if it.get("psrc") == "man" else ""))
+    ts = int(it.get("pts") or 0)
+    if ts and pa:
+        stand = datetime.datetime.fromtimestamp(ts).strftime("%d.%m. %H:%M")
+        n = int(it.get("pn") or 0)
+        out.append("Stand " + stand + (" · %d Angebote" % n if n else ""))
+    return out
+
+
 def icon_path(tex, cache):
     if not tex:
         return None
@@ -236,7 +259,17 @@ def make_pdf(data, out, icons_dir):
                 wrapped.append((p, r if k == 0 else "", col, li == 0))
         lh = 10.5
         ch = len(wrapped) * lh + 12
-        block = max(ch, icon + 8) + 10
+        # Angaben rechts neben dem Haken vorab umbrechen, damit die Zeilenhoehe passt
+        rx = ml + icon + 8 + card_w + 14
+        info = ["ID %d  |  Menge %d" % (it["id"], it.get("c", 0))]
+        info.extend(price_lines(it))
+        if it.get("per"):
+            info.append(it["per"])
+        info_w = []
+        for x in info:
+            info_w.extend(simpleSplit(x, font, 7, W - rx - ml - 22) or [""])
+        info_h = 24 + len(info_w) * 8.5 + 4
+        block = max(ch, icon + 8, info_h) + 10
         if y - block < mb:
             c.showPage()
             header()
@@ -274,18 +307,12 @@ def make_pdf(data, out, icons_dir):
         c.setFillColor(HexColor("#222222"))
         c.setFont(font, 7.5)
         c.drawString(rx + 22, top - 12, check_label)
-        info = ["ID %d  |  Menge %d" % (it["id"], it.get("c", 0))]
-        if it.get("p"):
-            info.append("Preis " + money(it["p"]))
-        if it.get("per"):
-            info.append(it["per"])
-        info = [x for x in info]
         yy = top - 24
+        c.setFont(font, 7)
         c.setFillColor(HexColor("#555555"))
-        for x in info:
-            for part in simpleSplit(x, font, 7, W - rx - ml - 22):
-                c.drawString(rx + 22, yy, part)
-                yy -= 8.5
+        for part in info_w:
+            c.drawString(rx + 22, yy, part)
+            yy -= 8.5
         y -= block
     c.save()
     print("PDF geschrieben:", out, "(%d Items, %d Seiten)" % (len(items), page[0]))
@@ -331,14 +358,13 @@ def make_html(data, out, icons_dir):
             tl.append('<div class="l" style="color:#%s"><span>%s</span><span>%s</span></div>' % (
                 col if re.match(r"^[0-9a-fA-F]{6}$", col or "") else "ffffff", html.escape(l), html.escape(r)))
         meta = "ID %d · Menge %d" % (it["id"], it.get("c", 0))
-        if it.get("p"):
-            meta += " · Preis " + money(it["p"])
+        meta_lines = [html.escape(meta)] + [html.escape(x) for x in price_lines(it)]
         if it.get("per"):
-            meta += " · " + it["per"]
+            meta_lines.append(html.escape(it["per"]))
         rows.append(
             '<div class="row" data-name="%s"><label class="chk"><input type="checkbox" value="%d"> %s</label>%s'
             '<div class="tip">%s</div><div class="meta">%s</div></div>' % (
-                html.escape((it.get("n") or "").lower()), it["id"], label, icon, "".join(tl), html.escape(meta)))
+                html.escape((it.get("n") or "").lower()), it["id"], label, icon, "".join(tl), "<br>".join(meta_lines)))
     page = """<!doctype html><html lang="de"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>BananaBank Export</title><style>
 body{font-family:system-ui,sans-serif;background:#f3f3f6;margin:0;padding:12px;color:#222}
@@ -347,7 +373,7 @@ h1{font-size:18px;margin:0 0 6px}.bar{position:sticky;top:0;background:#f3f3f6;p
 .row{display:flex;gap:10px;align-items:flex-start;background:#fff;border:1px solid #ddd;border-radius:6px;padding:8px;margin:8px 0;flex-wrap:wrap}
 .ic{width:36px;height:36px;border:1px solid #555;flex:none;display:inline-block}
 .tip{background:#0a0a17;border:1px solid #6a6a72;border-radius:4px;padding:6px 8px;min-width:260px;max-width:380px;font:12px/1.35 'DejaVu Sans',Verdana,sans-serif}
-.l{display:flex;justify-content:space-between;gap:12px}.meta{font-size:11px;color:#666;max-width:260px}
+.l{display:flex;justify-content:space-between;gap:12px}.meta{font-size:11px;color:#444;max-width:280px;line-height:1.45}
 .chk{font-size:13px;font-weight:600;white-space:nowrap;order:3}.chk input{width:20px;height:20px;vertical-align:middle}
 textarea{width:100%%;height:90px;margin-top:6px}</style>
 <h1>BananaBank: %(title)s (%(n)d Items)</h1>

@@ -309,7 +309,12 @@ function BB:FinishTarget()
     local ts = time()
     if db.priceTs and ts <= db.priceTs then ts = db.priceTs + 1 end
     local price, samples = fromSamples(hits)
-    db.prices[id] = { u = price, src = "ah", ts = ts, n = samples }
+    -- Rohwerte fuer Auswertungen (Export): Schnitt der guenstigsten Angebote und das guenstigste Angebot
+    local take = floor(getn(hits) * BB.PRICE_SHARE + 0.5)
+    if take < 1 then take = 1 end
+    local sum = 0
+    for i = 1, take do sum = sum + hits[i] end
+    db.prices[id] = { u = price, src = "ah", ts = ts, n = samples, a = floor(sum / take), lo = hits[1] }
     db.priceTs = ts
     s.set = s.set + 1
   elseif id then
