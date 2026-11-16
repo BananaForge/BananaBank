@@ -569,3 +569,53 @@ function UI:SaleMenu(slot)
   end, "MENU")
   ToggleDropDownMenu(1, nil, f, "cursor")
 end
+
+-- Fenster: Liste der Item-IDs einfuegen, die zum Verkauf freigegeben (oder mit "-" zurueckgenommen) werden
+function UI:OpenSaleImport()
+  if not self.saleImport then
+    local f = CreateFrame("Frame", "BananaBankSaleImport", UIParent)
+    self.saleImport = f
+    f:SetWidth(560)
+    f:SetHeight(190)
+    f:SetPoint("CENTER", UIParent, "CENTER", 0, 80)
+    f:SetFrameStrata("FULLSCREEN_DIALOG")
+    f:SetToplevel(true)
+    f:SetMovable(true)
+    f:EnableMouse(true)
+    f:RegisterForDrag("LeftButton")
+    f:SetScript("OnDragStart", function() this:StartMoving() end)
+    f:SetScript("OnDragStop", function() this:StopMovingOrSizing() end)
+    f:SetBackdrop({
+      bgFile = UI.WHITE, edgeFile = "Interface\\DialogFrame\\UI-DialogBox-Border",
+      tile = true, tileSize = 16, edgeSize = 32,
+      insets = { left = 11, right = 12, top = 12, bottom = 11 },
+    })
+    f:SetBackdropColor(0.015, 0.025, 0.06, 1)
+    self:Solid(f, 12, 1)
+    f:Hide()
+    tinsert(UISpecialFrames, "BananaBankSaleImport")
+    local close = CreateFrame("Button", nil, f, "UIPanelCloseButton")
+    close:SetPoint("TOPRIGHT", f, "TOPRIGHT", -6, -6)
+    local title = self:Font(f, 18, C.gold, UI.FONT_TITLE)
+    title:SetPoint("TOPLEFT", f, "TOPLEFT", 26, -20)
+    self:Loc(title, "SALE_IMPORT_TITLE")
+    self:GlowLine(f, -48, 20, -20)
+    local hint = self:Font(f, 10, C.muted)
+    hint:SetPoint("TOPLEFT", f, "TOPLEFT", 26, -58)
+    hint:SetWidth(508)
+    hint:SetHeight(30)
+    hint:SetJustifyV("TOP")
+    self:Loc(hint, "SALE_IMPORT_HINT")
+    f.box = self:EditBox("BananaBankSaleImportBox", f, 508)
+    f.box:SetMaxLetters(0)
+    f.box:SetPoint("TOPLEFT", f, "TOPLEFT", 30, -96)
+    local ok = self:Button(f, 160, 26, "SALE_IMPORT_BTN", function()
+      BB:SaleImport(f.box:GetText())
+      f.box:SetText("")
+      f:Hide()
+    end, "primary")
+    ok:SetPoint("BOTTOMRIGHT", f, "BOTTOMRIGHT", -20, 18)
+  end
+  self.saleImport:Show()
+  self.saleImport.box:SetFocus()
+end

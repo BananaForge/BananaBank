@@ -308,6 +308,12 @@ SlashCmdList["BANANABANK"] = function(msg)
   elseif cmd == "inboxwatch" then
     BananaBankDB.noInboxWatch = (rest == "off") or nil
     BB:Print("inboxwatch: " .. (BananaBankDB.noInboxWatch and "off" or "on"))
+  elseif cmd == "export" then
+    local m = restLower
+    if m == "sale" or m == "verkauf" then m = "sale" elseif m == "all" or m == "alle" then m = "all" else m = "open" end
+    if BB.ExportStart then BB:ExportStart(m) end
+  elseif cmd == "saleimport" then
+    if rest ~= "" then BB:SaleImport(rest) elseif BB.UI.OpenSaleImport then BB.UI:OpenSaleImport() end
   elseif cmd == "sale" or cmd == "verkauf" then
     if BB.PrintSale then BB:PrintSale() end
   elseif cmd == "reserved" or cmd == "reserviert" then

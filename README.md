@@ -16,6 +16,7 @@ BananaBank only works in a guild that has a guild rank called **`Gildenbank`** (
 
 ## Features
 
+- **3.21.0:** **Export for reviewing the sale list.** `/bb export` collects all items that are not yet for sale (`/bb export sale` = the sellable ones, `/bb export all` = everything) with name, quality, amount, AH price, banks and the tooltip lines, saved in the SavedVariables after `/reload`. The new tool `tools/bananabank_export.py` turns that file into a PDF (tooltip card, icon and a fillable checkbox per item) or an HTML page; `read` reads the ticked boxes of a filled PDF and prints the list for `/bb saleimport` (new window, `12345` releases for sale, `-12345` takes the release back).
 - **3.20.0:** **Guild quest complete screen.** When a guild quest is completed, every online member sees a big screen with the BananaGuild logo and the top 5 helpers (items and gold), click or 16 s to close (switch off in Settings). Button "Thank them in guild chat" posts the top 3 on demand; optional setting "Thank top helpers in guild chat" posts it automatically from the quest creator's client only, so it comes once.
 - **Stock for everyone:** the bank character records bags and bank on every bank visit. Grid with quality borders, search and filters. Soulbound items are hidden.
 - **Requests by code:** fill the cart, create a code, post it on Discord. The code reserves the items right away. Status: `Open → Confirmed → Sent`. Open requests expire after 7 days.

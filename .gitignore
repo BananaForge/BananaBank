@@ -14,3 +14,5 @@ Interface/
 *.zip
 lua50
 lua50src/
+tools/icons/
+__pycache__/

@@ -744,3 +744,123 @@ function BB:PrintSale()
     DEFAULT_CHAT_FRAME:AddMessage("  " .. self:ColoredName(list[i]) .. "  |cff999999(" .. tostring(o.by) .. ")|r")
   end
 end
+
+-- ------------------------------------------------------------
+-- Export fuer die Pruefung der Verkaufsliste (PDF / HTML ausserhalb des Spiels)
+-- /bb export        = alle Items, die noch NICHT verkaufsfaehig sind
+-- /bb export sale   = alle verkaufsfaehigen Items (Kontrolle rueckwaerts)
+-- /bb export all    = alles
+-- Das Ergebnis steht in den SavedVariables (db.exportData) und liegt nach /reload in der Datei.
+-- ------------------------------------------------------------
+local exportTip
+local function exportTipFrame()
+  if not exportTip then
+    exportTip = CreateFrame("GameTooltip", "BananaBankExportTip", UIParent, "GameTooltipTemplate")
+    exportTip:SetOwner(UIParent, "ANCHOR_NONE")
+  end
+  return exportTip
+end
+
+local function hex2(v) return string.format("%02x", math.floor((v or 1) * 255 + 0.5)) end
+
+-- Tooltip-Zeilen eines Items: { {links, rechts, "rrggbb"}, ... } oder nil, wenn der Client das Item nicht kennt
+function BB:ExportTooltip(id)
+  local ok, res = pcall(function()
+    local t = exportTipFrame()
+    t:ClearLines()
+    t:SetOwner(UIParent, "ANCHOR_NONE")
+    t:SetHyperlink("item:" .. id .. ":0:0:0")
+    local n = t:NumLines() or 0
+    if n < 1 then return nil end
+    local lines = {}
+    for i = 1, math.min(n, 30) do
+      local L = getglobal("BananaBankExportTipTextLeft" .. i)
+      local R = getglobal("BananaBankExportTipTextRight" .. i)
+      local l = L and L:GetText() or ""
+      local r = R and R:GetText() or ""
+      if r == "" then r = nil end
+      local cr, cg, cb = 1, 1, 1
+      if L and L.GetTextColor then cr, cg, cb = L:GetTextColor() end
+      if l ~= "" or r then
+        table.insert(lines, { string.sub(l, 1, 120), r and string.sub(r, 1, 60) or "", hex2(cr) .. hex2(cg) .. hex2(cb) })
+      end
+    end
+    if getn(lines) == 0 then return nil end
+    return lines
+  end)
+  if ok then return res end
+  return nil
+end
+
+function BB:ExportStart(mode)
+  mode = mode or "open"
+  local stock = self:GetStock()
+  local ids = {}
+  for id in pairs(stock) do
+    local sale = self:IsForSale(id)
+    if mode == "all" or (mode == "sale" and sale) or (mode == "open" and not sale) then table.insert(ids, id) end
+  end
+  table.sort(ids)
+  if getn(ids) == 0 then self:Print(self.T("EXP_NONE")) return end
+  self.exportJob = { mode = mode, ids = ids, pos = 1, items = {}, noTip = 0 }
+  self:Print(string.format(self.T("EXP_START"), getn(ids)))
+  self:ExportStep()
+end
+
+function BB:ExportStep()
+  local job = self.exportJob
+  if not job then return end
+  local stock = self.stockCache or self:GetStock()
+  local last = math.min(job.pos + 14, getn(job.ids))
+  for i = job.pos, last do
+    local id = job.ids[i]
+    local e = stock[id]
+    if e then
+      local k, s = self:ResolveCategory(id, e)
+      local per = {}
+      for bank, c in pairs(e.per or {}) do table.insert(per, bank .. " " .. c) end
+      table.sort(per)
+      local tip = self:ExportTooltip(id)
+      if not tip then job.noTip = job.noTip + 1 end
+      table.insert(job.items, {
+        id = id, n = e.n or ("#" .. id), q = e.q or 1, c = e.c or 0, tex = e.t or "", k = k or "", s = s or "",
+        cr = e.cr or "", p = (self:GetPrice(id)) or 0, sale = self:IsForSale(id) and 1 or 0,
+        per = table.concat(per, ", "), tip = tip,
+      })
+    end
+  end
+  job.pos = last + 1
+  if job.pos <= getn(job.ids) then
+    self:After(0.05, function() BB:ExportStep() end, "exportstep")
+    return
+  end
+  BananaBankDB.exportData = { ts = time(), mode = job.mode, by = self:Me(), version = self.VERSION, items = job.items }
+  self:Print(string.format(self.T("EXP_DONE"), getn(job.items), job.noTip))
+  self.exportJob = nil
+end
+
+-- Import: Liste von Item-IDs. "123" gibt frei, "-123" nimmt die Freigabe zurueck. Nur Bank-Raenge.
+function BB:SaleImport(text)
+  if not self:IsBank() or not self:MayBeBank(self:Me()) then
+    self:Print("|cffff4040" .. self.T("ERR_NOT_BANK") .. "|r")
+    return
+  end
+  local on, off, skipped = 0, 0, 0
+  for tok in string.gfind(text or "", "%-?%d+") do
+    local id = tonumber(tok)
+    if id and id ~= 0 then
+      if id > 0 then
+        if self:IsForSale(id) then
+          skipped = skipped + 1
+        elseif self:SetSale(id, true) then
+          on = on + 1
+        end
+      else
+        id = -id
+        if self:SaleOverride(id) and self:SetSale(id, false) then off = off + 1 else skipped = skipped + 1 end
+      end
+    end
+  end
+  self:Print(string.format(self.T("SALE_IMPORT_DONE"), on, off, skipped))
+  if self.UI then self.UI:Refresh() end
+end
