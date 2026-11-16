@@ -419,8 +419,8 @@ HTML_TEMPLATE = r"""<!doctype html>
 <html lang="de"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>BananaBank – Verkaufsliste prüfen</title>
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@500;700&display=swap" rel="stylesheet">
+<meta http-equiv="Cache-Control" content="no-store, no-cache, must-revalidate">
+<meta http-equiv="Pragma" content="no-cache">
 <style>
 :root{
   --gold:#ffd142; --gold2:#c79938; --brass:#8c6629; --text:#ebe6d6; --muted:#999eb3;
@@ -437,7 +437,7 @@ body{margin:0;color:var(--text);font:14px/1.45 "Trebuchet MS",Verdana,"Segoe UI"
     var(--bg);
   min-height:100vh}
 .wrap{max-width:1180px;margin:0 auto;padding:14px 14px 60px}
-h1,h2,.title{font-family:"Cinzel","Palatino Linotype","Book Antiqua",Georgia,serif;letter-spacing:.04em}
+h1,h2,.title{font-family:"Palatino Linotype","Book Antiqua",Palatino,Georgia,serif;letter-spacing:.04em}
 
 /* Kopf */
 .head{display:flex;align-items:center;gap:16px;padding:14px 18px;margin-bottom:12px;
@@ -446,7 +446,7 @@ h1,h2,.title{font-family:"Cinzel","Palatino Linotype","Book Antiqua",Georgia,ser
 .head img{width:56px;height:56px;image-rendering:auto;filter:drop-shadow(0 2px 4px #000)}
 .head h1{margin:0;font-size:28px;color:var(--gold);text-shadow:0 2px 0 #000,0 0 14px rgba(255,209,66,.35)}
 .head .sub{color:var(--muted);font-size:13px;margin-top:2px}
-.head .modebadge{margin-left:auto;text-align:right;color:var(--gold2);font-family:"Cinzel",Georgia,serif;font-size:13px}
+.head .modebadge{margin-left:auto;text-align:right;color:var(--gold2);font-family:"Palatino Linotype","Book Antiqua",Georgia,serif;font-size:13px}
 .head .modebadge b{display:block;color:var(--gold);font-size:18px}
 
 /* Werkzeugleiste */
@@ -458,13 +458,13 @@ h1,h2,.title{font-family:"Cinzel","Palatino Linotype","Book Antiqua",Georgia,ser
   padding:7px 9px;font:inherit;min-width:0}
 .bar input[type=text]{width:230px}
 .bar input[type=text]:focus,.bar select:focus{outline:none;border-color:var(--gold);box-shadow:0 0 6px rgba(255,209,66,.5)}
-.btn{cursor:pointer;color:#2a1b00;font-weight:700;font-family:"Cinzel",Georgia,serif;letter-spacing:.03em;
+.btn{cursor:pointer;color:#2a1b00;font-weight:700;font-family:"Palatino Linotype","Book Antiqua",Georgia,serif;letter-spacing:.03em;
   background:linear-gradient(180deg,#ffe58a,#e0a92b 55%,#b9821a);border:1px solid #5a3d08;border-radius:4px;padding:7px 14px;
   box-shadow:inset 0 1px 0 rgba(255,255,255,.6),0 2px 0 #3a2704}
 .btn:hover{filter:brightness(1.1)}.btn:active{transform:translateY(1px);box-shadow:inset 0 1px 0 rgba(255,255,255,.4)}
 .btn.ghost{color:var(--gold);background:linear-gradient(180deg,#1b2650,#101a3a);border-color:var(--brass);
   box-shadow:inset 0 1px 0 rgba(255,209,66,.25),0 2px 0 #000}
-.count{margin-left:auto;font-family:"Cinzel",Georgia,serif;color:var(--gold);font-size:16px;text-shadow:0 1px 0 #000}
+.count{margin-left:auto;font-family:"Palatino Linotype","Book Antiqua",Georgia,serif;color:var(--gold);font-size:16px;text-shadow:0 1px 0 #000}
 .count small{color:var(--muted);font:12px "Trebuchet MS",sans-serif}
 .chips{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px;align-items:center}
 .chips .lbl{color:var(--muted);font-size:12px;margin-right:2px}
@@ -509,7 +509,7 @@ h1,h2,.title{font-family:"Cinzel","Palatino Linotype","Book Antiqua",Georgia,ser
 .pick.gi input:checked + .box svg{stroke:#9cc2ff;filter:drop-shadow(0 0 4px rgba(120,170,255,.8))}
 .card.gcheck{border-color:#6f93e8;box-shadow:0 0 0 1px #000,0 0 18px rgba(110,160,255,.35),inset 0 0 40px rgba(110,160,255,.07)}
 .pick{flex:none;display:flex;flex-direction:column;align-items:center;gap:4px;cursor:pointer}
-.pick span{font-family:"Cinzel",Georgia,serif;font-size:11px;color:var(--gold2);text-align:center;max-width:110px;line-height:1.2}
+.pick span{font-family:"Palatino Linotype","Book Antiqua",Georgia,serif;font-size:11px;color:var(--gold2);text-align:center;max-width:110px;line-height:1.2}
 .pick input{position:absolute;opacity:0;pointer-events:none}
 .box{width:34px;height:34px;border:2px solid var(--gold2);border-radius:4px;background:#050818;
   box-shadow:inset 0 0 8px #000,0 0 0 1px #000;display:flex;align-items:center;justify-content:center;transition:all .12s}
@@ -519,7 +519,7 @@ h1,h2,.title{font-family:"Cinzel","Palatino Linotype","Book Antiqua",Georgia,ser
 .pick input:checked ~ span{color:var(--green)}
 .pick input:checked + .box svg{opacity:1;stroke:#7dff7d;filter:drop-shadow(0 0 4px rgba(90,255,90,.7))}
 .pick input:focus-visible + .box{outline:2px solid var(--gold);outline-offset:2px}
-.empty{text-align:center;color:var(--muted);padding:40px 0;font-family:"Cinzel",Georgia,serif}
+.empty{text-align:center;color:var(--muted);padding:40px 0;font-family:"Palatino Linotype","Book Antiqua",Georgia,serif}
 .foot{margin-top:24px;text-align:center;color:var(--muted);font-size:12px}
 .foot b{color:var(--gold2)}
 @media(max-width:700px){.head h1{font-size:22px}.head .modebadge{display:none}.bar{position:static}.tip{flex:1 1 calc(100% - 70px);min-width:0}.meta,.picks{flex-basis:100%}.picks{margin-left:0;flex-wrap:wrap}.pick{flex-direction:row;gap:10px}.pick span{max-width:none;text-align:left}.bar input[type=text]{width:100%}}
@@ -552,8 +552,10 @@ h1,h2,.title{font-family:"Cinzel","Palatino Linotype","Book Antiqua",Georgia,ser
   </div>
   <div class="res" id="res">
     <div class="hint">Diese Liste im Spiel mit <code>/bb saleimport</code> einfügen (Bank-Rang). __IMPORTHINT__</div>
-    <textarea id="out" readonly></textarea>
+    <textarea id="out"></textarea>
     <button class="btn" id="copy" style="margin-top:6px">In die Zwischenablage kopieren</button>
+    <button class="btn ghost" id="load" style="margin-top:6px">Liste aus dem Feld übernehmen</button>
+    <span id="loadmsg" class="hint"></span>
   </div>
 </div>
 
@@ -562,22 +564,39 @@ __ROWS__
 </div>
 <div class="empty" id="none" style="display:none">Keine Items passen zum Filter.</div>
 
-<div class="foot">Haken = <b>__LABEL__</b> · Der Stand deiner Haken bleibt in diesem Browser gespeichert · BananaBank __VERSION__</div>
+<div class="foot">Haken = <b>__LABEL__</b> · Die Seite speichert nichts im Browser: mit <b>Liste erstellen</b> sicherst du deinen Stand und kannst ihn später mit <b>Liste übernehmen</b> wieder einlesen · BananaBank __VERSION__ · Datei-ID <b>__BUILD__</b></div>
 </div>
 
 <script>
-var MODE=__MODEJSON__, HASGI=(MODE!=='guild'), KEY="bb-export-__TS__-"+MODE;
+var MODE=__MODEJSON__, HASGI=(MODE!=='guild'), DIRTY=false;
 var list=document.getElementById('list');
 var cards=[].slice.call(list.querySelectorAll('.card'));
 var qOn={0:1,1:1,2:1,3:1,4:1,5:1}, selMode=__SELDEF__, PRESET=__PRESET__;
 function mb(c){return c.querySelector('input.m')}
 function gb(c){return c.querySelector('input.gi')}
 function paint(c){c.classList.toggle('checked',!!(mb(c)&&mb(c).checked));c.classList.toggle('gcheck',!!(gb(c)&&gb(c).checked))}
-function save(){try{var v=[];cards.forEach(function(c){if(mb(c)&&mb(c).checked)v.push('m'+c.dataset.id);if(gb(c)&&gb(c).checked)v.push('g'+c.dataset.id)});localStorage.setItem(KEY,v.join(','))}catch(e){}}
-function load(){try{var v=localStorage.getItem(KEY);
-  if(!v&&PRESET){v=PRESET.m.map(function(x){return 'm'+x}).concat(PRESET.g.map(function(x){return 'g'+x})).join(',')}
-  if(!v)return;var set={};v.split(',').forEach(function(x){set[x]=1});
-  cards.forEach(function(c){if(set['m'+c.dataset.id]&&mb(c))mb(c).checked=true;if(set['g'+c.dataset.id]&&gb(c))gb(c).checked=true;paint(c)})}catch(e){}}
+function save(){DIRTY=true}
+function load(){
+  if(!PRESET)return;
+  var set={};PRESET.m.forEach(function(x){set['m'+x]=1});PRESET.g.forEach(function(x){set['g'+x]=1});
+  cards.forEach(function(c){if(set['m'+c.dataset.id]&&mb(c))mb(c).checked=true;if(set['g'+c.dataset.id]&&gb(c))gb(c).checked=true;paint(c)});
+  DIRTY=false;
+}
+/* Liste (z. B. 125,g2304,-55) wieder einlesen: setzt alle Haken passend, nichts wird versteckt gespeichert */
+function applyList(text){
+  var mm={},gg={};
+  (text.match(/-?[gG]?\d+/g)||[]).forEach(function(t){
+    var neg=t.charAt(0)==='-';if(neg)t=t.slice(1);
+    var g=/^[gG]/.test(t);if(g)t=t.slice(1);
+    var id=t.replace(/\D/g,'');
+    if(g&&!neg)gg[id]=1; else if(g&&neg&&MODE==='guild')mm[id]=1; else if(!g&&neg&&MODE==='sale')mm[id]=1; else if(!g&&!neg&&MODE!=='sale'&&MODE!=='guild')mm[id]=1;
+  });
+  var n=0;
+  cards.forEach(function(c){
+    if(mb(c))mb(c).checked=!!mm[c.dataset.id]; if(gb(c))gb(c).checked=!!gg[c.dataset.id];
+    if(mb(c)&&mb(c).checked||gb(c)&&gb(c).checked)n++; paint(c)});
+  DIRTY=false;apply();return n;
+}
 function apply(){
   var q=document.getElementById('q').value.toLowerCase(), shown=0, on=0, gon=0;
   cards.forEach(function(c){
@@ -618,9 +637,11 @@ list.addEventListener('change',function(e){var c=e.target.closest('.card');if(!c
   if(document.getElementById('res').classList.contains('show'))build();});
 document.getElementById('q').oninput=apply;
 document.getElementById('sort').onchange=sortNow;
-document.getElementById('go').onclick=function(){build();document.getElementById('out').select()};
+document.getElementById('go').onclick=function(){build();DIRTY=false;document.getElementById('out').select()};
+window.addEventListener('beforeunload',function(e){if(DIRTY){e.preventDefault();e.returnValue=''}});
 document.getElementById('vis').onclick=function(){cards.forEach(function(c){if(c.style.display!=='none'&&mb(c)){mb(c).checked=true;if(gb(c))gb(c).checked=false;paint(c)}});save();apply()};
 document.getElementById('clr').onclick=function(){if(!confirm('Alle Haken entfernen?'))return;cards.forEach(function(c){if(mb(c))mb(c).checked=false;if(gb(c))gb(c).checked=false;paint(c)});save();apply()};
+document.getElementById('load').onclick=function(){var n=applyList(document.getElementById('out').value);document.getElementById('loadmsg').textContent=' '+n+' Items übernommen'};
 document.getElementById('copy').onclick=function(){var o=document.getElementById('out');o.select();
   try{document.execCommand('copy');this.textContent='Kopiert ✓'}catch(e){} var b=this;setTimeout(function(){b.textContent='In die Zwischenablage kopieren'},1800)};
 document.getElementById('qchips').addEventListener('click',function(e){var q=e.target.dataset.q;if(q===undefined)return;
@@ -677,16 +698,18 @@ def make_html(data, out, icons_dir, preset=None):
     logo = logo_data_uri()
     page = HTML_TEMPLATE
     import datetime
+    build = datetime.datetime.now().strftime("%d.%m. %H:%M") + "-" + format(zlib.crc32(("%s|%s|%s" % (data.get("ts"), len(data["items"]), json.dumps(preset))).encode()) % 0xFFFFFF, "06x")
     sub = "Verkaufsliste prüfen"
     if data.get("ts"):
         sub += " · Export vom " + datetime.datetime.fromtimestamp(int(data["ts"])).strftime("%d.%m.%Y %H:%M")
     if data.get("by"):
         sub += " · " + str(data["by"])
+    sub += " · Datei erstellt " + build
     hint = "Zahlen = freigeben, mit Minus (-12345) = Freigabe zurücknehmen, mit g (g12345) = Gildenitem."
     for k, v in (("__LOGO__", '<img src="%s" alt="">' % logo if logo else ""), ("__SUB__", html.escape(sub)), ("__MODE__", mode_txt),
                  ("__N__", str(len(data["items"]))), ("__QCHIPS__", qchips), ("__IMPORTHINT__", hint), ("__ROWS__", "\n".join(rows)),
                  ("__LABEL__", label), ("__VERSION__", html.escape(str(data.get("version", "")))), ("__MODEJSON__", json.dumps(mode)),
-                 ("__TS__", str(data.get("ts", 0)) + ("-p%d" % (zlib.crc32(json.dumps(preset, sort_keys=True).encode()) % 100000) if preset else "")),
+                 ("__BUILD__", build),
                  ("__PRESET__", json.dumps(preset) if preset else "null"),
                  ("__SELDEF__", "'on'" if preset else "'all'"),
                  ("__ALLON__", "" if preset else "on"), ("__ONON__", "on" if preset else "")):
