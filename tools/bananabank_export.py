@@ -17,6 +17,8 @@ BananaBank Export-Werkzeug (laeuft ausserhalb von WoW)
   3. Die ausgefuellte Datei auswerten:
                 python3 bananabank_export.py read auswahl.pdf
      gibt die Liste fuer /bb saleimport aus (im Spiel: /bb saleimport, Liste einfuegen).
+     Vorbelegen (Entscheidungen aus einer Liste vorab ankreuzen, Ansicht "Nur angehakt"):
+                python3 bananabank_export.py html BananaBank.lua auswahl.html --preset "125,774,g2304,g2836"
      Bedeutung des Hakens: Export "open"  = zum Verkauf freigeben (ID)
                            Export "sale"  = Freigabe zuruecknehmen (-ID)
                            Export "guild" = Gildenitem-Markierung entfernen (-gID)
@@ -31,6 +33,7 @@ import sys
 import json
 import html
 import urllib.request
+import zlib
 
 # ---------------------------------------------------------------- Lua-Tabellen lesen
 TOKEN = re.compile(r'\s*(?:(--[^\n]*)|("(?:[^"\\]|\\.)*")|(\[)|(\])|(\{)|(\})|(=)|(,)|([-+]?\d+\.?\d*(?:[eE][-+]?\d+)?)|([A-Za-z_][A-Za-z_0-9]*))')
@@ -545,7 +548,7 @@ h1,h2,.title{font-family:"Cinzel","Palatino Linotype","Book Antiqua",Georgia,ser
   </div>
   <div class="chips" id="qchips"><span class="lbl">Qualität:</span>__QCHIPS__</div>
   <div class="chips" id="sel"><span class="lbl">Anzeige:</span>
-    <span class="chip on" data-sel="all">Alle</span><span class="chip" data-sel="on">Nur angehakt</span><span class="chip" data-sel="off">Nur offene</span><span class="chip" data-sel="gi">Nur Gildenitem</span>
+    <span class="chip __ALLON__" data-sel="all">Alle</span><span class="chip __ONON__" data-sel="on">Nur angehakt</span><span class="chip" data-sel="m">Nur Verkauf</span><span class="chip" data-sel="gi">Nur Gildenitem</span><span class="chip" data-sel="off">Nur offene</span>
   </div>
   <div class="res" id="res">
     <div class="hint">Diese Liste im Spiel mit <code>/bb saleimport</code> einfügen (Bank-Rang). __IMPORTHINT__</div>
@@ -566,19 +569,21 @@ __ROWS__
 var MODE=__MODEJSON__, HASGI=(MODE!=='guild'), KEY="bb-export-__TS__-"+MODE;
 var list=document.getElementById('list');
 var cards=[].slice.call(list.querySelectorAll('.card'));
-var qOn={0:1,1:1,2:1,3:1,4:1,5:1}, selMode='all';
+var qOn={0:1,1:1,2:1,3:1,4:1,5:1}, selMode=__SELDEF__, PRESET=__PRESET__;
 function mb(c){return c.querySelector('input.m')}
 function gb(c){return c.querySelector('input.gi')}
 function paint(c){c.classList.toggle('checked',!!(mb(c)&&mb(c).checked));c.classList.toggle('gcheck',!!(gb(c)&&gb(c).checked))}
 function save(){try{var v=[];cards.forEach(function(c){if(mb(c)&&mb(c).checked)v.push('m'+c.dataset.id);if(gb(c)&&gb(c).checked)v.push('g'+c.dataset.id)});localStorage.setItem(KEY,v.join(','))}catch(e){}}
-function load(){try{var v=localStorage.getItem(KEY);if(!v)return;var set={};v.split(',').forEach(function(x){set[x]=1});
+function load(){try{var v=localStorage.getItem(KEY);
+  if(!v&&PRESET){v=PRESET.m.map(function(x){return 'm'+x}).concat(PRESET.g.map(function(x){return 'g'+x})).join(',')}
+  if(!v)return;var set={};v.split(',').forEach(function(x){set[x]=1});
   cards.forEach(function(c){if(set['m'+c.dataset.id]&&mb(c))mb(c).checked=true;if(set['g'+c.dataset.id]&&gb(c))gb(c).checked=true;paint(c)})}catch(e){}}
 function apply(){
   var q=document.getElementById('q').value.toLowerCase(), shown=0, on=0, gon=0;
   cards.forEach(function(c){
     var m=mb(c)&&mb(c).checked, g=gb(c)&&gb(c).checked; if(m)on++; if(g)gon++;
     var ok=c.dataset.name.indexOf(q)>=0 && qOn[c.dataset.q];
-    if(selMode==='on'&&!(m||g))ok=false; if(selMode==='off'&&(m||g))ok=false; if(selMode==='gi'&&!g)ok=false;
+    if(selMode==='on'&&!(m||g))ok=false; if(selMode==='off'&&(m||g))ok=false; if(selMode==='gi'&&!g)ok=false; if(selMode==='m'&&!m)ok=false;
     c.style.display=ok?'':'none'; if(ok)shown++;
   });
   document.getElementById('cnt').textContent=on;
@@ -630,7 +635,7 @@ load();sortNow();apply();
 CHECK_SVG = '<svg viewBox="0 0 24 24"><path d="M4 12.5l5 5L20 6.5"/></svg>'
 
 
-def make_html(data, out, icons_dir):
+def make_html(data, out, icons_dir, preset=None):
     import base64
     mode = data.get("mode", "open")
     label = {"open": "Zum Verkauf freigeben", "sale": "Freigabe zurücknehmen", "all": "Verkaufsfähig markieren",
@@ -681,15 +686,36 @@ def make_html(data, out, icons_dir):
     for k, v in (("__LOGO__", '<img src="%s" alt="">' % logo if logo else ""), ("__SUB__", html.escape(sub)), ("__MODE__", mode_txt),
                  ("__N__", str(len(data["items"]))), ("__QCHIPS__", qchips), ("__IMPORTHINT__", hint), ("__ROWS__", "\n".join(rows)),
                  ("__LABEL__", label), ("__VERSION__", html.escape(str(data.get("version", "")))), ("__MODEJSON__", json.dumps(mode)),
-                 ("__TS__", str(data.get("ts", 0)))):
+                 ("__TS__", str(data.get("ts", 0)) + ("-p%d" % (zlib.crc32(json.dumps(preset, sort_keys=True).encode()) % 100000) if preset else "")),
+                 ("__PRESET__", json.dumps(preset) if preset else "null"),
+                 ("__SELDEF__", "'on'" if preset else "'all'"),
+                 ("__ALLON__", "" if preset else "on"), ("__ONON__", "on" if preset else "")):
         page = page.replace(k, v)
     with open(out, "w", encoding="utf-8") as f:
         f.write(page)
     print("HTML geschrieben:", out)
 
 
+def parse_preset(text):
+    """'125,g2304,-5' -> {"m": [125], "g": [2304]}  (Verkauf und Gildenitem vorab angehakt)"""
+    m_ids, g_ids = [], []
+    for tok in re.findall(r"-?[gG]?\d+", text or ""):
+        if tok.startswith("-"):
+            continue
+        if tok[0] in "gG":
+            g_ids.append(int(tok[1:]))
+        else:
+            m_ids.append(int(tok))
+    return {"m": sorted(set(m_ids)), "g": sorted(set(g_ids))}
+
+
 def main():
     a = sys.argv[1:]
+    preset = None
+    if "--preset" in a:
+        i = a.index("--preset")
+        preset = parse_preset(a[i + 1] if i + 1 < len(a) else "")
+        del a[i:i + 2]
     if len(a) < 2:
         print(__doc__)
         sys.exit(1)
@@ -699,7 +725,10 @@ def main():
         read_pdf(a[1])
     elif cmd in ("pdf", "html") and len(a) >= 3:
         data = load_export(a[1])
-        (make_pdf if cmd == "pdf" else make_html)(data, a[2], icons)
+        if cmd == "pdf":
+            make_pdf(data, a[2], icons)
+        else:
+            make_html(data, a[2], icons, preset)
     else:
         print(__doc__)
         sys.exit(1)
