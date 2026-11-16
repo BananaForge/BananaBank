@@ -340,55 +340,302 @@ def read_pdf(path):
 
 
 # ---------------------------------------------------------------- HTML (interaktiv, ohne Server)
+def money_html(c):
+    c = int(c or 0)
+    g, s_, k = c // 10000, (c % 10000) // 100, c % 100
+    out = []
+    if g:
+        out.append('<span class="g">%dg</span>' % g)
+    if s_:
+        out.append('<span class="s">%ds</span>' % s_)
+    if k or not out:
+        out.append('<span class="k">%dc</span>' % k)
+    return " ".join(out)
+
+
+def price_html(it):
+    import datetime
+    rows = []
+    pa, pl, p = int(it.get("pa") or 0), int(it.get("pl") or 0), int(it.get("p") or 0)
+    if pa:
+        extra = ' <em>(ca.)</em>' if it.get("pderived") else ""
+        rows.append("<div><b>AH-Preis</b> %s%s</div>" % (money_html(pa), extra))
+    elif it.get("psrc") == "man":
+        rows.append('<div><b>AH-Preis</b> <em>kein Scan (Handpreis)</em></div>')
+    else:
+        rows.append('<div><b>AH-Preis</b> <em>kein Scan</em></div>')
+    if pl:
+        rows.append("<div><b>Günstigstes</b> %s</div>" % money_html(pl))
+    if p:
+        rows.append("<div><b>Gildenpreis</b> %s%s</div>" % (money_html(p), " <em>(Handpreis)</em>" if it.get("psrc") == "man" else ""))
+    ts = int(it.get("pts") or 0)
+    if ts and pa:
+        stand = datetime.datetime.fromtimestamp(ts).strftime("%d.%m. %H:%M")
+        n = int(it.get("pn") or 0)
+        rows.append('<div class="dim">Stand %s%s</div>' % (stand, " · %d Angebote" % n if n else ""))
+    return "".join(rows)
+
+
+def logo_data_uri():
+    try:
+        import base64, io
+        from PIL import Image
+        here = os.path.dirname(os.path.abspath(__file__))
+        path = os.path.join(here, "..", "Media", "Logo64.tga")
+        if not os.path.exists(path):
+            return ""
+        im = Image.open(path).convert("RGBA")
+        buf = io.BytesIO()
+        im.save(buf, "PNG")
+        return "data:image/png;base64," + base64.b64encode(buf.getvalue()).decode()
+    except Exception:
+        return ""
+
+
+HTML_TEMPLATE = r"""<!doctype html>
+<html lang="de"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>BananaBank – Verkaufsliste prüfen</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@500;700&display=swap" rel="stylesheet">
+<style>
+:root{
+  --gold:#ffd142; --gold2:#c79938; --brass:#8c6629; --text:#ebe6d6; --muted:#999eb3;
+  --bg:#080b17; --panel:#0e1429; --blue:#142a5c; --green:#59d959; --red:#f24d40; --orange:#ff9926;
+  --q0:#9d9d9d; --q1:#ffffff; --q2:#1eff00; --q3:#0070dd; --q4:#a335ee; --q5:#ff8000;
+}
+*{box-sizing:border-box}
+html{background:#05070f}
+body{margin:0;color:var(--text);font:14px/1.45 "Trebuchet MS",Verdana,"Segoe UI",sans-serif;
+  background:
+    radial-gradient(ellipse at 50% -10%, rgba(40,70,150,.35), transparent 60%),
+    radial-gradient(ellipse at 50% 120%, rgba(140,102,41,.18), transparent 55%),
+    repeating-linear-gradient(45deg, rgba(255,255,255,.012) 0 2px, transparent 2px 4px),
+    var(--bg);
+  min-height:100vh}
+.wrap{max-width:1180px;margin:0 auto;padding:14px 14px 60px}
+h1,h2,.title{font-family:"Cinzel","Palatino Linotype","Book Antiqua",Georgia,serif;letter-spacing:.04em}
+
+/* Kopf */
+.head{display:flex;align-items:center;gap:16px;padding:14px 18px;margin-bottom:12px;
+  background:linear-gradient(180deg,#121b3a,#0b1128);border:2px solid var(--brass);border-radius:6px;
+  box-shadow:0 0 0 1px #000,inset 0 0 0 1px rgba(255,209,66,.25),0 6px 24px rgba(0,0,0,.6)}
+.head img{width:56px;height:56px;image-rendering:auto;filter:drop-shadow(0 2px 4px #000)}
+.head h1{margin:0;font-size:28px;color:var(--gold);text-shadow:0 2px 0 #000,0 0 14px rgba(255,209,66,.35)}
+.head .sub{color:var(--muted);font-size:13px;margin-top:2px}
+.head .modebadge{margin-left:auto;text-align:right;color:var(--gold2);font-family:"Cinzel",Georgia,serif;font-size:13px}
+.head .modebadge b{display:block;color:var(--gold);font-size:18px}
+
+/* Werkzeugleiste */
+.bar{position:sticky;top:0;z-index:5;margin-bottom:12px;padding:10px 12px;
+  background:linear-gradient(180deg,rgba(18,27,58,.97),rgba(9,14,32,.97));border:2px solid var(--brass);border-radius:6px;
+  box-shadow:0 0 0 1px #000,0 8px 20px rgba(0,0,0,.6)}
+.row1{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.bar input[type=text],.bar select{background:#050818;color:var(--text);border:1px solid var(--brass);border-radius:4px;
+  padding:7px 9px;font:inherit;min-width:0}
+.bar input[type=text]{width:230px}
+.bar input[type=text]:focus,.bar select:focus{outline:none;border-color:var(--gold);box-shadow:0 0 6px rgba(255,209,66,.5)}
+.btn{cursor:pointer;color:#2a1b00;font-weight:700;font-family:"Cinzel",Georgia,serif;letter-spacing:.03em;
+  background:linear-gradient(180deg,#ffe58a,#e0a92b 55%,#b9821a);border:1px solid #5a3d08;border-radius:4px;padding:7px 14px;
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.6),0 2px 0 #3a2704}
+.btn:hover{filter:brightness(1.1)}.btn:active{transform:translateY(1px);box-shadow:inset 0 1px 0 rgba(255,255,255,.4)}
+.btn.ghost{color:var(--gold);background:linear-gradient(180deg,#1b2650,#101a3a);border-color:var(--brass);
+  box-shadow:inset 0 1px 0 rgba(255,209,66,.25),0 2px 0 #000}
+.count{margin-left:auto;font-family:"Cinzel",Georgia,serif;color:var(--gold);font-size:16px;text-shadow:0 1px 0 #000}
+.count small{color:var(--muted);font:12px "Trebuchet MS",sans-serif}
+.chips{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px;align-items:center}
+.chips .lbl{color:var(--muted);font-size:12px;margin-right:2px}
+.chip{cursor:pointer;user-select:none;padding:3px 10px;border:1px solid var(--brass);border-radius:999px;background:#0a1030;
+  color:var(--muted);font-size:12px}
+.chip.on{background:linear-gradient(180deg,#2a3a78,#16224f);color:var(--gold);border-color:var(--gold);box-shadow:0 0 8px rgba(255,209,66,.3)}
+.chip[data-q="0"].on{color:var(--q0)}.chip[data-q="1"].on{color:var(--q1)}.chip[data-q="2"].on{color:var(--q2)}
+.chip[data-q="3"].on{color:#4aa3ff}.chip[data-q="4"].on{color:#c77dff}.chip[data-q="5"].on{color:var(--q5)}
+.res{display:none;margin-top:10px}
+.res.show{display:block}
+.res textarea{width:100%;height:78px;background:#f1e3b6;color:#2a1b00;border:2px solid var(--brass);border-radius:4px;
+  padding:8px;font:13px/1.4 Consolas,"Courier New",monospace;box-shadow:inset 0 0 18px rgba(120,80,10,.35)}
+.res .hint{color:var(--muted);font-size:12px;margin:4px 0}
+.res .hint code{color:var(--gold);background:#050818;padding:1px 5px;border-radius:3px}
+
+/* Karten */
+.list{display:flex;flex-direction:column;gap:10px}
+.card{position:relative;display:flex;flex-wrap:wrap;gap:14px;align-items:flex-start;padding:12px 14px 12px 12px;
+  background:linear-gradient(180deg,rgba(20,32,70,.85),rgba(10,16,38,.92));border:2px solid #3a4468;border-radius:6px;
+  box-shadow:0 0 0 1px #000,0 4px 14px rgba(0,0,0,.5);transition:border-color .15s, box-shadow .15s}
+.card:hover{border-color:var(--brass)}
+.card.checked{border-color:var(--gold);box-shadow:0 0 0 1px #000,0 0 18px rgba(255,209,66,.35),inset 0 0 40px rgba(255,209,66,.07)}
+.icon{flex:none;width:44px;height:44px;border:2px solid var(--qc,#555);border-radius:4px;background:#000 center/cover no-repeat;
+  box-shadow:0 0 8px color-mix(in srgb,var(--qc,#555) 55%,transparent),inset 0 0 0 1px #000}
+.tip{flex:0 1 380px;min-width:250px;background:rgba(6,6,16,.96);border:2px solid #6a6a78;border-radius:6px;padding:7px 10px;
+  font:12.5px/1.4 "Trebuchet MS","DejaVu Sans",sans-serif;box-shadow:0 0 0 1px #000,inset 0 0 0 1px rgba(255,255,255,.06)}
+.tip .l{display:flex;justify-content:space-between;gap:14px}
+.tip .l:first-child{font-weight:700;font-size:13.5px}
+.meta{flex:1 1 220px;min-width:200px;font-size:12px;color:var(--muted);line-height:1.55}
+.meta b{color:var(--text);font-weight:600;margin-right:4px}
+.meta .id{color:var(--gold2);font-family:Consolas,monospace}
+.meta em{color:var(--orange);font-style:normal;font-size:11px}
+.meta .dim{opacity:.8}
+.meta .banks{color:#8fb4ff;margin-top:2px}
+.g{color:#ffd100}.s{color:#c7c7cf}.k{color:#c47a3a}
+.pick{flex:none;display:flex;flex-direction:column;align-items:center;gap:4px;cursor:pointer;margin-left:auto;padding-right:4px}
+.pick span{font-family:"Cinzel",Georgia,serif;font-size:11px;color:var(--gold2);text-align:center;max-width:110px;line-height:1.2}
+.pick input{position:absolute;opacity:0;pointer-events:none}
+.box{width:34px;height:34px;border:2px solid var(--gold2);border-radius:4px;background:#050818;
+  box-shadow:inset 0 0 8px #000,0 0 0 1px #000;display:flex;align-items:center;justify-content:center;transition:all .12s}
+.box svg{width:24px;height:24px;stroke:var(--gold);stroke-width:3.5;fill:none;stroke-linecap:round;stroke-linejoin:round;opacity:0}
+.pick:hover .box{border-color:var(--gold);box-shadow:inset 0 0 8px #000,0 0 10px rgba(255,209,66,.45)}
+.pick input:checked + .box{background:linear-gradient(180deg,#1d3a1d,#0e2a0e);border-color:var(--green)}
+.pick input:checked ~ span{color:var(--green)}
+.pick input:checked + .box svg{opacity:1;stroke:#7dff7d;filter:drop-shadow(0 0 4px rgba(90,255,90,.7))}
+.pick input:focus-visible + .box{outline:2px solid var(--gold);outline-offset:2px}
+.empty{text-align:center;color:var(--muted);padding:40px 0;font-family:"Cinzel",Georgia,serif}
+.foot{margin-top:24px;text-align:center;color:var(--muted);font-size:12px}
+.foot b{color:var(--gold2)}
+@media(max-width:700px){.head h1{font-size:22px}.head .modebadge{display:none}.bar{position:static}.tip{flex:1 1 calc(100% - 70px);min-width:0}.meta,.pick{flex-basis:100%}.pick{flex-direction:row;margin-left:0;gap:10px}.pick span{max-width:none;text-align:left}.bar input[type=text]{width:100%}}
+</style></head><body><div class="wrap">
+
+<div class="head">
+  __LOGO__
+  <div><h1>BananaBank</h1><div class="sub">__SUB__</div></div>
+  <div class="modebadge">__MODE__<b>__N__ Items</b></div>
+</div>
+
+<div class="bar">
+  <div class="row1">
+    <input type="text" id="q" placeholder="Suchen …" autocomplete="off">
+    <select id="sort">
+      <option value="name">Sortierung: Name</option>
+      <option value="q">Qualität ↓</option>
+      <option value="p">AH-Preis ↓</option>
+      <option value="c">Menge ↓</option>
+      <option value="orig">Reihenfolge Export</option>
+    </select>
+    <button class="btn ghost" id="vis">Sichtbare anhaken</button>
+    <button class="btn ghost" id="clr">Alle abwählen</button>
+    <button class="btn" id="go">Liste erstellen</button>
+    <div class="count"><span id="cnt">0</span> <small>ausgewählt · <span id="shown">0</span> sichtbar</small></div>
+  </div>
+  <div class="chips" id="qchips"><span class="lbl">Qualität:</span>__QCHIPS__</div>
+  <div class="chips" id="sel"><span class="lbl">Anzeige:</span>
+    <span class="chip on" data-sel="all">Alle</span><span class="chip" data-sel="on">Nur angehakt</span><span class="chip" data-sel="off">Nur offene</span>
+  </div>
+  <div class="res" id="res">
+    <div class="hint">Diese Liste im Spiel mit <code>/bb saleimport</code> einfügen (Bank-Rang). __IMPORTHINT__</div>
+    <textarea id="out" readonly></textarea>
+    <button class="btn" id="copy" style="margin-top:6px">In die Zwischenablage kopieren</button>
+  </div>
+</div>
+
+<div class="list" id="list">
+__ROWS__
+</div>
+<div class="empty" id="none" style="display:none">Keine Items passen zum Filter.</div>
+
+<div class="foot">Haken = <b>__LABEL__</b> · Der Stand deiner Haken bleibt in diesem Browser gespeichert · BananaBank __VERSION__</div>
+</div>
+
+<script>
+var MODE=__MODEJSON__, KEY="bb-export-__TS__-"+MODE;
+var list=document.getElementById('list');
+var cards=[].slice.call(list.querySelectorAll('.card'));
+var qOn={0:1,1:1,2:1,3:1,4:1,5:1}, selMode='all';
+function save(){try{var ids=[];cards.forEach(function(c){if(c.querySelector('input').checked)ids.push(c.dataset.id)});localStorage.setItem(KEY,ids.join(','))}catch(e){}}
+function load(){try{var v=localStorage.getItem(KEY);if(!v)return;var set={};v.split(',').forEach(function(x){set[x]=1});
+  cards.forEach(function(c){if(set[c.dataset.id]){c.querySelector('input').checked=true;c.classList.add('checked')}})}catch(e){}}
+function apply(){
+  var q=document.getElementById('q').value.toLowerCase(), shown=0, on=0;
+  cards.forEach(function(c){
+    var chk=c.querySelector('input').checked; if(chk)on++;
+    var ok=c.dataset.name.indexOf(q)>=0 && qOn[c.dataset.q];
+    if(selMode==='on'&&!chk)ok=false; if(selMode==='off'&&chk)ok=false;
+    c.style.display=ok?'':'none'; if(ok)shown++;
+  });
+  document.getElementById('cnt').textContent=on;
+  document.getElementById('shown').textContent=shown;
+  document.getElementById('none').style.display=shown?'none':'block';
+}
+function sortNow(){
+  var k=document.getElementById('sort').value;
+  var arr=cards.slice();
+  arr.sort(function(a,b){
+    if(k==='name')return a.dataset.name<b.dataset.name?-1:1;
+    if(k==='q')return (b.dataset.q-a.dataset.q)||(a.dataset.name<b.dataset.name?-1:1);
+    if(k==='p')return (b.dataset.p-a.dataset.p);
+    if(k==='c')return (b.dataset.c-a.dataset.c);
+    return a.dataset.i-b.dataset.i;});
+  arr.forEach(function(c){list.appendChild(c)});
+}
+function build(){
+  var ids=[];cards.forEach(function(c){if(c.querySelector('input').checked)ids.push((MODE==='sale'?'-':'')+c.dataset.id)});
+  ids.sort(function(a,b){return Math.abs(a)-Math.abs(b)});
+  var o=document.getElementById('out');o.value=ids.join(',');document.getElementById('res').classList.add('show');return ids.length;
+}
+list.addEventListener('change',function(e){var c=e.target.closest('.card');if(c){c.classList.toggle('checked',e.target.checked);save();apply();
+  if(document.getElementById('res').classList.contains('show'))build();}});
+document.getElementById('q').oninput=apply;
+document.getElementById('sort').onchange=sortNow;
+document.getElementById('go').onclick=function(){build();document.getElementById('out').select()};
+document.getElementById('vis').onclick=function(){cards.forEach(function(c){if(c.style.display!=='none'){var i=c.querySelector('input');i.checked=true;c.classList.add('checked')}});save();apply()};
+document.getElementById('clr').onclick=function(){if(!confirm('Alle Haken entfernen?'))return;cards.forEach(function(c){c.querySelector('input').checked=false;c.classList.remove('checked')});save();apply()};
+document.getElementById('copy').onclick=function(){var o=document.getElementById('out');o.select();
+  try{document.execCommand('copy');this.textContent='Kopiert ✓'}catch(e){} var b=this;setTimeout(function(){b.textContent='In die Zwischenablage kopieren'},1800)};
+document.getElementById('qchips').addEventListener('click',function(e){var q=e.target.dataset.q;if(q===undefined)return;
+  qOn[q]=qOn[q]?0:1;e.target.classList.toggle('on',!!qOn[q]);apply()});
+document.getElementById('sel').addEventListener('click',function(e){var s=e.target.dataset.sel;if(!s)return;selMode=s;
+  [].forEach.call(document.querySelectorAll('#sel .chip'),function(x){x.classList.toggle('on',x===e.target)});apply()});
+load();sortNow();apply();
+</script></body></html>
+"""
+
+
 def make_html(data, out, icons_dir):
+    import base64
     mode = data.get("mode", "open")
     label = {"open": "Zum Verkauf freigeben", "sale": "Freigabe zurücknehmen", "all": "Verkaufsfähig markieren"}.get(mode, "Auswahl")
+    stamp = {"open": "freigeben", "sale": "zurücknehmen", "all": "markiert"}.get(mode, "gewählt")
+    mode_txt = {"open": "Noch nicht verkaufsfähig", "sale": "Verkaufsfähige Items (Kontrolle)", "all": "Alle Items"}.get(mode, "Items")
+    qnames = {0: "Schlecht", 1: "Gewöhnlich", 2: "Ungewöhnlich", 3: "Selten", 4: "Episch", 5: "Legendär"}
+    qcol = {0: "#9d9d9d", 1: "#ffffff", 2: "#1eff00", 3: "#0070dd", 4: "#a335ee", 5: "#ff8000"}
+    present = sorted({int(it.get("q", 1)) for it in data["items"]})
+    qchips = "".join('<span class="chip on" data-q="%d">%s</span>' % (q, qnames.get(q, str(q))) for q in present)
     rows = []
-    for it in data["items"]:
+    for idx, it in enumerate(data["items"]):
+        q = int(it.get("q", 1))
         ip = icon_path(it.get("tex", ""), icons_dir)
-        icon = ""
         if ip:
-            import base64
             with open(ip, "rb") as f:
-                icon = '<img class="ic" src="data:image/jpeg;base64,%s">' % base64.b64encode(f.read()).decode()
+                bg = 'background-image:url(data:image/jpeg;base64,%s)' % base64.b64encode(f.read()).decode()
         else:
-            icon = '<span class="ic"></span>'
+            bg = ""
         tl = []
         for l, r, col in card_lines(it):
             tl.append('<div class="l" style="color:#%s"><span>%s</span><span>%s</span></div>' % (
                 col if re.match(r"^[0-9a-fA-F]{6}$", col or "") else "ffffff", html.escape(l), html.escape(r)))
-        meta = "ID %d · Menge %d" % (it["id"], it.get("c", 0))
-        meta_lines = [html.escape(meta)] + [html.escape(x) for x in price_lines(it)]
+        meta = '<div><span class="id">ID %d</span> · <b>Menge</b>%d</div>%s' % (it["id"], it.get("c", 0), price_html(it))
         if it.get("per"):
-            meta_lines.append(html.escape(it["per"]))
+            meta += '<div class="banks">%s</div>' % html.escape(it["per"])
+        pa = int(it.get("pa") or it.get("p") or 0)
         rows.append(
-            '<div class="row" data-name="%s"><label class="chk"><input type="checkbox" value="%d"> %s</label>%s'
-            '<div class="tip">%s</div><div class="meta">%s</div></div>' % (
-                html.escape((it.get("n") or "").lower()), it["id"], label, icon, "".join(tl), "<br>".join(meta_lines)))
-    page = """<!doctype html><html lang="de"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>BananaBank Export</title><style>
-body{font-family:system-ui,sans-serif;background:#f3f3f6;margin:0;padding:12px;color:#222}
-h1{font-size:18px;margin:0 0 6px}.bar{position:sticky;top:0;background:#f3f3f6;padding:8px 0;z-index:2}
-.bar input[type=text]{padding:6px;width:220px}.bar button{padding:6px 12px;margin-left:6px}
-.row{display:flex;gap:10px;align-items:flex-start;background:#fff;border:1px solid #ddd;border-radius:6px;padding:8px;margin:8px 0;flex-wrap:wrap}
-.ic{width:36px;height:36px;border:1px solid #555;flex:none;display:inline-block}
-.tip{background:#0a0a17;border:1px solid #6a6a72;border-radius:4px;padding:6px 8px;min-width:260px;max-width:380px;font:12px/1.35 'DejaVu Sans',Verdana,sans-serif}
-.l{display:flex;justify-content:space-between;gap:12px}.meta{font-size:11px;color:#444;max-width:280px;line-height:1.45}
-.chk{font-size:13px;font-weight:600;white-space:nowrap;order:3}.chk input{width:20px;height:20px;vertical-align:middle}
-textarea{width:100%%;height:90px;margin-top:6px}</style>
-<h1>BananaBank: %(title)s (%(n)d Items)</h1>
-<div class="bar"><input type="text" id="q" placeholder="Suchen ..."> <button onclick="out()">Auswahl berechnen</button>
-<span id="cnt"></span><textarea id="res" readonly placeholder="Hier steht die Liste fuer /bb saleimport"></textarea></div>
-%(rows)s
-<script>
-var MODE=%(mode)s;
-document.getElementById('q').oninput=function(){var q=this.value.toLowerCase();
- document.querySelectorAll('.row').forEach(function(r){r.style.display=r.dataset.name.indexOf(q)<0?'none':'flex'})};
-function out(){var ids=[];document.querySelectorAll('.row input:checked').forEach(function(c){ids.push((MODE=='sale'?'-':'')+c.value)});
- document.getElementById('res').value=ids.join(',');document.getElementById('cnt').textContent=' '+ids.length+' ausgewaehlt';
- document.getElementById('res').select()}
-</script></html>""" % {"title": {"open": "Noch nicht verkaufsfähig", "sale": "Verkaufsfähige Items", "all": "Alle Items"}.get(mode, "Items"),
-                       "n": len(data["items"]), "rows": "".join(rows), "mode": json.dumps(mode)}
+            '<div class="card" data-id="%d" data-i="%d" data-q="%d" data-p="%d" data-c="%d" data-name="%s" data-stamp="%s">'
+            '<div class="icon" style="--qc:%s;%s"></div><div class="tip">%s</div><div class="meta">%s</div>'
+            '<label class="pick"><input type="checkbox"><div class="box"><svg viewBox="0 0 24 24"><path d="M4 12.5l5 5L20 6.5"/></svg></div>'
+            '<span>%s</span></label></div>' % (
+                it["id"], idx, q, pa, it.get("c", 0), html.escape((it.get("n") or "").lower()), stamp,
+                qcol.get(q, "#fff"), bg, "".join(tl), meta, label))
+    logo = logo_data_uri()
+    page = HTML_TEMPLATE
+    import datetime
+    sub = "Verkaufsliste prüfen"
+    if data.get("ts"):
+        sub += " · Export vom " + datetime.datetime.fromtimestamp(int(data["ts"])).strftime("%d.%m.%Y %H:%M")
+    if data.get("by"):
+        sub += " · " + str(data["by"])
+    hint = "Ein Minus davor (-12345) nimmt die Freigabe zurück." if mode == "sale" else ""
+    for k, v in (("__LOGO__", '<img src="%s" alt="">' % logo if logo else ""), ("__SUB__", html.escape(sub)), ("__MODE__", mode_txt),
+                 ("__N__", str(len(data["items"]))), ("__QCHIPS__", qchips), ("__IMPORTHINT__", hint), ("__ROWS__", "\n".join(rows)),
+                 ("__LABEL__", label), ("__VERSION__", html.escape(str(data.get("version", "")))), ("__MODEJSON__", json.dumps(mode)),
+                 ("__TS__", str(data.get("ts", 0)))):
+        page = page.replace(k, v)
     with open(out, "w", encoding="utf-8") as f:
         f.write(page)
     print("HTML geschrieben:", out)
