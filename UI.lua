@@ -1000,7 +1000,9 @@ function UI:OnSlotEnter(slot)
   end
   if BB:IsBank() and BB.SaleOverride then
     local so = BB:SaleOverride(id)
-    if so then
+    if BB:IsGuildItem(id) then
+      table.insert(lines, { T("GI_TT"), "", 0.55, 0.75, 1 })
+    elseif so then
       table.insert(lines, { string.format(T("SALE_TT_FREE"), so.by or "?"), "", 0.5, 1, 0.5 })
     elseif BB:SaleAuto(id) then
       table.insert(lines, { T("SALE_TT_AUTO"), "", 0.5, 1, 0.5 })

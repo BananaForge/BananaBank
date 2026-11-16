@@ -4,6 +4,7 @@ BananaBank Export-Werkzeug (laeuft ausserhalb von WoW)
 
   1. Im Spiel:  /bb export          (noch nicht verkaufsfaehige Items)
                 /bb export sale     (verkaufsfaehige Items, Kontrolle rueckwaerts)
+                /bb export guild    (Gildenitems, Kontrolle)
                 /bb export all      (alles)
      danach /reload, damit WoW die Datei schreibt:
      WTF/Account/<KONTO>/SavedVariables/BananaBank.lua
@@ -16,8 +17,10 @@ BananaBank Export-Werkzeug (laeuft ausserhalb von WoW)
   3. Die ausgefuellte Datei auswerten:
                 python3 bananabank_export.py read auswahl.pdf
      gibt die Liste fuer /bb saleimport aus (im Spiel: /bb saleimport, Liste einfuegen).
-     Bedeutung des Hakens: Export "open"  = zum Verkauf freigeben
-                           Export "sale"  = Freigabe zuruecknehmen (kommt als -ID in die Liste)
+     Bedeutung des Hakens: Export "open"  = zum Verkauf freigeben (ID)
+                           Export "sale"  = Freigabe zuruecknehmen (-ID)
+                           Export "guild" = Gildenitem-Markierung entfernen (-gID)
+                           zweiter Haken  = Gildenitem, nicht verkaufen (gID)
 
 Benoetigt: Python 3, reportlab, pypdf, pillow  (pip install reportlab pypdf pillow)
 Icons werden von wow.zamimg.com geladen (nur Namen aus der Datei); ohne Netz bleibt der Platz leer.
@@ -231,8 +234,10 @@ def make_pdf(data, out, icons_dir):
     icon = 36
     items = data["items"]
     mode = data.get("mode", "open")
-    check_label = {"open": "Zum Verkauf freigeben", "sale": "Freigabe zurücknehmen", "all": "Verkaufsfähig markieren"}.get(mode, "Auswahl")
-    title = {"open": "Noch nicht verkaufsfähige Items", "sale": "Verkaufsfähige Items (Kontrolle)", "all": "Alle Items"}.get(mode, "Items")
+    check_label = {"open": "Zum Verkauf freigeben", "sale": "Freigabe zurücknehmen", "all": "Verkaufsfähig markieren",
+                   "guild": "Gildenitem-Markierung entfernen"}.get(mode, "Auswahl")
+    title = {"open": "Noch nicht verkaufsfähige Items", "sale": "Verkaufsfähige Items (Kontrolle)", "all": "Alle Items",
+             "guild": "Gildenitems (Kontrolle)"}.get(mode, "Items")
 
     c = canvas.Canvas(out, pagesize=A4)
     c.setTitle("BananaBank - " + title)
@@ -268,7 +273,7 @@ def make_pdf(data, out, icons_dir):
         info_w = []
         for x in info:
             info_w.extend(simpleSplit(x, font, 7, W - rx - ml - 22) or [""])
-        info_h = 24 + len(info_w) * 8.5 + 4
+        info_h = 24 + (22 if mode != "guild" else 0) + len(info_w) * 8.5 + 4
         block = max(ch, icon + 8, info_h) + 10
         if y - block < mb:
             c.showPage()
@@ -307,7 +312,14 @@ def make_pdf(data, out, icons_dir):
         c.setFillColor(HexColor("#222222"))
         c.setFont(font, 7.5)
         c.drawString(rx + 22, top - 12, check_label)
-        yy = top - 24
+        if mode != "guild":
+            c.acroForm.checkbox(name="gld_%d_%s" % (it["id"], mode), tooltip="Gildenitem: " + it.get("n", ""), x=rx, y=top - 42, size=16,
+                                buttonStyle="check", borderColor=HexColor("#2a4a9a"), fillColor=HexColor("#ffffff"),
+                                textColor=HexColor("#000000"), forceBorder=True)
+            c.setFillColor(HexColor("#2a4a9a"))
+            c.drawString(rx + 22, top - 34, "Gildenitem (nicht verkaufen)")
+            c.setFillColor(HexColor("#222222"))
+        yy = top - 24 - (22 if mode != "guild" else 0)
         c.setFont(font, 7)
         c.setFillColor(HexColor("#555555"))
         for part in info_w:
@@ -323,20 +335,28 @@ def read_pdf(path):
     from pypdf import PdfReader
     rd = PdfReader(path)
     fields = rd.get_fields() or {}
-    on, off, mode = [], [], None
+    tokens = []
+    n_on = n_off = n_g = n_goff = 0
     for name, f in fields.items():
-        m = re.match(r"^chk_(\d+)_(open|sale|all)$", name)
+        m = re.match(r"^(chk|gld)_(\d+)_(open|sale|all|guild)$", name)
         if not m:
             continue
-        val = f.get("/V")
-        if str(val) in ("/Yes", "/On", "/1", "Yes", "True", "/Ja"):
-            mode = m.group(2)
-            (off if m.group(2) == "sale" else on).append(int(m.group(1)))
-    on.sort()
-    off.sort()
+        if str(f.get("/V")) not in ("/Yes", "/On", "/1", "Yes", "True", "/Ja"):
+            continue
+        kind, id_, mode = m.group(1), int(m.group(2)), m.group(3)
+        if kind == "gld":
+            tokens.append((id_, "g%d" % id_)); n_g += 1
+        elif mode == "sale":
+            tokens.append((id_, "-%d" % id_)); n_off += 1
+        elif mode == "guild":
+            tokens.append((id_, "-g%d" % id_)); n_goff += 1
+        else:
+            tokens.append((id_, "%d" % id_)); n_on += 1
+    tokens.sort()
     print("# fuer /bb saleimport (im Spiel einfuegen):")
-    print(",".join([str(i) for i in on] + ["-%d" % i for i in off]))
-    print("# %d zum Verkauf freigeben, %d Freigaben zuruecknehmen" % (len(on), len(off)), file=sys.stderr)
+    print(",".join(t for _, t in tokens))
+    print("# %d freigeben, %d Freigaben zuruecknehmen, %d Gildenitems, %d Gildenitem-Markierungen entfernen" % (n_on, n_off, n_g, n_goff),
+          file=sys.stderr)
 
 
 # ---------------------------------------------------------------- HTML (interaktiv, ohne Server)
@@ -477,7 +497,15 @@ h1,h2,.title{font-family:"Cinzel","Palatino Linotype","Book Antiqua",Georgia,ser
 .meta .dim{opacity:.8}
 .meta .banks{color:#8fb4ff;margin-top:2px}
 .g{color:#ffd100}.s{color:#c7c7cf}.k{color:#c47a3a}
-.pick{flex:none;display:flex;flex-direction:column;align-items:center;gap:4px;cursor:pointer;margin-left:auto;padding-right:4px}
+.picks{flex:none;display:flex;gap:16px;margin-left:auto;padding-right:4px}
+.pick.gi .box{border-color:#4a6fc4}
+.pick.gi span{color:#8fb4ff}
+.pick.gi:hover .box{border-color:#8fb4ff;box-shadow:inset 0 0 8px #000,0 0 10px rgba(110,160,255,.5)}
+.pick.gi input:checked + .box{background:linear-gradient(180deg,#1d2f5c,#0e1a3a);border-color:#8fb4ff}
+.pick.gi input:checked ~ span{color:#8fb4ff}
+.pick.gi input:checked + .box svg{stroke:#9cc2ff;filter:drop-shadow(0 0 4px rgba(120,170,255,.8))}
+.card.gcheck{border-color:#6f93e8;box-shadow:0 0 0 1px #000,0 0 18px rgba(110,160,255,.35),inset 0 0 40px rgba(110,160,255,.07)}
+.pick{flex:none;display:flex;flex-direction:column;align-items:center;gap:4px;cursor:pointer}
 .pick span{font-family:"Cinzel",Georgia,serif;font-size:11px;color:var(--gold2);text-align:center;max-width:110px;line-height:1.2}
 .pick input{position:absolute;opacity:0;pointer-events:none}
 .box{width:34px;height:34px;border:2px solid var(--gold2);border-radius:4px;background:#050818;
@@ -491,7 +519,7 @@ h1,h2,.title{font-family:"Cinzel","Palatino Linotype","Book Antiqua",Georgia,ser
 .empty{text-align:center;color:var(--muted);padding:40px 0;font-family:"Cinzel",Georgia,serif}
 .foot{margin-top:24px;text-align:center;color:var(--muted);font-size:12px}
 .foot b{color:var(--gold2)}
-@media(max-width:700px){.head h1{font-size:22px}.head .modebadge{display:none}.bar{position:static}.tip{flex:1 1 calc(100% - 70px);min-width:0}.meta,.pick{flex-basis:100%}.pick{flex-direction:row;margin-left:0;gap:10px}.pick span{max-width:none;text-align:left}.bar input[type=text]{width:100%}}
+@media(max-width:700px){.head h1{font-size:22px}.head .modebadge{display:none}.bar{position:static}.tip{flex:1 1 calc(100% - 70px);min-width:0}.meta,.picks{flex-basis:100%}.picks{margin-left:0;flex-wrap:wrap}.pick{flex-direction:row;gap:10px}.pick span{max-width:none;text-align:left}.bar input[type=text]{width:100%}}
 </style></head><body><div class="wrap">
 
 <div class="head">
@@ -513,11 +541,11 @@ h1,h2,.title{font-family:"Cinzel","Palatino Linotype","Book Antiqua",Georgia,ser
     <button class="btn ghost" id="vis">Sichtbare anhaken</button>
     <button class="btn ghost" id="clr">Alle abwählen</button>
     <button class="btn" id="go">Liste erstellen</button>
-    <div class="count"><span id="cnt">0</span> <small>ausgewählt · <span id="shown">0</span> sichtbar</small></div>
+    <div class="count"><span id="cnt">0</span> <small>ausgewählt<span id="gcntw"> · <span id="gcnt">0</span> Gildenitem</span> · <span id="shown">0</span> sichtbar</small></div>
   </div>
   <div class="chips" id="qchips"><span class="lbl">Qualität:</span>__QCHIPS__</div>
   <div class="chips" id="sel"><span class="lbl">Anzeige:</span>
-    <span class="chip on" data-sel="all">Alle</span><span class="chip" data-sel="on">Nur angehakt</span><span class="chip" data-sel="off">Nur offene</span>
+    <span class="chip on" data-sel="all">Alle</span><span class="chip" data-sel="on">Nur angehakt</span><span class="chip" data-sel="off">Nur offene</span><span class="chip" data-sel="gi">Nur Gildenitem</span>
   </div>
   <div class="res" id="res">
     <div class="hint">Diese Liste im Spiel mit <code>/bb saleimport</code> einfügen (Bank-Rang). __IMPORTHINT__</div>
@@ -535,22 +563,27 @@ __ROWS__
 </div>
 
 <script>
-var MODE=__MODEJSON__, KEY="bb-export-__TS__-"+MODE;
+var MODE=__MODEJSON__, HASGI=(MODE!=='guild'), KEY="bb-export-__TS__-"+MODE;
 var list=document.getElementById('list');
 var cards=[].slice.call(list.querySelectorAll('.card'));
 var qOn={0:1,1:1,2:1,3:1,4:1,5:1}, selMode='all';
-function save(){try{var ids=[];cards.forEach(function(c){if(c.querySelector('input').checked)ids.push(c.dataset.id)});localStorage.setItem(KEY,ids.join(','))}catch(e){}}
+function mb(c){return c.querySelector('input.m')}
+function gb(c){return c.querySelector('input.gi')}
+function paint(c){c.classList.toggle('checked',!!(mb(c)&&mb(c).checked));c.classList.toggle('gcheck',!!(gb(c)&&gb(c).checked))}
+function save(){try{var v=[];cards.forEach(function(c){if(mb(c)&&mb(c).checked)v.push('m'+c.dataset.id);if(gb(c)&&gb(c).checked)v.push('g'+c.dataset.id)});localStorage.setItem(KEY,v.join(','))}catch(e){}}
 function load(){try{var v=localStorage.getItem(KEY);if(!v)return;var set={};v.split(',').forEach(function(x){set[x]=1});
-  cards.forEach(function(c){if(set[c.dataset.id]){c.querySelector('input').checked=true;c.classList.add('checked')}})}catch(e){}}
+  cards.forEach(function(c){if(set['m'+c.dataset.id]&&mb(c))mb(c).checked=true;if(set['g'+c.dataset.id]&&gb(c))gb(c).checked=true;paint(c)})}catch(e){}}
 function apply(){
-  var q=document.getElementById('q').value.toLowerCase(), shown=0, on=0;
+  var q=document.getElementById('q').value.toLowerCase(), shown=0, on=0, gon=0;
   cards.forEach(function(c){
-    var chk=c.querySelector('input').checked; if(chk)on++;
+    var m=mb(c)&&mb(c).checked, g=gb(c)&&gb(c).checked; if(m)on++; if(g)gon++;
     var ok=c.dataset.name.indexOf(q)>=0 && qOn[c.dataset.q];
-    if(selMode==='on'&&!chk)ok=false; if(selMode==='off'&&chk)ok=false;
+    if(selMode==='on'&&!(m||g))ok=false; if(selMode==='off'&&(m||g))ok=false; if(selMode==='gi'&&!g)ok=false;
     c.style.display=ok?'':'none'; if(ok)shown++;
   });
   document.getElementById('cnt').textContent=on;
+  document.getElementById('gcnt').textContent=gon;
+  document.getElementById('gcntw').style.display=HASGI?'':'none';
   document.getElementById('shown').textContent=shown;
   document.getElementById('none').style.display=shown?'none':'block';
 }
@@ -565,18 +598,24 @@ function sortNow(){
     return a.dataset.i-b.dataset.i;});
   arr.forEach(function(c){list.appendChild(c)});
 }
+function num(t){return parseInt(t.replace(/\D/g,''),10)}
 function build(){
-  var ids=[];cards.forEach(function(c){if(c.querySelector('input').checked)ids.push((MODE==='sale'?'-':'')+c.dataset.id)});
-  ids.sort(function(a,b){return Math.abs(a)-Math.abs(b)});
+  var ids=[];cards.forEach(function(c){
+    if(mb(c)&&mb(c).checked)ids.push((MODE==='sale'?'-':(MODE==='guild'?'-g':''))+c.dataset.id);
+    if(gb(c)&&gb(c).checked)ids.push('g'+c.dataset.id)});
+  ids.sort(function(a,b){return num(a)-num(b)});
   var o=document.getElementById('out');o.value=ids.join(',');document.getElementById('res').classList.add('show');return ids.length;
 }
-list.addEventListener('change',function(e){var c=e.target.closest('.card');if(c){c.classList.toggle('checked',e.target.checked);save();apply();
-  if(document.getElementById('res').classList.contains('show'))build();}});
+list.addEventListener('change',function(e){var c=e.target.closest('.card');if(!c)return;
+  /* Verkauf und Gildenitem schliessen sich aus */
+  if(e.target.checked){var other=e.target.classList.contains('m')?gb(c):mb(c);if(other)other.checked=false}
+  paint(c);save();apply();
+  if(document.getElementById('res').classList.contains('show'))build();});
 document.getElementById('q').oninput=apply;
 document.getElementById('sort').onchange=sortNow;
 document.getElementById('go').onclick=function(){build();document.getElementById('out').select()};
-document.getElementById('vis').onclick=function(){cards.forEach(function(c){if(c.style.display!=='none'){var i=c.querySelector('input');i.checked=true;c.classList.add('checked')}});save();apply()};
-document.getElementById('clr').onclick=function(){if(!confirm('Alle Haken entfernen?'))return;cards.forEach(function(c){c.querySelector('input').checked=false;c.classList.remove('checked')});save();apply()};
+document.getElementById('vis').onclick=function(){cards.forEach(function(c){if(c.style.display!=='none'&&mb(c)){mb(c).checked=true;if(gb(c))gb(c).checked=false;paint(c)}});save();apply()};
+document.getElementById('clr').onclick=function(){if(!confirm('Alle Haken entfernen?'))return;cards.forEach(function(c){if(mb(c))mb(c).checked=false;if(gb(c))gb(c).checked=false;paint(c)});save();apply()};
 document.getElementById('copy').onclick=function(){var o=document.getElementById('out');o.select();
   try{document.execCommand('copy');this.textContent='Kopiert ✓'}catch(e){} var b=this;setTimeout(function(){b.textContent='In die Zwischenablage kopieren'},1800)};
 document.getElementById('qchips').addEventListener('click',function(e){var q=e.target.dataset.q;if(q===undefined)return;
@@ -588,12 +627,17 @@ load();sortNow();apply();
 """
 
 
+CHECK_SVG = '<svg viewBox="0 0 24 24"><path d="M4 12.5l5 5L20 6.5"/></svg>'
+
+
 def make_html(data, out, icons_dir):
     import base64
     mode = data.get("mode", "open")
-    label = {"open": "Zum Verkauf freigeben", "sale": "Freigabe zurücknehmen", "all": "Verkaufsfähig markieren"}.get(mode, "Auswahl")
-    stamp = {"open": "freigeben", "sale": "zurücknehmen", "all": "markiert"}.get(mode, "gewählt")
-    mode_txt = {"open": "Noch nicht verkaufsfähig", "sale": "Verkaufsfähige Items (Kontrolle)", "all": "Alle Items"}.get(mode, "Items")
+    label = {"open": "Zum Verkauf freigeben", "sale": "Freigabe zurücknehmen", "all": "Verkaufsfähig markieren",
+             "guild": "Gildenitem-Markierung entfernen"}.get(mode, "Auswahl")
+    stamp = label
+    mode_txt = {"open": "Noch nicht verkaufsfähig", "sale": "Verkaufsfähige Items (Kontrolle)", "all": "Alle Items",
+                "guild": "Gildenitems (Kontrolle)"}.get(mode, "Items")
     qnames = {0: "Schlecht", 1: "Gewöhnlich", 2: "Ungewöhnlich", 3: "Selten", 4: "Episch", 5: "Legendär"}
     qcol = {0: "#9d9d9d", 1: "#ffffff", 2: "#1eff00", 3: "#0070dd", 4: "#a335ee", 5: "#ff8000"}
     present = sorted({int(it.get("q", 1)) for it in data["items"]})
@@ -615,13 +659,16 @@ def make_html(data, out, icons_dir):
         if it.get("per"):
             meta += '<div class="banks">%s</div>' % html.escape(it["per"])
         pa = int(it.get("pa") or it.get("p") or 0)
-        rows.append(
-            '<div class="card" data-id="%d" data-i="%d" data-q="%d" data-p="%d" data-c="%d" data-name="%s" data-stamp="%s">'
-            '<div class="icon" style="--qc:%s;%s"></div><div class="tip">%s</div><div class="meta">%s</div>'
-            '<label class="pick"><input type="checkbox"><div class="box"><svg viewBox="0 0 24 24"><path d="M4 12.5l5 5L20 6.5"/></svg></div>'
-            '<span>%s</span></label></div>' % (
-                it["id"], idx, q, pa, it.get("c", 0), html.escape((it.get("n") or "").lower()), stamp,
-                qcol.get(q, "#fff"), bg, "".join(tl), meta, label))
+        main_pick = ('<label class="pick"><input type="checkbox" class="m"><div class="box">' + CHECK_SVG +
+                     '</div><span>' + html.escape(label) + '</span></label>')
+        gi_pick = "" if mode == "guild" else (
+            '<label class="pick gi"><input type="checkbox" class="gi"><div class="box">' + CHECK_SVG +
+            '</div><span>Gildenitem<br>(nicht verkaufen)</span></label>')
+        card = ('<div class="card" data-id="%d" data-i="%d" data-q="%d" data-p="%d" data-c="%d" data-name="%s">'
+                '<div class="icon" style="--qc:%s;%s"></div><div class="tip">%s</div><div class="meta">%s</div>'
+                % (it["id"], idx, q, pa, it.get("c", 0), html.escape((it.get("n") or "").lower()),
+                   qcol.get(q, "#fff"), bg, "".join(tl), meta))
+        rows.append(card + '<div class="picks">' + main_pick + gi_pick + '</div></div>')
     logo = logo_data_uri()
     page = HTML_TEMPLATE
     import datetime
@@ -630,7 +677,7 @@ def make_html(data, out, icons_dir):
         sub += " · Export vom " + datetime.datetime.fromtimestamp(int(data["ts"])).strftime("%d.%m.%Y %H:%M")
     if data.get("by"):
         sub += " · " + str(data["by"])
-    hint = "Ein Minus davor (-12345) nimmt die Freigabe zurück." if mode == "sale" else ""
+    hint = "Zahlen = freigeben, mit Minus (-12345) = Freigabe zurücknehmen, mit g (g12345) = Gildenitem."
     for k, v in (("__LOGO__", '<img src="%s" alt="">' % logo if logo else ""), ("__SUB__", html.escape(sub)), ("__MODE__", mode_txt),
                  ("__N__", str(len(data["items"]))), ("__QCHIPS__", qchips), ("__IMPORTHINT__", hint), ("__ROWS__", "\n".join(rows)),
                  ("__LABEL__", label), ("__VERSION__", html.escape(str(data.get("version", "")))), ("__MODEJSON__", json.dumps(mode)),

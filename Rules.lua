@@ -647,7 +647,14 @@ function BB:SaleAuto(id)
   return false
 end
 
+-- Gildenitem: bleibt fuer die Gilde, wird nie angeboten und taucht im normalen Export nicht auf
+function BB:IsGuildItem(id)
+  local o = BananaBankDB.saleOv and BananaBankDB.saleOv[id]
+  return (o and o.s == "g") and true or false
+end
+
 function BB:IsForSale(id)
+  if self:IsGuildItem(id) then return false end
   return (self:SaleOverride(id) or self:SaleAuto(id)) and true or false
 end
 
@@ -662,16 +669,25 @@ function BB:SaleRuleApplies(reqTs)
   return true
 end
 
-function BB:SetSale(id, on)
+-- state: "y" = zum Verkauf freigegeben, "g" = Gildenitem, "a" = Markierung zurueckgenommen
+function BB:SetSaleState(id, state)
   if not id or not self:IsBank() or not self:MayBeBank(self:Me()) then return false end
   local db = BananaBankDB
   db.saleOv = db.saleOv or {}
   local ts = time()
   local cur = db.saleOv[id]
   if cur and cur.ts >= ts then ts = cur.ts + 1 end
-  db.saleOv[id] = { s = on and "y" or "a", ts = ts, by = self:Me() }
+  db.saleOv[id] = { s = state, ts = ts, by = self:Me() }
   self:After(3, function() BB:PushSale() end, "salepush")
   return true
+end
+
+function BB:SetSale(id, on)
+  return self:SetSaleState(id, on and "y" or "a")
+end
+
+function BB:SetGuildItem(id, on)
+  return self:SetSaleState(id, on and "g" or "a")
 end
 
 function BB:SaleCount()
@@ -695,7 +711,7 @@ function BB:ParseSale(payload)
   for _, rec in ipairs(BB.Split(payload or "", ";")) do
     local f = BB.Split(rec, ":")
     local id, ts = tonumber(f[1]), tonumber(f[3])
-    if id and ts and (f[2] == "y" or f[2] == "a") and f[4] and f[4] ~= "" then
+    if id and ts and (f[2] == "y" or f[2] == "a" or f[2] == "g") and f[4] and f[4] ~= "" then
       table.insert(out, { id = id, s = f[2], ts = ts, by = f[4] })
     end
   end
@@ -743,12 +759,23 @@ function BB:PrintSale()
     local o = BananaBankDB.saleOv[list[i]]
     DEFAULT_CHAT_FRAME:AddMessage("  " .. self:ColoredName(list[i]) .. "  |cff999999(" .. tostring(o.by) .. ")|r")
   end
+  local gl = {}
+  for id, o in pairs(BananaBankDB.saleOv or {}) do
+    if o.s == "g" then table.insert(gl, id) end
+  end
+  table.sort(gl)
+  self:Print(string.format(self.T("GI_LIST_HEAD"), getn(gl)))
+  for i = 1, getn(gl) do
+    local o = BananaBankDB.saleOv[gl[i]]
+    DEFAULT_CHAT_FRAME:AddMessage("  " .. self:ColoredName(gl[i]) .. "  |cff999999(" .. tostring(o.by) .. ")|r")
+  end
 end
 
 -- ------------------------------------------------------------
 -- Export fuer die Pruefung der Verkaufsliste (PDF / HTML ausserhalb des Spiels)
 -- /bb export        = alle Items, die noch NICHT verkaufsfaehig sind
 -- /bb export sale   = alle verkaufsfaehigen Items (Kontrolle rueckwaerts)
+-- /bb export guild  = alle als Gildenitem markierten Items (Kontrolle)
 -- /bb export all    = alles
 -- Das Ergebnis steht in den SavedVariables (db.exportData) und liegt nach /reload in der Datei.
 -- ------------------------------------------------------------
@@ -798,7 +825,10 @@ function BB:ExportStart(mode)
   local ids = {}
   for id in pairs(stock) do
     local sale = self:IsForSale(id)
-    if mode == "all" or (mode == "sale" and sale) or (mode == "open" and not sale) then table.insert(ids, id) end
+    local gi = self:IsGuildItem(id)
+    if mode == "all" or (mode == "guild" and gi) or (mode == "sale" and sale) or (mode == "open" and not sale and not gi) then
+      table.insert(ids, id)
+    end
   end
   table.sort(ids)
   if getn(ids) == 0 then self:Print(self.T("EXP_NONE")) return end
@@ -836,7 +866,7 @@ function BB:ExportStep()
       end
       table.insert(job.items, {
         id = id, n = e.n or ("#" .. id), q = e.q or 1, c = e.c or 0, tex = e.t or "", k = k or "", s = s or "",
-        cr = e.cr or "", p = (self:GetPrice(id)) or 0, sale = self:IsForSale(id) and 1 or 0,
+        cr = e.cr or "", p = (self:GetPrice(id)) or 0, sale = self:IsForSale(id) and 1 or 0, gi = self:IsGuildItem(id) and 1 or 0,
         pa = ah.a or 0, pl = ah.lo or 0, pn = ah.n or 0, pts = ah.ts or 0, psrc = ah.src or "", pderived = ah.derived and 1 or 0,
         per = table.concat(per, ", "), tip = tip,
       })
@@ -852,28 +882,39 @@ function BB:ExportStep()
   self.exportJob = nil
 end
 
--- Import: Liste von Item-IDs. "123" gibt frei, "-123" nimmt die Freigabe zurueck. Nur Bank-Raenge.
+-- Import: Liste von Item-IDs.
+--   "123" = zum Verkauf freigeben      "-123"  = Freigabe zuruecknehmen
+--   "g123" = als Gildenitem markieren  "-g123" = Gildenitem-Markierung entfernen
+-- Nur Bank-Raenge.
 function BB:SaleImport(text)
   if not self:IsBank() or not self:MayBeBank(self:Me()) then
     self:Print("|cffff4040" .. self.T("ERR_NOT_BANK") .. "|r")
     return
   end
-  local on, off, skipped = 0, 0, 0
-  for tok in string.gfind(text or "", "%-?%d+") do
-    local id = tonumber(tok)
-    if id and id ~= 0 then
-      if id > 0 then
+  local on, off, gon, goff, skipped = 0, 0, 0, 0, 0
+  for tok in string.gfind(text or "", "%-?[gG]?%d+") do
+    local neg = (string.sub(tok, 1, 1) == "-")
+    local body = neg and string.sub(tok, 2) or tok
+    local guild = (string.find(body, "^[gG]") ~= nil)
+    if guild then body = string.sub(body, 2) end
+    local id = tonumber(body)
+    if id and id > 0 then
+      if guild and not neg then
+        if self:IsGuildItem(id) then skipped = skipped + 1
+        elseif self:SetGuildItem(id, true) then gon = gon + 1 end
+      elseif guild and neg then
+        if self:IsGuildItem(id) and self:SetGuildItem(id, false) then goff = goff + 1 else skipped = skipped + 1 end
+      elseif not neg then
         if self:IsForSale(id) then
           skipped = skipped + 1
         elseif self:SetSale(id, true) then
           on = on + 1
         end
       else
-        id = -id
         if self:SaleOverride(id) and self:SetSale(id, false) then off = off + 1 else skipped = skipped + 1 end
       end
     end
   end
-  self:Print(string.format(self.T("SALE_IMPORT_DONE"), on, off, skipped))
+  self:Print(string.format(self.T("SALE_IMPORT_DONE"), on, off, gon, goff, skipped))
   if self.UI then self.UI:Refresh() end
 end

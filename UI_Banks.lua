@@ -547,7 +547,10 @@ function UI:SaleMenu(slot)
     UIDropDownMenu_AddButton(title)
     local b = {}
     b.notCheckable = 1
-    if BB:SaleOverride(id) then
+    if BB:IsGuildItem(id) then
+      b.text = T("GI_NOSALE")
+      b.disabled = 1
+    elseif BB:SaleOverride(id) then
       b.text = T("SALE_MENU_OFF")
       b.func = function()
         BB:SetSale(id, false)
@@ -566,6 +569,25 @@ function UI:SaleMenu(slot)
       end
     end
     UIDropDownMenu_AddButton(b)
+    -- Gildenitem: bleibt fuer die Gilde, wird nicht angeboten und nicht mehr exportiert
+    local g = {}
+    g.notCheckable = 1
+    if BB:IsGuildItem(id) then
+      g.text = T("GI_MENU_OFF")
+      g.func = function()
+        BB:SetGuildItem(id, false)
+        BB:Print(string.format(T("GI_UNSET"), BB:ColoredName(id)))
+        UI:RefreshStock()
+      end
+    else
+      g.text = T("GI_MENU_ON")
+      g.func = function()
+        BB:SetGuildItem(id, true)
+        BB:Print(string.format(T("GI_SET"), BB:ColoredName(id)))
+        UI:RefreshStock()
+      end
+    end
+    UIDropDownMenu_AddButton(g)
   end, "MENU")
   ToggleDropDownMenu(1, nil, f, "cursor")
 end

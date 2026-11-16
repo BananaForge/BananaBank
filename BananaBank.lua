@@ -310,7 +310,7 @@ SlashCmdList["BANANABANK"] = function(msg)
     BB:Print("inboxwatch: " .. (BananaBankDB.noInboxWatch and "off" or "on"))
   elseif cmd == "export" then
     local m = restLower
-    if m == "sale" or m == "verkauf" then m = "sale" elseif m == "all" or m == "alle" then m = "all" else m = "open" end
+    if m == "sale" or m == "verkauf" then m = "sale" elseif m == "guild" or m == "gilde" then m = "guild" elseif m == "all" or m == "alle" then m = "all" else m = "open" end
     if BB.ExportStart then BB:ExportStart(m) end
   elseif cmd == "saleimport" then
     if rest ~= "" then BB:SaleImport(rest) elseif BB.UI.OpenSaleImport then BB.UI:OpenSaleImport() end
