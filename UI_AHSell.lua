@@ -329,12 +329,11 @@ function UI:BuildAHSell()
   f.l2:SetHeight(26)
   f.l2:SetJustifyV("TOP")
   f.rows = {}
-  f.offset = 0
   for i = 1, ROWS do
     local r = CreateFrame("Frame", nil, f)
     r:SetHeight(16)
     r:SetPoint("TOPLEFT", f, "TOPLEFT", 14, -90 - (i - 1) * ROW_H)
-    r:SetPoint("TOPRIGHT", f, "TOPRIGHT", -14, -90 - (i - 1) * ROW_H)
+    r:SetPoint("TOPRIGHT", f, "TOPRIGHT", -36, -90 - (i - 1) * ROW_H)
     r.chk = CreateFrame("CheckButton", nil, r, "UICheckButtonTemplate")
     r.chk:SetWidth(22)
     r.chk:SetHeight(22)
@@ -347,7 +346,7 @@ function UI:BuildAHSell()
     end)
     r.name = self:Font(r, 10, C.text)
     r.name:SetPoint("LEFT", r, "LEFT", 20, 0)
-    r.name:SetWidth(144)
+    r.name:SetWidth(124)
     r.name:SetHeight(12)
     r.val = self:Font(r, 10, C.gold)
     r.val:SetPoint("RIGHT", r, "RIGHT", 0, 0)
@@ -355,11 +354,22 @@ function UI:BuildAHSell()
     r.val:SetJustifyH("RIGHT")
     f.rows[i] = r
   end
-  f:EnableMouseWheel(true)
-  f:SetScript("OnMouseWheel", function()
-    this.offset = (this.offset or 0) - (arg1 or 0)
-    UI:RefreshAHSell()
+  -- Bildlaufleiste (die Zeilen sind Kinder des Fensters, der Rahmen liefert nur die Leiste und das Mausrad)
+  local sf = CreateFrame("ScrollFrame", "BananaBankAHScroll", f, "FauxScrollFrameTemplate")
+  sf:SetPoint("TOPLEFT", f, "TOPLEFT", 14, -90)
+  sf:SetPoint("BOTTOMRIGHT", f, "TOPRIGHT", -32, -90 - ROWS * ROW_H)
+  sf:SetScript("OnVerticalScroll", function()
+    FauxScrollFrame_OnVerticalScroll(ROW_H, function() UI:RefreshAHSell() end)
   end)
+  local function wheel()
+    local sb = getglobal("BananaBankAHScrollScrollBar")
+    if sb then sb:SetValue(sb:GetValue() - (arg1 or 0) * ROW_H) end
+  end
+  sf:EnableMouseWheel(true)
+  sf:SetScript("OnMouseWheel", wheel)
+  f:EnableMouseWheel(true)
+  f:SetScript("OnMouseWheel", wheel)
+  f.sf = sf
   f.more = self:Font(f, 10, C.muted)
   f.more:SetPoint("TOPLEFT", f, "TOPLEFT", 14, -92 - ROWS * 18)
   f.more:SetWidth(252)
@@ -409,7 +419,7 @@ function UI:RefreshAHSell()
       inBags = inBags + list[i].bags
     end
   end
-  f.l1:SetText(string.format(T("AHS_COUNT"), nsel, pieces, BB.Money(total)) .. "  |cff999999(" .. string.format(T("AHS_SELECTED"), nsel, getn(list)) .. ")|r")
+  f.l1:SetText(string.format(T("AHS_COUNT"), nsel, pieces, BB.Money(total)))
   local bankLeft = pieces - inBags
   local hint = string.format(T("AHS_RULE"), BB:AHKeep(), BB:AHKeepGold())
   local st = BB:AHStats()
@@ -419,12 +429,14 @@ function UI:RefreshAHSell()
   end
   if bankLeft > 0 then hint = string.format(T("AHS_IN_BANK"), bankLeft) .. " " .. hint end
   f.l2:SetText(hint)
-  local maxOff = math.max(0, getn(list) - ROWS)
-  if f.offset > maxOff then f.offset = maxOff end
-  if f.offset < 0 then f.offset = 0 end
+  local offset = 0
+  if f.sf and FauxScrollFrame_Update then
+    FauxScrollFrame_Update(f.sf, getn(list), ROWS, ROW_H)
+    offset = FauxScrollFrame_GetOffset(f.sf)
+  end
   for i = 1, ROWS do
     local r = f.rows[i]
-    local e = list[f.offset + i]
+    local e = list[offset + i]
     if e then
       local qc = BB.QUALITY_COLOR[e.q or 1] or BB.QUALITY_COLOR[1]
       r.id = e.id
@@ -438,7 +450,7 @@ function UI:RefreshAHSell()
       r:Hide()
     end
   end
-  if getn(list) > ROWS then f.more:SetText(string.format(T("AHS_MORE"), getn(list) - ROWS)) else f.more:SetText("") end
+  f.more:SetText(string.format(T("AHS_SELECTED"), nsel, getn(list)))
   local run = self.AH.run
   if run then
     f.go.fs:SetText(string.format(T("AHS_RUNNING"), run.posted, getn(run.queue)))

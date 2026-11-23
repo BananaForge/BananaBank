@@ -16,6 +16,7 @@ BananaBank only works in a guild that has a guild rank called **`Gildenbank`** (
 
 ## Features
 
+- **3.23.1:** the AH sale window has a visible scroll bar (plus mouse wheel) for long lists; the "N of M selected" line moved below the list so the header is no longer cut off.
 - **3.23.0:** **AH assistant with checkboxes.** Every line of the AH sale window has a checkbox (all ticked by default); only ticked items are posted ("Post selected") and fetched from the bank ("Fetch AH goods"). Buttons "Select all" / "Select none", the mouse wheel scrolls longer lists, the header shows "N of M selected" and the proceeds of the selection. Unticked items are greyed out.
 - **tools:** `bananabank_export.py html ... --preset "125,g2304,..."` pre-ticks decisions from a list (`id` = release, `gid` = guild item) and opens the page in the view "Nur angehakt"; new filter chip "Nur Verkauf". The page no longer stores anything in the browser (no cache mix-ups): ticks start from the preset, "Liste erstellen" saves the state as text, "Liste übernehmen" reads it back; no external fonts or requests; the header shows a file ID (creation time) to recognise old copies.
 - **3.22.2:** BananaActivity.lua version 5: the online count for the activity heatmap is dropped when the guild list is stale (own character missing, e.g. right after a guild change).
