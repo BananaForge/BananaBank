@@ -274,7 +274,7 @@ SlashCmdList["BANANABANK"] = function(msg)
     elseif what == "gold" and tonumber(num) then
       BananaBankDB.ahKeepGold = tonumber(num)
     end
-    local list, total = BB:AHCandidates()
+    local list, total = BB:AHCandidates(true)
     local pieces = 0
     for i = 1, table.getn(list) do pieces = pieces + list[i].sell end
     BB:Print(string.format(BB.T("AHS_COUNT"), table.getn(list), pieces, BB.Money(total)))

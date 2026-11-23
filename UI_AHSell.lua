@@ -50,9 +50,14 @@ function BB:SlotHogs()
   return n, kinds
 end
 
+-- Auswahl im Assistenten: standardmaessig ist alles markiert; abgewaehlte Items stehen in BB.ahSkip
+BB.ahSkip = BB.ahSkip or {}
+function BB:AHSelected(id) return not self.ahSkip[id] end
+
 -- Kandidaten fuers Auktionshaus: nicht stapelbar, Preis bekannt, mehr da als bleiben soll.
 -- { { id =, n =, q =, t =, price =, sell =, bags =, bank = } ... } und der geschaetzte Erloes
-function BB:AHCandidates()
+-- all = true: auch abgewaehlte Items (mit sel = false), sonst nur die markierten
+function BB:AHCandidates(all)
   local list, total = {}, 0
   local stock = self:GetStock()
   local bags = self:ScanContainers(BB.BAG_LIST)
@@ -71,9 +76,12 @@ function BB:AHCandidates()
         local surplus = avail - keep
         local sell = math.min(here, surplus)
         if sell > 0 then
-          table.insert(list, { id = id, n = e.n, q = e.q or 1, t = e.t, price = price, sell = sell,
-            bags = math.min(sell, (bags[id] and bags[id].c) or 0) })
-          total = total + price * sell
+          local sel = self:AHSelected(id)
+          if sel or all then
+            table.insert(list, { id = id, n = e.n, q = e.q or 1, t = e.t, price = price, sell = sell, sel = sel,
+              bags = math.min(sell, (bags[id] and bags[id].c) or 0) })
+            if sel then total = total + price * sell end
+          end
         end
       end
     end
@@ -280,13 +288,14 @@ end)
 -- Fenster neben dem Auktionshaus
 -- ------------------------------------------------------------
 local ROWS = 8
+local ROW_H = 18
 
 function UI:BuildAHSell()
   if self.ahWin then return end
   local f = CreateFrame("Frame", "BananaBankAHSell", UIParent)
   self.ahWin = f
   f:SetWidth(280)
-  f:SetHeight(112 + ROWS * 18 + 44)
+  f:SetHeight(112 + ROWS * 18 + 70)
   f:SetFrameStrata("DIALOG")
   f:SetToplevel(true)
   f:SetMovable(true)
@@ -320,25 +329,52 @@ function UI:BuildAHSell()
   f.l2:SetHeight(26)
   f.l2:SetJustifyV("TOP")
   f.rows = {}
+  f.offset = 0
   for i = 1, ROWS do
     local r = CreateFrame("Frame", nil, f)
     r:SetHeight(16)
-    r:SetPoint("TOPLEFT", f, "TOPLEFT", 14, -90 - (i - 1) * 18)
-    r:SetPoint("TOPRIGHT", f, "TOPRIGHT", -14, -90 - (i - 1) * 18)
+    r:SetPoint("TOPLEFT", f, "TOPLEFT", 14, -90 - (i - 1) * ROW_H)
+    r:SetPoint("TOPRIGHT", f, "TOPRIGHT", -14, -90 - (i - 1) * ROW_H)
+    r.chk = CreateFrame("CheckButton", nil, r, "UICheckButtonTemplate")
+    r.chk:SetWidth(22)
+    r.chk:SetHeight(22)
+    r.chk:SetPoint("LEFT", r, "LEFT", -4, 0)
+    r.chk:SetScript("OnClick", function()
+      local id = this:GetParent().id
+      if not id then return end
+      if this:GetChecked() then BB.ahSkip[id] = nil else BB.ahSkip[id] = true end
+      UI:RefreshAHSell()
+    end)
     r.name = self:Font(r, 10, C.text)
-    r.name:SetPoint("LEFT", r, "LEFT", 0, 0)
-    r.name:SetWidth(158)
+    r.name:SetPoint("LEFT", r, "LEFT", 20, 0)
+    r.name:SetWidth(144)
     r.name:SetHeight(12)
     r.val = self:Font(r, 10, C.gold)
     r.val:SetPoint("RIGHT", r, "RIGHT", 0, 0)
-    r.val:SetWidth(88)
+    r.val:SetWidth(84)
     r.val:SetJustifyH("RIGHT")
     f.rows[i] = r
   end
+  f:EnableMouseWheel(true)
+  f:SetScript("OnMouseWheel", function()
+    this.offset = (this.offset or 0) - (arg1 or 0)
+    UI:RefreshAHSell()
+  end)
   f.more = self:Font(f, 10, C.muted)
   f.more:SetPoint("TOPLEFT", f, "TOPLEFT", 14, -92 - ROWS * 18)
   f.more:SetWidth(252)
   f.more:SetHeight(12)
+  f.selAll = self:Button(f, 120, 20, "AHS_ALL", function()
+    BB.ahSkip = {}
+    UI:RefreshAHSell()
+  end, "flat")
+  f.selAll:SetPoint("BOTTOMLEFT", f, "BOTTOMLEFT", 14, 42)
+  f.selNone = self:Button(f, 120, 20, "AHS_NONE", function()
+    local list = BB:AHCandidates(true)
+    for i = 1, getn(list) do BB.ahSkip[list[i].id] = true end
+    UI:RefreshAHSell()
+  end, "flat")
+  f.selNone:SetPoint("LEFT", f.selAll, "RIGHT", 12, 0)
   f.go = self:Button(f, 252, 24, "", function()
     if UI.AH.run then UI:AHStop() else UI:AHStart() end
   end, "primary")
@@ -352,7 +388,7 @@ function UI:RefreshAHSell()
     f:Hide()
     return
   end
-  local list, total = BB:AHCandidates()
+  local list, total = BB:AHCandidates(true)
   if getn(list) == 0 and not self.AH.run then
     f:Hide()
     return
@@ -365,12 +401,15 @@ function UI:RefreshAHSell()
       f:SetPoint("TOPRIGHT", UIParent, "TOPRIGHT", -60, -260)
     end
   end
-  local pieces, inBags = 0, 0
+  local pieces, inBags, nsel, psel = 0, 0, 0, 0
   for i = 1, getn(list) do
-    pieces = pieces + list[i].sell
-    inBags = inBags + list[i].bags
+    if list[i].sel then
+      nsel = nsel + 1
+      pieces = pieces + list[i].sell
+      inBags = inBags + list[i].bags
+    end
   end
-  f.l1:SetText(string.format(T("AHS_COUNT"), getn(list), pieces, BB.Money(total)))
+  f.l1:SetText(string.format(T("AHS_COUNT"), nsel, pieces, BB.Money(total)) .. "  |cff999999(" .. string.format(T("AHS_SELECTED"), nsel, getn(list)) .. ")|r")
   local bankLeft = pieces - inBags
   local hint = string.format(T("AHS_RULE"), BB:AHKeep(), BB:AHKeepGold())
   local st = BB:AHStats()
@@ -380,16 +419,22 @@ function UI:RefreshAHSell()
   end
   if bankLeft > 0 then hint = string.format(T("AHS_IN_BANK"), bankLeft) .. " " .. hint end
   f.l2:SetText(hint)
+  local maxOff = math.max(0, getn(list) - ROWS)
+  if f.offset > maxOff then f.offset = maxOff end
+  if f.offset < 0 then f.offset = 0 end
   for i = 1, ROWS do
     local r = f.rows[i]
-    local e = list[i]
+    local e = list[f.offset + i]
     if e then
       local qc = BB.QUALITY_COLOR[e.q or 1] or BB.QUALITY_COLOR[1]
+      r.id = e.id
+      r.chk:SetChecked(e.sel and 1 or nil)
       r.name:SetText((e.sell > 1 and (e.sell .. "x ") or "") .. (e.n or "?"))
-      r.name:SetTextColor(qc[1], qc[2], qc[3])
+      if e.sel then r.name:SetTextColor(qc[1], qc[2], qc[3]) else r.name:SetTextColor(0.5, 0.5, 0.5) end
       r.val:SetText(BB.Money(e.price))
       r:Show()
     else
+      r.id = nil
       r:Hide()
     end
   end
@@ -400,7 +445,7 @@ function UI:RefreshAHSell()
     f.go:SetOn(true)
   else
     f.go.fs:SetText(string.format(T("AHS_GO"), inBags))
-    f.go:SetOn(inBags > 0)
+    f.go:SetOn(inBags > 0 and nsel > 0)
   end
   f:Show()
 end
